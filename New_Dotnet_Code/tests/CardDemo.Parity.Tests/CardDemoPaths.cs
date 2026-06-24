@@ -10,10 +10,12 @@ public static class CardDemoPaths
     public static string LegacyAppRoot { get; } = Locate();
 
     public static string CopybookDir => Path.Combine(LegacyAppRoot, "app", "cpy");
+    public static string CblDir => Path.Combine(LegacyAppRoot, "app", "cbl");
     public static string EbcdicDataDir => Path.Combine(LegacyAppRoot, "app", "data", "EBCDIC");
     public static string AsciiDataDir => Path.Combine(LegacyAppRoot, "app", "data", "ASCII");
 
     public static string Copybook(string name) => Path.Combine(CopybookDir, name);
+    public static string Program(string fileName) => Path.Combine(CblDir, fileName);
     public static string EbcdicData(string name) => Path.Combine(EbcdicDataDir, name);
     public static string AsciiData(string name) => Path.Combine(AsciiDataDir, name);
 

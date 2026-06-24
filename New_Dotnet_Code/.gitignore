@@ -1,0 +1,13 @@
+# .NET build output
+bin/
+obj/
+
+# Rider/VS
+.vs/
+.idea/
+*.user
+
+# Local SQLite databases (data is bootstrapped from the EBCDIC source of truth)
+*.db
+*.db-shm
+*.db-wal

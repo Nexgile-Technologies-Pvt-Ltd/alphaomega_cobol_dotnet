@@ -37,6 +37,18 @@ public sealed class CardDemoDatabase : IDisposable
         return new VsamFile(Connection, def);
     }
 
+    /// <summary>Creates the table for a QSAM sequential file and returns its accessor.</summary>
+    public SequentialFile DefineSequentialFile(string name, int recordLength)
+    {
+        Execute($"""
+            CREATE TABLE IF NOT EXISTS "{name}" (
+                seq   INTEGER PRIMARY KEY,
+                image BLOB NOT NULL
+            );
+            """);
+        return new SequentialFile(Connection, name, recordLength);
+    }
+
     private void Execute(string sql)
     {
         using SqliteCommand cmd = Connection.CreateCommand();

@@ -210,7 +210,7 @@ public sealed class Cbact04cInterestCalculator(Cbact04cContext ctx)
 
     private string ReadDiscGrp(string groupId, string typeCd, decimal catCd)
     {
-        FixedRecord keyRec = FixedRecord.CreateBlank(_ctx.DiscGrpLayout)
+        FixedRecord keyRec = FixedRecord.CreateBlank(_ctx.DiscGrpLayout, _ctx.Host)
             .SetText("DIS-ACCT-GROUP-ID", groupId)
             .SetText("DIS-TRAN-TYPE-CD", typeCd)
             .SetNumber("DIS-TRAN-CAT-CD", catCd);
@@ -237,16 +237,17 @@ public sealed class Cbact04cInterestCalculator(Cbact04cContext ctx)
     private void WriteB1300Tx()
     {
         _wsTranidSuffix++;                                              // ADD 1 TO WS-TRANID-SUFFIX
-        FixedRecord tran = FixedRecord.CreateBlank(_ctx.TranLayout);
+        FixedRecord tran = FixedRecord.CreateBlank(_ctx.TranLayout, _ctx.Host);
 
         // STRING PARM-DATE, WS-TRANID-SUFFIX DELIMITED BY SIZE INTO TRAN-ID
-        tran.SetText("TRAN-ID", _ctx.ParmDate.PadRight(10).Substring(0, 10) + _wsTranidSuffix.ToString("D6"));
+        tran.StringInto("TRAN-ID", _ctx.ParmDate.PadRight(10).Substring(0, 10) + _wsTranidSuffix.ToString("D6"));
         tran.SetText("TRAN-TYPE-CD", "01");
         tran.SetNumber("TRAN-CAT-CD", 5m); // MOVE '05' to 9(4) -> unsigned integer 5 (0005)
         tran.SetText("TRAN-SOURCE", "System");
 
         string acctId = AcctIdText(_account!, "ACCT-ID");
-        tran.SetText("TRAN-DESC", "Int. for a/c " + acctId);            // STRING into X(100), rest spaces
+        // STRING 'Int. for a/c ', ACCT-ID INTO TRAN-DESC — only 24 bytes written; rest stays LOW-VALUES.
+        tran.StringInto("TRAN-DESC", "Int. for a/c " + acctId);
         tran.SetNumber("TRAN-AMT", _wsMonthlyInt);
         tran.SetNumber("TRAN-MERCHANT-ID", 0m);
         tran.SetText("TRAN-MERCHANT-NAME", "");

@@ -159,7 +159,7 @@ public class Cbact04cTests
 
     private static decimal? ReadRate(BootstrapResult boot, Layouts l, string groupId, string typeCd, decimal catCd)
     {
-        byte[] key = FixedRecord.CreateBlank(l.DiscGrp)
+        byte[] key = FixedRecord.CreateBlank(l.DiscGrp, Host)
             .SetText("DIS-ACCT-GROUP-ID", groupId)
             .SetText("DIS-TRAN-TYPE-CD", typeCd)
             .SetNumber("DIS-TRAN-CAT-CD", catCd)

@@ -13,8 +13,8 @@ public class NumericCodecTests
     [Fact]
     public void Zoned_decode_matches_observed_account_balance_both_hosts()
     {
-        // ASCII twin: "00000001940{"  (last byte '{' = +0 overpunch) -> +194.00
-        byte[] ascii = System.Text.Encoding.ASCII.GetBytes("00000001940{");
+        // GnuCOBOL ASCII positive: all plain digits -> +194.00 (S9(10)V99 = 12 digits)
+        byte[] ascii = System.Text.Encoding.ASCII.GetBytes("000000019400");
         Assert.Equal(194.00m, ZonedDecimalCodec.Decode(ascii, scale: 2, signed: true, HostKind.Ascii));
 
         // EBCDIC image: F0*7 F1 F9 F4 F0 C0  -> +194.00
@@ -46,7 +46,7 @@ public class NumericCodecTests
 
         var ascii = new byte[3];
         ZonedDecimalCodec.Encode(-5m, ascii, totalDigits: 3, scale: 0, signed: true, HostKind.Ascii);
-        Assert.Equal((byte)'N', ascii[2]); // negative overpunch for digit 5
+        Assert.Equal((byte)'u', ascii[2]); // GnuCOBOL ASCII negative: '0' + 5 + 0x40
     }
 
     [Fact]

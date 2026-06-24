@@ -48,3 +48,28 @@ public sealed class Cbact03cXrefPrinter(VsamFile xrefFile, RecordLayout xrefLayo
         return sysout;
     }
 }
+
+/// <summary>
+/// Faithful port of <c>CBCUS01C</c> — reads the customer file (KSDS) in key order and DISPLAYs each
+/// CUSTOMER-RECORD. Output is the SYSOUT (DISPLAY) stream.
+/// </summary>
+/// <remarks>Ported from <c>app/cbl/CBCUS01C.cbl</c>. Faithful quirk: each record is displayed TWICE —
+/// once in 1000-CUSTFILE-GET-NEXT (line 96) and again in the main loop (line 78). Reproduced, not fixed.</remarks>
+public sealed class Cbcus01cCustomerPrinter(VsamFile custFile, RecordLayout custLayout, HostKind host)
+{
+    public IReadOnlyList<string> Run()
+    {
+        _ = custLayout;
+        var sysout = new List<string> { "START OF EXECUTION OF PROGRAM CBCUS01C" };
+        custFile.StartBrowse();
+        while (custFile.ReadNext(out byte[]? image) == FileStatus.Ok)
+        {
+            string line = HostEncoding.For(host).GetString(image!);
+            sysout.Add(line); // DISPLAY in 1000-CUSTFILE-GET-NEXT (line 96)
+            sysout.Add(line); // DISPLAY in the main loop (line 78)
+        }
+        custFile.EndBrowse();
+        sysout.Add("END OF EXECUTION OF PROGRAM CBCUS01C");
+        return sysout;
+    }
+}

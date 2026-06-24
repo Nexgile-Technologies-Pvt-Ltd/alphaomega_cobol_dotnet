@@ -172,6 +172,38 @@ internal static class OracleCobolFixtures
            STOP RUN.
 ";
 
+    public const string LoadCust = @"       IDENTIFICATION DIVISION.
+       PROGRAM-ID. LOADCUST.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT IN-F  ASSIGN TO LDIN
+                  ORGANIZATION SEQUENTIAL.
+           SELECT OUT-F ASSIGN TO CUSTFILE
+                  ORGANIZATION INDEXED ACCESS SEQUENTIAL
+                  RECORD KEY IS O-KEY.
+       DATA DIVISION.
+       FILE SECTION.
+       FD IN-F.
+       01 IN-REC PIC X(500).
+       FD OUT-F.
+       01 OUT-REC.
+          05 O-KEY  PIC X(09).
+          05 FILLER PIC X(491).
+       WORKING-STORAGE SECTION.
+       01 WS-EOF PIC X VALUE 'N'.
+       PROCEDURE DIVISION.
+           OPEN INPUT IN-F
+           OPEN OUTPUT OUT-F
+           PERFORM UNTIL WS-EOF = 'Y'
+              READ IN-F AT END MOVE 'Y' TO WS-EOF
+                NOT AT END MOVE IN-REC TO OUT-REC WRITE OUT-REC
+              END-READ
+           END-PERFORM
+           CLOSE IN-F OUT-F
+           STOP RUN.
+";
+
     // Unloads the INDEXED TRANSACT file to a fixed sequential file in key order (for comparison).
     public const string UnloadTran = @"       IDENTIFICATION DIVISION.
        PROGRAM-ID. UNLDTRAN.

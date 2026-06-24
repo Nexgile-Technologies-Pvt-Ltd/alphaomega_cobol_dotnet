@@ -65,6 +65,31 @@ public class PrinterGoldenMasterTests
         AssertLinesEqual(cobol, dotnet);
     }
 
+    [Fact]
+    public void Cbcus01c_customer_printer_sysout_matches_gnucobol()
+    {
+        GnuCobolInstall? install = GnuCobolInstall.TryLocate();
+        if (install is null) return;
+
+        RecordLayout layout = Parse("CVCUS01Y.cpy");
+        string work = NewWork("cbcus01c");
+        byte[] ascii = ToAscii("AWS.M2.CARDDEMO.CUSTDATA.PS", layout);
+        File.WriteAllBytes(Path.Combine(work, "cust.seq"), ascii);
+
+        var h = new GnuCobolHarness(install);
+        CompileExeFile(h, work, "CBCUS01C", CardDemoPaths.Program("CBCUS01C.cbl"), [CardDemoPaths.CopybookDir]);
+        CompileExeSrc(h, work, "LOADCUST", OracleCobolFixtures.LoadCust);
+        RunOk(h, work, "LOADCUST", new() { ["LDIN"] = Path.Combine(work, "cust.seq"), ["CUSTFILE"] = Idx(work, "CUSTFILE") });
+        string[] cobol = Lines(RunCapture(h, work, "CBCUS01C", new() { ["CUSTFILE"] = Idx(work, "CUSTFILE") }));
+
+        using var db = new CardDemoDatabase();
+        VsamFile custFile = db.DefineFile(CardDemoFiles.Customer.Definition);
+        Load(custFile, ascii, 500);
+        IReadOnlyList<string> dotnet = new Cbcus01cCustomerPrinter(custFile, layout, Host).Run();
+
+        AssertLinesEqual(cobol, dotnet);
+    }
+
     // --- helpers ----------------------------------------------------------------------------------
 
     private static void AssertLinesEqual(string[] cobol, IReadOnlyList<string> dotnet)

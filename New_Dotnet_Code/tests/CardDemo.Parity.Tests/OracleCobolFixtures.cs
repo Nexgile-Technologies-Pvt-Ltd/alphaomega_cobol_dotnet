@@ -140,6 +140,39 @@ internal static class OracleCobolFixtures
            STOP RUN.
 ";
 
+    // Unloads the INDEXED TRANSACT file to a fixed sequential file in key order (for comparison).
+    public const string UnloadTran = @"       IDENTIFICATION DIVISION.
+       PROGRAM-ID. UNLDTRAN.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT IN-F  ASSIGN TO TRANFILE
+                  ORGANIZATION INDEXED ACCESS SEQUENTIAL
+                  RECORD KEY IS R-KEY.
+           SELECT OUT-F ASSIGN TO UNLOAD
+                  ORGANIZATION SEQUENTIAL.
+       DATA DIVISION.
+       FILE SECTION.
+       FD IN-F.
+       01 IN-REC.
+          05 R-KEY  PIC X(16).
+          05 FILLER PIC X(334).
+       FD OUT-F.
+       01 OUT-REC PIC X(350).
+       WORKING-STORAGE SECTION.
+       01 WS-EOF PIC X VALUE 'N'.
+       PROCEDURE DIVISION.
+           OPEN INPUT IN-F
+           OPEN OUTPUT OUT-F
+           PERFORM UNTIL WS-EOF = 'Y'
+              READ IN-F NEXT AT END MOVE 'Y' TO WS-EOF
+                NOT AT END MOVE IN-REC TO OUT-REC WRITE OUT-REC
+              END-READ
+           END-PERFORM
+           CLOSE IN-F OUT-F
+           STOP RUN.
+";
+
     // Driver: invokes CBACT04C exactly as JCL EXEC PGM=CBACT04C,PARM='2022071800' would.
     public const string RunB04 = @"       IDENTIFICATION DIVISION.
        PROGRAM-ID. RUNB04.

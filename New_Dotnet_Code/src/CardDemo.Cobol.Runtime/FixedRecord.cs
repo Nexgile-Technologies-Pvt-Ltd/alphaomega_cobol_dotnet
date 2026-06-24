@@ -69,6 +69,22 @@ public sealed class FixedRecord
     }
 
     /// <summary>
+    /// Creates a record with COBOL <c>INITIALIZE</c> semantics: alphanumeric fields become spaces and
+    /// numeric fields become zero. (Note: real INITIALIZE leaves FILLER unchanged; here FILLER is set to
+    /// spaces, which is immaterial to the fields the programs read back.)
+    /// </summary>
+    public static FixedRecord CreateInitialized(RecordLayout layout, HostKind host)
+    {
+        var values = new object?[layout.Fields.Count];
+        for (int i = 0; i < layout.Fields.Count; i++)
+        {
+            FieldDef f = layout.Fields[i];
+            values[i] = f.Category == CobolCategory.Alphanumeric ? new string(' ', f.Length) : (object)0m;
+        }
+        return new FixedRecord(layout, values, host);
+    }
+
+    /// <summary>
     /// MOVE into an alphanumeric field: left-justified, right-truncated, right-padded with spaces to the
     /// full field width (overwrites the whole field).
     /// </summary>

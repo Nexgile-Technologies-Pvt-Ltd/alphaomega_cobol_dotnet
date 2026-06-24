@@ -115,6 +115,13 @@ public sealed class VsamFile
         return (long)c.ExecuteScalar()!;
     }
 
+    /// <summary>Empties the file, modelling OPEN OUTPUT on an indexed file (DISP=NEW / define-and-load).</summary>
+    public void Clear()
+    {
+        using SqliteCommand c = Command($"DELETE FROM \"{_t}\"");
+        c.ExecuteNonQuery();
+    }
+
     private string ReadDirectional(bool forward, out byte[]? image)
     {
         string cmp;

@@ -26,10 +26,55 @@ public sealed class FixedRecord
     public decimal GetNumber(string name) => (decimal)GetValue(name)!;
 
     /// <summary>Raw decoded value of a field (string for alphanumeric, decimal for numeric).</summary>
-    public object? GetValue(string name)
+    public object? GetValue(string name) => _values[IndexOf(name)];
+
+    /// <summary>
+    /// Creates an all-spaces / zero record, modelling a freshly-initialised COBOL WORKING-STORAGE record:
+    /// alphanumeric fields are spaces, numeric fields are zero.
+    /// </summary>
+    public static FixedRecord CreateBlank(RecordLayout layout)
+    {
+        var values = new object?[layout.Fields.Count];
+        for (int i = 0; i < layout.Fields.Count; i++)
+        {
+            FieldDef f = layout.Fields[i];
+            values[i] = f.Category == CobolCategory.Alphanumeric ? new string(' ', f.Length) : 0m;
+        }
+        return new FixedRecord(layout, values);
+    }
+
+    /// <summary>
+    /// Stores text into an alphanumeric field with COBOL MOVE semantics: left-justified, right-truncated,
+    /// and right-padded with spaces to the field width.
+    /// </summary>
+    public FixedRecord SetText(string name, string value)
+    {
+        int i = IndexOf(name);
+        FieldDef f = Layout.Fields[i];
+        if (f.Category != CobolCategory.Alphanumeric)
+            throw new InvalidOperationException($"Field '{name}' is numeric; use SetNumber.");
+        _values[i] = value.Length >= f.Length ? value[..f.Length] : value.PadRight(f.Length, ' ');
+        return this;
+    }
+
+    /// <summary>
+    /// Stores a number into a numeric field with COBOL MOVE semantics: truncate-toward-zero to the field
+    /// scale and silent high-order overflow (unsigned fields keep the magnitude).
+    /// </summary>
+    public FixedRecord SetNumber(string name, decimal value)
+    {
+        int i = IndexOf(name);
+        FieldDef f = Layout.Fields[i];
+        if (f.Category != CobolCategory.Numeric)
+            throw new InvalidOperationException($"Field '{name}' is alphanumeric; use SetText.");
+        _values[i] = Decimals.Store(value, f.IntegerDigits, f.Scale, f.Signed);
+        return this;
+    }
+
+    private int IndexOf(string name)
     {
         for (int i = 0; i < Layout.Fields.Count; i++)
-            if (Layout.Fields[i].Name == name) return _values[i];
+            if (Layout.Fields[i].Name == name) return i;
         throw new KeyNotFoundException($"Field '{name}' not found in record '{Layout.Name}'.");
     }
 

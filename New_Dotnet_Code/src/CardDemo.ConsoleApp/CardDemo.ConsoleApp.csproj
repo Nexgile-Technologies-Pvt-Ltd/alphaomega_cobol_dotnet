@@ -3,6 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="..\CardDemo.Online\CardDemo.Online.csproj" />
     <ProjectReference Include="..\CardDemo.Batch\CardDemo.Batch.csproj" />
+    <ProjectReference Include="..\CardDemo.Data\CardDemo.Data.csproj" />
+    <ProjectReference Include="..\CardDemo.Import\CardDemo.Import.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\CardDemo.Cobol.Runtime\CardDemo.Cobol.Runtime.csproj" />
     <ProjectReference Include="..\..\src\CardDemo.Tooling\CardDemo.Tooling.csproj" />
     <ProjectReference Include="..\..\src\CardDemo.Batch\CardDemo.Batch.csproj" />
+    <ProjectReference Include="..\..\src\CardDemo.Online\CardDemo.Online.csproj" />
   </ItemGroup>
 
 </Project>

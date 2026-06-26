@@ -3,11 +3,21 @@
   <ItemGroup>
     <ProjectReference Include="..\CardDemo.Cobol.Runtime\CardDemo.Cobol.Runtime.csproj" />
     <ProjectReference Include="..\CardDemo.Records\CardDemo.Records.csproj" />
+    <ProjectReference Include="..\CardDemo.Domain\CardDemo.Domain.csproj" />
+    <ProjectReference Include="..\CardDemo.Tooling\CardDemo.Tooling.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.9" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+  </ItemGroup>
+
+  <!-- The authoritative DDL (_design/schema.sql) is embedded so RelationalDb can create the
+       schema regardless of the process working directory (tests, batch, online all share it). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\_design\schema.sql">
+      <LogicalName>CardDemo.Data.schema.sql</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <PropertyGroup>

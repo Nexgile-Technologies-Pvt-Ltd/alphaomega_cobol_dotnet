@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CardDemo.Domain\CardDemo.Domain.csproj" />
+    <ProjectReference Include="..\CardDemo.Data\CardDemo.Data.csproj" />
+    <ProjectReference Include="..\CardDemo.Cobol.Runtime\CardDemo.Cobol.Runtime.csproj" />
+    <ProjectReference Include="..\CardDemo.Tooling\CardDemo.Tooling.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

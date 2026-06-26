@@ -7,7 +7,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CardDemo.Batch", "src\CardDemo.Batch\CardDemo.Batch.csproj", "{60CB74FF-A2CC-47BC-958D-7F027BDD879D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CardDemo.Cobol.Runtime", "src\CardDemo.Cobol.Runtime\CardDemo.Cobol.Runtime.csproj", "{2703162F-7625-407D-8EE0-BFB246D4E465}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CardDemo.Runtime", "src\CardDemo.Runtime\CardDemo.Runtime.csproj", "{2703162F-7625-407D-8EE0-BFB246D4E465}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CardDemo.Utilities", "src\CardDemo.Utilities\CardDemo.Utilities.csproj", "{6A125FDA-D406-4AEA-9AA1-D31B2A5F971B}"
 EndProject

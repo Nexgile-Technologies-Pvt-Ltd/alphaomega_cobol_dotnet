@@ -1,5 +1,5 @@
 using System.Globalization;
-using CardDemo.Cobol.Runtime;
+using CardDemo.Runtime;
 using CardDemo.Domain;
 using CardDemo.Import;
 

@@ -1,9 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\CardDemo.Cobol.Runtime\CardDemo.Cobol.Runtime.csproj" />
-    <ProjectReference Include="..\CardDemo.Records\CardDemo.Records.csproj" />
+    <ProjectReference Include="..\CardDemo.Runtime\CardDemo.Runtime.csproj" />
+    <ProjectReference Include="..\CardDemo.Domain\CardDemo.Domain.csproj" />
     <ProjectReference Include="..\CardDemo.Data\CardDemo.Data.csproj" />
+    <ProjectReference Include="..\CardDemo.Import\CardDemo.Import.csproj" />
+    <ProjectReference Include="..\CardDemo.Tooling\CardDemo.Tooling.csproj" />
+    <ProjectReference Include="..\CardDemo.Batch\CardDemo.Batch.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

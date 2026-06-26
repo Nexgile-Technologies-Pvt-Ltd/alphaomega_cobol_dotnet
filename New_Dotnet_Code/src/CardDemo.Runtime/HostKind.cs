@@ -1,4 +1,4 @@
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>
 /// Identifies the byte representation of a fixed-width record image.

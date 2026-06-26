@@ -1,4 +1,4 @@
-using CardDemo.Cobol.Runtime;
+using CardDemo.Runtime;
 using Microsoft.Data.Sqlite;
 
 namespace CardDemo.Data;

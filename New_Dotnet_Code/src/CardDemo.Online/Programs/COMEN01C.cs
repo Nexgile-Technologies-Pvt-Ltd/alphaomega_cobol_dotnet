@@ -1,4 +1,4 @@
-using CardDemo.Cobol.Runtime;
+using CardDemo.Runtime;
 using CardDemo.Data;
 
 namespace CardDemo.Online.Programs;

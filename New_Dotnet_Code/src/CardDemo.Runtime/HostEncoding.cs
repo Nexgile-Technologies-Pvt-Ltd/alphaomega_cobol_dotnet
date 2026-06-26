@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>
 /// Provides the single-byte encodings used to translate the text (PIC X) portions of fixed-width

@@ -1,4 +1,4 @@
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>
 /// Models an abnormal termination: a batch <c>CALL 'CEE3ABD'</c> (e.g. ABCODE 999 in

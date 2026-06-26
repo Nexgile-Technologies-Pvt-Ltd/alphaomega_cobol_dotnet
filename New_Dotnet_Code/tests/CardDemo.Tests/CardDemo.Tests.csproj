@@ -22,9 +22,10 @@
     <ProjectReference Include="..\..\src\CardDemo.Domain\CardDemo.Domain.csproj" />
     <ProjectReference Include="..\..\src\CardDemo.Data\CardDemo.Data.csproj" />
     <ProjectReference Include="..\..\src\CardDemo.Import\CardDemo.Import.csproj" />
-    <ProjectReference Include="..\..\src\CardDemo.Cobol.Runtime\CardDemo.Cobol.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\CardDemo.Runtime\CardDemo.Runtime.csproj" />
     <ProjectReference Include="..\..\src\CardDemo.Tooling\CardDemo.Tooling.csproj" />
     <ProjectReference Include="..\..\src\CardDemo.Batch\CardDemo.Batch.csproj" />
+    <ProjectReference Include="..\..\src\CardDemo.JobControl\CardDemo.JobControl.csproj" />
     <ProjectReference Include="..\..\src\CardDemo.Online\CardDemo.Online.csproj" />
     <!-- Optional DB2 / IMS / MQ add-on modules (COBTUPDT, CBPAUP0C, COACCT01/CODATE01/COPAUA0C). -->
     <ProjectReference Include="..\..\src\CardDemo.Db2\CardDemo.Db2.csproj" />

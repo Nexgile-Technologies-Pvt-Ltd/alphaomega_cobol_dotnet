@@ -1,4 +1,4 @@
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>
 /// Encodes and decodes COBOL packed-decimal (USAGE COMP-3) fields: two digits per byte, with the

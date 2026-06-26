@@ -1,4 +1,4 @@
-using CardDemo.Cobol.Runtime;
+using CardDemo.Runtime;
 using CardDemo.Data;
 using CardDemo.Import;
 
@@ -11,7 +11,7 @@ namespace CardDemo.Batch;
 /// its repositories without every job re-wiring the data layer. Flat (non-table) sequential I/O — the
 /// QSAM datasets a job reads or writes that are not VSAM/relational masters — is handled by the
 /// <see cref="ReadFixedRecords"/> reader and the <see cref="FixedFileWriter"/> appender, both of which
-/// route field formatting through the <c>CardDemo.Cobol.Runtime</c> codecs so the bytes stay faithful.
+/// route field formatting through the <c>CardDemo.Runtime</c> codecs so the bytes stay faithful.
 /// </summary>
 /// <remarks>
 /// The repositories are created lazily on first access and cached, so a job touches only the tables it
@@ -176,7 +176,7 @@ public sealed class BatchSupport : IDisposable
 
 /// <summary>
 /// Appends fixed-width record images and host-encoded text lines to a flat output dataset — the writer
-/// side of a job's non-table QSAM I/O. Field formatting goes through the <c>CardDemo.Cobol.Runtime</c>
+/// side of a job's non-table QSAM I/O. Field formatting goes through the <c>CardDemo.Runtime</c>
 /// codecs so numbers land in the dataset exactly as the original program would have written them.
 /// </summary>
 /// <remarks>

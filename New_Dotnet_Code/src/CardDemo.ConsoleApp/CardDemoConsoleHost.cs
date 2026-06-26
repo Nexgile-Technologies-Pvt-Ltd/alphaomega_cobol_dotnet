@@ -1,4 +1,4 @@
-using CardDemo.Cobol.Runtime;
+using CardDemo.Runtime;
 using CardDemo.ConsoleApp.Maps;
 using CardDemo.Data;
 using CardDemo.Import;

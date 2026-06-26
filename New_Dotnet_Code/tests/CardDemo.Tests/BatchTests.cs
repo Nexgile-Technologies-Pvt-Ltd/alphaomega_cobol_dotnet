@@ -1,5 +1,5 @@
 using CardDemo.Batch;
-using CardDemo.Cobol.Runtime;
+using CardDemo.Runtime;
 using CardDemo.Data;
 using CardDemo.Domain;
 using CardDemo.Import;

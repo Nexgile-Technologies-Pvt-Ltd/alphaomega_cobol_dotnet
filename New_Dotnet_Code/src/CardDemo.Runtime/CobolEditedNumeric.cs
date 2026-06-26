@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>
 /// Formats a numeric value into a COBOL numeric-edited PICTURE (the kind used by report and screen

@@ -1,4 +1,4 @@
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>
 /// Implements COBOL fixed-point decimal semantics on top of <see cref="decimal"/>.

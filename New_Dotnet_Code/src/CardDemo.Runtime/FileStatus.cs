@@ -1,4 +1,4 @@
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>
 /// The two-character COBOL FILE STATUS values that CardDemo programs branch on literally

@@ -1,4 +1,4 @@
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>
 /// Single source of "now" for every COBOL <c>FUNCTION CURRENT-DATE</c> / CICS <c>ASKTIME</c> /

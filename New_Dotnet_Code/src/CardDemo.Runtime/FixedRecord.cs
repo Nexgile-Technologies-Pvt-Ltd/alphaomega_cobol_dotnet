@@ -1,4 +1,4 @@
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>
 /// A fixed-width record that can be decoded from a byte image or built up field-by-field, then

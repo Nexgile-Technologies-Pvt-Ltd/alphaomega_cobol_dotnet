@@ -1,5 +1,5 @@
 using System.Text;
-using CardDemo.Cobol.Runtime;
+using CardDemo.Runtime;
 using CardDemo.Data;
 using CardDemo.Domain;
 

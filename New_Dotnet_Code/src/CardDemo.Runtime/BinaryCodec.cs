@@ -1,4 +1,4 @@
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>
 /// Encodes and decodes COBOL binary (USAGE COMP / COMP-4 / BINARY) fields as big-endian two's

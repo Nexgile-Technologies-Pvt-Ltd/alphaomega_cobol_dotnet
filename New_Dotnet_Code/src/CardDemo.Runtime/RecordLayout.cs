@@ -1,4 +1,4 @@
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>COBOL data category of an elementary item.</summary>
 public enum CobolCategory

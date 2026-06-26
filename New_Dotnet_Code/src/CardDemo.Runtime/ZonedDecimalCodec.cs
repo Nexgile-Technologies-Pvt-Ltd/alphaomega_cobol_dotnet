@@ -1,4 +1,4 @@
-namespace CardDemo.Cobol.Runtime;
+namespace CardDemo.Runtime;
 
 /// <summary>
 /// Encodes and decodes COBOL zoned-decimal fields (USAGE DISPLAY numeric), where each digit occupies

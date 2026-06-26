@@ -31,9 +31,10 @@ namespace CardDemo.Batch;
 /// (<c>-ZZZ,ZZZ,ZZZ.ZZ</c> for detail, <c>+ZZZ,ZZZ,ZZZ.ZZ</c> for totals).</para>
 /// <para>FAITHFUL BUGS reproduced verbatim (see <c>_design/specs/CBTRN03C.md</c> §7):
 /// <list type="number">
-/// <item><b>Inverted date filter with <c>NEXT SENTENCE</c>:</b> an out-of-range record skips the rest of the
-/// loop body (no DISPLAY / lookups / detail / accumulation) and the loop simply iterates. Reproduced as a
-/// <c>continue</c> that skips processing of that record.</item>
+/// <item><b>Inverted date filter with <c>NEXT SENTENCE</c>:</b> the date range test sits inside one
+/// PERFORM UNTIL ... END-PERFORM sentence, so <c>NEXT SENTENCE</c> branches past the terminating period to
+/// 9000-TRANFILE-CLOSE — an out-of-range record TERMINATES the whole read loop (no further records, no
+/// page/grand totals) rather than skipping just that record. Reproduced as a <c>break</c>.</item>
 /// <item><b>Stale last-amount double-add:</b> at EOF the program adds the STALE last transaction's
 /// <c>TRAN-AMT</c> into the page &amp; account totals a SECOND time (the last real transaction's amount is
 /// added twice), inflating the final page total and grand total. NOT guarded — reproduced exactly.</item>
@@ -235,15 +236,17 @@ public sealed class Cbtrn03c
                     TranfileGetNext1000(); // source: CBTRN03C.cbl:172
 
                     // Date filter (lines 173-178): IF in-range CONTINUE ELSE NEXT SENTENCE.
-                    // FAITHFUL BUG #1: NEXT SENTENCE jumps past the period ending the whole PERFORM ...
-                    // END-PERFORM sentence, so an out-of-range record skips the rest of the loop body and
-                    // the loop iterates. (CONTINUE = fall through to process the in-range record.)
+                    // FAITHFUL BUG #1: the whole PERFORM UNTIL ... END-PERFORM is ONE sentence terminated by
+                    // the period on cbl:206, so NEXT SENTENCE (cbl:177) transfers control to the statement
+                    // after that period — 9000-TRANFILE-CLOSE (cbl:208). An out-of-range record therefore
+                    // TERMINATES the read loop entirely (it does NOT skip-and-continue): no page/grand totals
+                    // are written, processing jumps straight to the close paragraphs. Modelled as `break`.
                     string procDate = Substr(_tranRecord.ProcTs, 0, 10); // TRAN-PROC-TS (1:10)  // source: CBTRN03C.cbl:173-174
                     bool inRange =
                         string.CompareOrdinal(procDate, _wsStartDate) >= 0 &&
                         string.CompareOrdinal(procDate, _wsEndDate) <= 0;
                     if (!inRange)
-                        continue; // NEXT SENTENCE -> skip this (out-of-range) record, iterate the loop  // source: CBTRN03C.cbl:177,206
+                        break; // NEXT SENTENCE -> branch past END-PERFORM. to 9000-TRANFILE-CLOSE  // source: CBTRN03C.cbl:177,206,208
 
                     // IF END-OF-FILE = 'N' (a record was actually read, not EOF)  // source: CBTRN03C.cbl:179
                     if (!_endOfFile)

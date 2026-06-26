@@ -154,6 +154,10 @@ public sealed class Coactupc : ITransactionHandler
 
         // INITIALIZE CC-WORK-AREA, WS-MISC-STORAGE, WS-COMMAREA. :866-868 (WS starts clean each task)
         _map = BuildBmsMap();
+        // Capture the current date for this task up front. EDIT-DATE-OF-BIRTH (CSUTLDPY.cpy:343) does
+        // MOVE FUNCTION CURRENT-DATE at the moment of the check; the EDIT phase runs before 3100-SCREEN-INIT,
+        // so _now must be populated here (not only in 3100) for the DOB future-date test to use the real date.
+        _now = ctx.Clock.Now;
 
         // MOVE LIT-THISTRANID TO WS-TRANID. :872
         _wsTranId = LIT_THISTRANID;

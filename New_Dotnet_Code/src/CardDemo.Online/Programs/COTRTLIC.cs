@@ -1904,11 +1904,13 @@ public sealed class Cotrtlic : ITransactionHandler
         char up = Take(image, ref p, 1)[0]; _caUpdateFlag = up == 'Y' ? 'Y' : '\0';
     }
 
-    // The program tail is larger than the spare COMMAREA bytes; carry it via a side channel keyed on the
-    // COMMAREA so the pseudo-conversational state round-trips losslessly within a session.
+    // The COBOL reassembles WS-THIS-PROGCOMMAREA into the returned COMMAREA bytes (COTRTLIC.cbl:904-907); the
+    // console runtime round-trips only the 160-byte nav area (CardDemoCommArea), which cannot hold the larger
+    // (~426-byte) trailer, so — exactly like COACTUPC/COTRTUPC's ProgStateStore (documented boundary, spec §6) —
+    // it is carried via a side channel keyed on the FULL, content-stable nav-area image. Keying on the complete
+    // image (not a partial tuple of a few fields) is what makes the per-turn round-trip collision-free.
     private static readonly Dictionary<string, string> TailStore = new(StringComparer.Ordinal);
-    private string TailKey() =>
-        $"{_commArea.FromTranId}|{_commArea.UserId}|{_commArea.LastMap}|{_commArea.LastMapSet}";
+    private string TailKey() => _commArea.ToImage();
     private void StashTail(string image) => TailStore[TailKey()] = image;
     private string UnstashTail() => TailStore.TryGetValue(TailKey(), out string? v) ? v : "";
 

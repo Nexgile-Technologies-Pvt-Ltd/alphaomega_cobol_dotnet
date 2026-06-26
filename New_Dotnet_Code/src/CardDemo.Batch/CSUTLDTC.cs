@@ -362,10 +362,18 @@ public sealed class Csutldtc
             return Feedback.Error(FcNonNumericData, msgNo: 2520);
         }
 
-        // Range/calendar validation. CEEDAYS rejects an impossible calendar date with a bad-date-value
-        // condition; CardDemo's callers tolerate exactly this (the '2513' check). // CSUTLDPY.cpy:298, COTRN02C.cbl:400
+        // Range/calendar validation. CEEDAYS reports an impossible date by its SPECIFIC LE feedback condition,
+        // each with its own message number (the low halfword of the condition id): an out-of-range month is
+        // FC-INVALID-MONTH (0x09D5 = 2517), a year-in-era of zero is FC-YEAR-IN-ERA-ZERO (0x09D9 = 2521), and
+        // any other bad day-of-month / value (e.g. 2023-02-29, 2023-04-31, day 00) is FC-BAD-DATE-VALUE
+        // (0x09CC = 2508, verdict "Datevalue error"). CardDemo's callers tolerate ONLY FC-UNSUPP-RANGE (2513);
+        // every other non-zero condition is an invalid-date rejection. // CSUTLDTC.cbl:62-70,133-148
         if (!IsValidCalendarDate(year, month, day))
-            return Feedback.Error(FcBadDateValue, msgNo: 2513);
+        {
+            if (month < 1 || month > 12) return Feedback.Error(FcInvalidMonth, msgNo: 2517);
+            if (year < 1)                return Feedback.Error(FcYearInEraZero, msgNo: 2521);
+            return Feedback.Error(FcBadDateValue, msgNo: 2508);
+        }
 
         // Valid date: CEEDAYS returns the all-zero (success) token. The Lillian day number is computed but
         // the caller never reads it (faithful bug #4); compute a faithful value anyway.

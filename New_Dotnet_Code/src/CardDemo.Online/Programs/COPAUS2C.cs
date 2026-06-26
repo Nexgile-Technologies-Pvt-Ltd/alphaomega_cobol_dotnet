@@ -183,9 +183,10 @@ public sealed class Copaus2c
     {
         // EXEC SQL UPDATE CARDDEMO.AUTHFRDS SET AUTH_FRAUD=:AUTH-FRAUD, FRAUD_RPT_DATE=CURRENT DATE
         //          WHERE CARD_NUM=:CARD-NUM AND AUTH_TS=TIMESTAMP_FORMAT(:AUTH-TS,...). source: :222-229
-        // The repository UPDATE rewrites all non-key columns by PK; only AUTH_FRAUD + FRAUD_RPT_DATE differ
-        // from the existing row's data in practice, and the PK (CARD_NUM, AUTH_TS) is preserved.
-        string updStatus = _authFrds.Update(row);
+        // COBOL sets ONLY the two fraud columns; every other existing DB column value is preserved. Use the
+        // targeted repository update (NOT the all-columns Update, which would overwrite the stored row with
+        // the COMMAREA image).
+        string updStatus = _authFrds.UpdateFraudFlag(row.CardNum, row.AuthTs, row.AuthFraudInd, row.FraudRptDate);
         if (updStatus == FileStatus.Ok)
         {
             // SQLCODE = ZERO. source: :230-232

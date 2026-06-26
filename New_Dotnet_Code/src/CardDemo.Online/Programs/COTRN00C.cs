@@ -450,7 +450,9 @@ public sealed class Cotrn00c : ITransactionHandler
             EndbrTransactFile();                 // PERFORM ENDBR-TRANSACT-FILE. source: :322
 
             // MOVE CDEMO-CT00-PAGE-NUM TO PAGENUMI; MOVE SPACE TO TRNIDINO; PERFORM SEND. source: :324-326
-            _map.Field("PAGENUM").SetValue(_ct00PageNum.ToString(), setMdt: false);
+            // CDEMO-CT00-PAGE-NUM PIC 9(08) -> PAGENUMI PIC X(8): a numeric-to-alphanumeric MOVE copies the
+            // 8 zoned digits, so page 1 renders as "00000001" (zero-filled), not "1".
+            _map.Field("PAGENUM").SetValue(_ct00PageNum.ToString("D8"), setMdt: false);
             _map.Field("TRNIDIN").SetValue(" ", setMdt: false);
             SendTrnlstScreen(ctx);
         }
@@ -506,7 +508,9 @@ public sealed class Cotrn00c : ITransactionHandler
             EndbrTransactFile();                 // PERFORM ENDBR-TRANSACT-FILE. source: :371
 
             // MOVE CDEMO-CT00-PAGE-NUM TO PAGENUMI; PERFORM SEND. source: :373-374
-            _map.Field("PAGENUM").SetValue(_ct00PageNum.ToString(), setMdt: false);
+            // CDEMO-CT00-PAGE-NUM PIC 9(08) -> PAGENUMI PIC X(8): a numeric-to-alphanumeric MOVE copies the
+            // 8 zoned digits, so page 1 renders as "00000001" (zero-filled), not "1".
+            _map.Field("PAGENUM").SetValue(_ct00PageNum.ToString("D8"), setMdt: false);
             SendTrnlstScreen(ctx);
         }
     }

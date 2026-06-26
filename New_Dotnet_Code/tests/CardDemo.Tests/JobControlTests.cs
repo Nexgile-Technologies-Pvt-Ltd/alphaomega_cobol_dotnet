@@ -444,6 +444,8 @@ public sealed class JobControlTests
     {
         Assert.True(OnlineConfigJobs.IsOnlineConfig("CBADMCDJ"));
         Assert.True(OnlineConfigJobs.IsOnlineConfig("DUSRSECJ"));
+        Assert.True(OnlineConfigJobs.IsOnlineConfig("DALYREJS")); // GDG-define, modeled by GdgManager.Define.
+        Assert.True(OnlineConfigJobs.IsOnlineConfig("REPTFILE")); // GDG-define, modeled by GdgManager.Define.
         Assert.False(OnlineConfigJobs.IsOnlineConfig("POSTTRAN")); // a real batch job, not online-config.
         Assert.NotEmpty(OnlineConfigJobs.All);
         Assert.All(OnlineConfigJobs.All, j => Assert.False(string.IsNullOrWhiteSpace(j.Reason)));

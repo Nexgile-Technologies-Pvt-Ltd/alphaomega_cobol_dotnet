@@ -519,10 +519,11 @@ public sealed class BatchTests
     // =================================================================================================
 
     /// <summary>
-    /// CSUTLDTC validates a known good date (2024-02-29, a real leap day) and a known bad date (2023-02-29,
-    /// not a leap year). A good date returns severity 0 and the verdict "Date is valid"; a bad date returns
-    /// severity 3 and "Datevalue error" (message 2513), which is exactly the condition the CardDemo callers
-    /// branch on.
+    /// CSUTLDTC validates a known good date (2024-02-29, a real leap day) and known bad dates. A good date
+    /// returns severity 0 and the verdict "Date is valid". CEEDAYS reports each invalid date by its specific
+    /// LE condition: a bad day-of-month (2023-02-29, non-leap) is FC-BAD-DATE-VALUE "Datevalue error"
+    /// message 2508; an out-of-range month (2023-00-15) is FC-INVALID-MONTH "Invalid month" message 2517.
+    /// CardDemo callers tolerate only message 2513 (FC-UNSUPP-RANGE), so both of these are rejected.
     /// </summary>
     [Fact]
     public void Csutldtc_ValidatesGoodAndBadDates()
@@ -533,12 +534,19 @@ public sealed class BatchTests
         Assert.Equal("0000", goodMsg[..4]);          // bytes 1-4 = severity (callers test '0000')
         Assert.Contains("Date is valid", goodMsg);
 
-        // Bad date — Feb 29 in a non-leap year.
+        // Bad date — Feb 29 in a non-leap year => FC-BAD-DATE-VALUE, message 2508 ("Datevalue error").
         Csutldtc bad = Csutldtc.Run("2023-02-29", "YYYY-MM-DD", out string badMsg, out int badRc);
         Assert.Equal(3, badRc);                      // LE error severity
         Assert.Equal("0003", badMsg[..4]);
-        Assert.Equal("2513", badMsg.Substring(15, 4)); // bytes 16-19 = message number
+        Assert.Equal("2508", badMsg.Substring(15, 4)); // bytes 16-19 = message number (0x09CC)
         Assert.Contains("Datevalue error", badMsg);
+        Assert.NotEqual("2513", badMsg.Substring(15, 4)); // NOT the tolerated FC-UNSUPP-RANGE condition
+
+        // Out-of-range month => FC-INVALID-MONTH, message 2517 ("Invalid month").
+        Csutldtc badMonth = Csutldtc.Run("2023-00-15", "YYYY-MM-DD", out string badMonthMsg, out _);
+        Assert.Equal("0003", badMonthMsg[..4]);
+        Assert.Equal("2517", badMonthMsg.Substring(15, 4)); // 0x09D5
+        Assert.Contains("Invalid month", badMonthMsg);
 
         // The other shipped mask (YYYYMMDD) also validates a good date.
         Csutldtc good8 = Csutldtc.Run("20240229", "YYYYMMDD", out string good8Msg, out int good8Rc);

@@ -109,6 +109,23 @@ public sealed class AuthFraudRepository : RepositoryBase
         return c.ExecuteNonQuery() > 0 ? FileStatus.Ok : FileStatus.RecordNotFound;
     }
 
+    /// <summary>
+    /// Targeted fraud-flag update matching COBOL FRAUD-UPDATE (COPAUS2C.cbl:222-229): sets ONLY
+    /// <c>AUTH_FRAUD</c> and <c>FRAUD_RPT_DATE</c> by composite key, leaving every other existing column
+    /// value untouched. Returns '00' or '23'.
+    /// </summary>
+    public string UpdateFraudFlag(string cardNum, string authTs, string authFraud, string fraudRptDate)
+    {
+        using SqliteCommand c = Cmd(
+            $"UPDATE {Table} SET AUTH_FRAUD=@AUTH_FRAUD, FRAUD_RPT_DATE=@FRAUD_RPT_DATE " +
+            "WHERE CARD_NUM=@CARD_NUM AND AUTH_TS=@AUTH_TS");
+        c.Parameters.AddWithValue("@AUTH_FRAUD", authFraud);
+        c.Parameters.AddWithValue("@FRAUD_RPT_DATE", fraudRptDate);
+        c.Parameters.AddWithValue("@CARD_NUM", cardNum);
+        c.Parameters.AddWithValue("@AUTH_TS", authTs);
+        return c.ExecuteNonQuery() > 0 ? FileStatus.Ok : FileStatus.RecordNotFound;
+    }
+
     /// <summary>Deletes by composite key. Returns '00' or '23'.</summary>
     public string Delete(string cardNum, string authTs)
     {

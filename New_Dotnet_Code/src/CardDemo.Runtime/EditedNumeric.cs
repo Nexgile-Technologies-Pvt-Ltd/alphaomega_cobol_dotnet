@@ -18,6 +18,12 @@ public static class EditedNumeric
     /// <summary>Formats <paramref name="value"/> into <paramref name="picture"/>, returning a fixed-width string.</summary>
     public static string Format(decimal value, string picture)
     {
+        // COBOL PICTURE symbols are case-insensitive (the compiler folds them), so a lowercase
+        // edit picture such as "-zzzzzzz9.99" zero-suppresses exactly like "-ZZZZZZZ9.99".
+        // Normalise to upper case so the 'Z'/'9'/'CR'/'DB' handling below is case-agnostic.
+        // Insertion characters in numeric-edited pictures (+ - . , B 0 /) are unaffected by casing.
+        picture = picture.ToUpperInvariant();
+
         char sign = '\0';
         int start = 0;
         if (picture.Length > 0 && (picture[0] == '+' || picture[0] == '-')) { sign = picture[0]; start = 1; }

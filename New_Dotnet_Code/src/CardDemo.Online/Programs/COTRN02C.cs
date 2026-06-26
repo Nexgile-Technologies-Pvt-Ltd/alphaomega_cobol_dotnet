@@ -509,20 +509,33 @@ public sealed class Cotrn02c : ITransactionHandler
     /// <summary>
     /// CSUTLDTC LE date-validator stand-in (the program's <c>CALL 'CSUTLDTC' USING date, 'YYYY-MM-DD', RESULT</c>).
     /// Returns the 80-byte CSUTLDTC-RESULT image whose only fields the caller reads are CSUTLDTC-RESULT-SEV-CD
-    /// (bytes 1-4) and CSUTLDTC-RESULT-MSG-NUM (bytes 16-19): severity <c>'0000'</c> + message <c>'0000'</c>
-    /// for a valid date; severity <c>'0012'</c> + message <c>'2513'</c> (LE bad-date-value condition, the one
-    /// CardDemo tolerates) for any unparseable/invalid CCYY-MM-DD. The remaining bytes are spaces — the COBOL
-    /// branches on nothing else. // source: COTRN02C.cbl:393-407, CSUTLDTC.cbl:128-149
+    /// (bytes 1-4) and CSUTLDTC-RESULT-MSG-NUM (bytes 16-19). A valid date yields severity <c>'0000'</c> +
+    /// message <c>'0000'</c>. CEEDAYS reports each invalid date by its specific LE condition (severity 3): a bad
+    /// day-of-month/value -> FC-BAD-DATE-VALUE (msg 2508), an out-of-range month -> FC-INVALID-MONTH (2517), a
+    /// year-in-era of zero -> FC-YEAR-IN-ERA-ZERO (2521), non-numeric -> FC-NON-NUMERIC-DATA (2520). CardDemo
+    /// tolerates ONLY message 2513 (FC-UNSUPP-RANGE), so the caller's <c>IF MSG-NUM NOT = 2513</c> rejects each
+    /// of these. // source: COTRN02C.cbl:393-407, CSUTLDTC.cbl:62-70,128-149
     /// </summary>
     private static string Csutldtc(string date, string mask)
     {
-        bool valid = mask.TrimEnd() == "YYYY-MM-DD"
-            && DateTime.TryParseExact((date ?? "").Trim(), "yyyy-MM-dd",
-                CultureInfo.InvariantCulture, DateTimeStyles.None, out _);
-
+        string sev = "0003", msgNo;
+        string d = (date ?? "").Trim();
+        int y = 0, mo = 0, day = 0;
+        bool parsed = mask.TrimEnd() == "YYYY-MM-DD" && d.Length == 10 && d[4] == '-' && d[7] == '-'
+            && int.TryParse(d[..4], out y) & int.TryParse(d.Substring(5, 2), out mo) & int.TryParse(d.Substring(8, 2), out day);
+        if (parsed)
+        {
+            bool real = y is >= 1 and <= 9999 && mo is >= 1 and <= 12 && day >= 1 && day <= DateTime.DaysInMonth(y, mo);
+            if (real) { sev = "0000"; msgNo = "0000"; }
+            else if (mo < 1 || mo > 12) msgNo = "2517"; // FC-INVALID-MONTH
+            else if (y < 1)             msgNo = "2521"; // FC-YEAR-IN-ERA-ZERO
+            else                        msgNo = "2508"; // FC-BAD-DATE-VALUE ("Datevalue error")
+        }
+        else
+        {
+            msgNo = "2520"; // FC-NON-NUMERIC-DATA / unparseable CCYY-MM-DD
+        }
         // sev(4) + 'Mesg Code:' filler(11) + msg-no(4) + space + verdict... — only sev/msg-no are read.
-        string sev = valid ? "0000" : "0012";
-        string msgNo = valid ? "0000" : "2513";
         string image = sev + "Mesg Code: " + msgNo;
         return image.PadRight(80, ' ');
     }

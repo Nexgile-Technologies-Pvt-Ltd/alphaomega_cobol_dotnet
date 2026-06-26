@@ -23,6 +23,8 @@ public static class OnlineConfigJobs
         new("DEFGDGD", "DEFINE GENERATIONDATAGROUP for the daily GDG bases — modeled by GdgManager.Define, not a data job."),
         new("TRANIDX", "DEFINE ALTERNATEINDEX/PATH + BLDINDEX for the transaction AIX — a secondary query in the relational model."),
         new("ESDSRRDS", "VSAM ESDS/RRDS cluster definitions — no relational store (online/file infrastructure)."),
+        new("DALYREJS", "DEFINE GENERATIONDATAGROUP for AWS.M2.CARDDEMO.DALYREJS — modeled by GdgManager.Define (POSTTRAN creates the base)."),
+        new("REPTFILE", "DEFINE GENERATIONDATAGROUP for AWS.M2.CARDDEMO.TRANREPT — modeled by GdgManager.Define (TRANREPT creates the base)."),
     ];
 
     /// <summary>True if <paramref name="jclMember"/> is one of the online-config (skipped) members.</summary>

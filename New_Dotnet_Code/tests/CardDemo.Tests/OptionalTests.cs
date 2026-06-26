@@ -219,8 +219,11 @@ public sealed class OptionalTests
         Assert.Equal(FileStatus.RecordNotFound, details.ReadByKey(222, AuthKey(1), out _));
 
         // The totals report shows the reads/deletes (2 summaries read, 1 summary + 1 detail deleted).
-        Assert.Contains("# SUMMARY REC DELETED : 00000001", result.Sysout);
-        Assert.Contains("# DETAILS REC DELETED : 00000001", result.Sysout);
+        // IBM DISPLAY of the S9(8) COMP counters emits the 8 digit positions with NO leading sign/space byte
+        // (the sign is a trailing overpunch; the counters are non-negative), so the value abuts the ':' from
+        // the DISPLAY literal — "...DELETED :00000001", not "...DELETED : 00000001".
+        Assert.Contains("# SUMMARY REC DELETED :00000001", result.Sysout);
+        Assert.Contains("# DETAILS REC DELETED :00000001", result.Sysout);
     }
 
     // =================================================================================================

@@ -444,7 +444,9 @@ public sealed class Cousr00c : ITransactionHandler
             EndbrUserSecFile();                  // PERFORM ENDBR-USER-SEC-FILE. source: :325
 
             // MOVE CDEMO-CU00-PAGE-NUM TO PAGENUMI; MOVE SPACE TO USRIDINO; PERFORM SEND. source: :327-329
-            _map.Field("PAGENUM").SetValue(_cu00PageNum.ToString(), setMdt: false);
+            // CDEMO-CU00-PAGE-NUM PIC 9(08) -> PAGENUMI PIC X(8): the numeric-to-alphanumeric MOVE copies the
+            // 8 zoned digits left-justified, so page 1 renders as "00000001" (zero-filled), not "1".
+            _map.Field("PAGENUM").SetValue(_cu00PageNum.ToString("D8"), setMdt: false);
             _map.Field("USRIDIN").SetValue(" ", setMdt: false);
             SendUsrlstScreen(ctx);
         }
@@ -500,7 +502,8 @@ public sealed class Cousr00c : ITransactionHandler
             EndbrUserSecFile();                  // PERFORM ENDBR-USER-SEC-FILE. source: :374
 
             // MOVE CDEMO-CU00-PAGE-NUM TO PAGENUMI; PERFORM SEND. source: :376-377
-            _map.Field("PAGENUM").SetValue(_cu00PageNum.ToString(), setMdt: false);
+            // CDEMO-CU00-PAGE-NUM PIC 9(08) -> PAGENUMI PIC X(8): zero-filled 8-digit render (e.g. "00000002").
+            _map.Field("PAGENUM").SetValue(_cu00PageNum.ToString("D8"), setMdt: false);
             SendUsrlstScreen(ctx);
         }
     }
@@ -764,16 +767,22 @@ public sealed class Cousr00c : ITransactionHandler
     //  source: COUSR00C.cbl:66-75,114,141-144
     // =============================================================================================
     // COUSR00C never reads/writes CDEMO-CUSTOMER-INFO; the trailer is packed there so the paging state
-    // (USRID-FIRST/LAST, PAGE-NUM, NEXT-PAGE-FLG) round-trips losslessly each turn.
+    // (USRID-FIRST/LAST, PAGE-NUM, NEXT-PAGE-FLG, USR-SEL-FLG, USR-SELECTED) round-trips losslessly.
+    // CDEMO-CU00-INFO aliases CDEMO-CU02-INFO / CDEMO-CU03-INFO at identical physical COMMAREA bytes in the
+    // COBOL, so when a list row is selected ('U' -> COUSR02C update, 'D' -> COUSR03C delete) the XCTL hands
+    // that program the chosen user id via USR-SEL-FLG (byte 25) + USR-SELECTED (bytes 26-33). The pack layout
+    // below MUST match COUSR02C/COUSR03C Save/RestoreCuNNInfo or the selection is lost across the XCTL.
     // Pack layout into CustFName(25)+CustMName(25)+CustLName(25) = 75 bytes:
-    //   USRID-FIRST X(8) | USRID-LAST X(8) | PAGE-NUM 9(8) | NEXT X(1) | (spare).
+    //   USRID-FIRST X(8) | USRID-LAST X(8) | PAGE-NUM 9(8) | NEXT X(1) | SEL-FLG X(1) | USR-SELECTED X(8).
     private void SaveCu00Info()
     {
         string packed =
             PadX(_cu00UsridFirst, 8) +
             PadX(_cu00UsridLast, 8) +
             Zoned(_cu00PageNum, 8) +
-            (_cu00NextPageFlg == '\0' ? 'N' : _cu00NextPageFlg);
+            (_cu00NextPageFlg == '\0' ? 'N' : _cu00NextPageFlg) +
+            PadX(_cu00UsrSelFlg, 1) +
+            PadX(_cu00UsrSelected, 8);
         packed = PadX(packed, 75);
         _commArea.CustFName = packed.Substring(0, 25);
         _commArea.CustMName = packed.Substring(25, 25);
@@ -783,12 +792,14 @@ public sealed class Cousr00c : ITransactionHandler
     private void RestoreCu00Info()
     {
         string packed = PadX(_commArea.CustFName, 25) + PadX(_commArea.CustMName, 25) + PadX(_commArea.CustLName, 25);
-        if (packed.Length < 25) packed = PadX(packed, 75);
+        packed = PadX(packed, 75);
         _cu00UsridFirst = packed.Substring(0, 8).TrimEnd();
         _cu00UsridLast = packed.Substring(8, 8).TrimEnd();
         _cu00PageNum = (int)ParseLong(packed.Substring(16, 8));
         char nx = packed[24];
         _cu00NextPageFlg = nx == 'Y' ? 'Y' : 'N';
+        _cu00UsrSelFlg = packed.Substring(25, 1).TrimEnd();
+        _cu00UsrSelected = packed.Substring(26, 8).TrimEnd();
     }
 
     // =============================================================================================

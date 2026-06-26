@@ -839,12 +839,16 @@ public sealed class Copaus0c : ITransactionHandler
         else
         {
             // MOVE ZERO TO APPRCNTO DECLCNTO CREDBALO CASHBALO APPRAMTO DECLAMTO. source: :800-807
-            _map.Field("APPRCNT").SetValue("0", setMdt: false);
-            _map.Field("DECLCNT").SetValue("0", setMdt: false);
-            _map.Field("CREDBAL").SetValue("0", setMdt: false);
-            _map.Field("CASHBAL").SetValue("0", setMdt: false);
-            _map.Field("APPRAMT").SetValue("0", setMdt: false);
-            _map.Field("DECLAMT").SetValue("0", setMdt: false);
+            // The receiving BMS symbolic fields are alphanumeric (COPAU00.cpy: APPRCNTO/DECLCNTO PIC X(3),
+            // CREDBALO X(12), CASHBALO X(9), APPRAMTO/DECLAMTO X(10)). MOVE of the figurative constant ZERO
+            // into an alphanumeric item fills the ENTIRE field with character '0' (not a single '0'), so each
+            // field renders as its full width of '0's.
+            _map.Field("APPRCNT").SetValue(new string('0', 3), setMdt: false);
+            _map.Field("DECLCNT").SetValue(new string('0', 3), setMdt: false);
+            _map.Field("CREDBAL").SetValue(new string('0', 12), setMdt: false);
+            _map.Field("CASHBAL").SetValue(new string('0', 9), setMdt: false);
+            _map.Field("APPRAMT").SetValue(new string('0', 10), setMdt: false);
+            _map.Field("DECLAMT").SetValue(new string('0', 10), setMdt: false);
         }
     }
 

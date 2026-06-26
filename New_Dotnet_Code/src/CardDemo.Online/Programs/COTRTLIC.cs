@@ -1865,9 +1865,9 @@ public sealed class Cotrtlic : ITransactionHandler
         sb.Append(PadX(_caFirstTrCode, 2));
         sb.Append(DigitOrZero(_caScreenNum));
         sb.Append(DigitOrZero(_caLastPageDisplayed));
-        sb.Append(_caNextPageInd == '\0' ? ' ' : _caNextPageInd);
-        sb.Append(_caDeleteFlag == '\0' ? ' ' : _caDeleteFlag);
-        sb.Append(_caUpdateFlag == '\0' ? ' ' : _caUpdateFlag);
+        sb.Append(_caNextPageInd == '\0' ? '\0' : _caNextPageInd);
+        sb.Append(_caDeleteFlag == '\0' ? '\0' : _caDeleteFlag);
+        sb.Append(_caUpdateFlag == '\0' ? '\0' : _caUpdateFlag);
         string image = sb.ToString();
 
         // Store the variable-length tail image in the COMMAREA's unused customer-name slots (75 bytes is too
@@ -2170,8 +2170,8 @@ public sealed class Cotrtlic : ITransactionHandler
 
     /// <summary>Encodes a page-buffer slot: null (LOW-VALUES) -> all-0x00; populated -> padded text.</summary>
     private static string SlotImage(string? value, int width)
-        => value is null ? new string(' ', width) : PadX(value, width);
-    private static bool IsLowSlot(string code) => code.Length > 0 && code[0] == ' ';
+        => value is null ? new string('\0', width) : PadX(value, width);
+    private static bool IsLowSlot(string code) => code.Length > 0 && code[0] == '\0';
     private static string Take(string image, ref int p, int n)
     {
         if (p >= image.Length) { p += n; return new string(' ', n); }

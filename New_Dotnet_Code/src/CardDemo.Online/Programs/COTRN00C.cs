@@ -804,15 +804,21 @@ public sealed class Cotrn00c : ITransactionHandler
     // =============================================================================================
     // COTRN00C never reads/writes CDEMO-CUSTOMER-INFO; the trailer is packed there so the paging state
     // (TRNID-FIRST/LAST, PAGE-NUM, NEXT-PAGE-FLG, TRN-SEL-FLG/SELECTED) round-trips losslessly each turn.
+    // CDEMO-CT00-INFO and CDEMO-CT01-INFO alias identical physical COMMAREA bytes in the COBOL, so when a
+    // list row is selected ('S') and we XCTL to COTRN01C, that program reads TRN-SEL-FLG (byte 41) and
+    // TRN-SELECTED (bytes 42-57) from this same overlay to auto-display the chosen transaction. The pack
+    // layout below MUST match COTRN01C.SaveCt01Info/RestoreCt01Info exactly or the selection is lost.
     // Pack layout into CustFName(25)+CustMName(25)+CustLName(25) = 75 bytes:
-    //   TRNID-FIRST X(16) | TRNID-LAST X(16) | PAGE-NUM 9(8) | NEXT X(1) | (spare).
+    //   TRNID-FIRST X(16) | TRNID-LAST X(16) | PAGE-NUM 9(8) | NEXT X(1) | SEL-FLG X(1) | TRN-SELECTED X(16).
     private void SaveCt00Info()
     {
         string packed =
             PadX(_ct00TrnidFirst, 16) +
             PadX(_ct00TrnidLast, 16) +
             Zoned(_ct00PageNum, 8) +
-            (_ct00NextPageFlg == '\0' ? 'N' : _ct00NextPageFlg);
+            (_ct00NextPageFlg == '\0' ? 'N' : _ct00NextPageFlg) +
+            (string.IsNullOrEmpty(_ct00TrnSelFlg) ? " " : _ct00TrnSelFlg.Substring(0, 1)) +
+            PadX(_ct00TrnSelected, 16);
         packed = PadX(packed, 75);
         _commArea.CustFName = packed.Substring(0, 25);
         _commArea.CustMName = packed.Substring(25, 25);
@@ -822,12 +828,15 @@ public sealed class Cotrn00c : ITransactionHandler
     private void RestoreCt00Info()
     {
         string packed = PadX(_commArea.CustFName, 25) + PadX(_commArea.CustMName, 25) + PadX(_commArea.CustLName, 25);
-        if (packed.Length < 41) packed = PadX(packed, 75);
+        packed = PadX(packed, 75);
         _ct00TrnidFirst = packed.Substring(0, 16).TrimEnd();
         _ct00TrnidLast = packed.Substring(16, 16).TrimEnd();
         _ct00PageNum = (int)ParseLong(packed.Substring(32, 8));
         char nx = packed[40];
         _ct00NextPageFlg = nx == 'Y' ? 'Y' : 'N';
+        char sf = packed[41];
+        _ct00TrnSelFlg = sf == ' ' ? "" : sf.ToString();
+        _ct00TrnSelected = packed.Substring(42, 16).TrimEnd();
     }
 
     // =============================================================================================

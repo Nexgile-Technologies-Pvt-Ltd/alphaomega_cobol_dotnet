@@ -13,8 +13,9 @@ namespace CardDemo.Tests;
 /// real <see cref="Dispatcher"/> and a scripted <see cref="IScreenIo"/> that injects the keyed RECEIVE
 /// fields and records the SENT symbolic map. Covers (per the design note §4/§6 and the CSD routing spec):
 /// COSGN00C sign-on success XCTL routing (admin → COADM01C, user → COMEN01C) and its error branches
-/// (incl. the FB-1 blank-password-still-reads faithful bug); COMEN01C/COADM01C menu fan-out; a
-/// COUSR01C-add → COUSR02C-update CRUD round-trip over USRSEC; and COACTVWC reading a known account.
+/// (incl. the blank-password branch that sets WS-ERR-FLG and shows "Please enter Password" without
+/// reading USRSEC); COMEN01C/COADM01C menu fan-out; a COUSR01C-add → COUSR02C-update CRUD round-trip
+/// over USRSEC; and COACTVWC reading a known account.
 /// </summary>
 public sealed class OnlineTests
 {
@@ -181,11 +182,14 @@ public sealed class OnlineTests
     }
 
     [Fact]
-    public void Cosgn00c_blank_password_with_userid_shows_enter_password_message_FB1()
+    public void Cosgn00c_blank_password_with_userid_sets_errflag_shows_enter_password()
     {
-        // FB-1: the Password-blank branch does NOT set WS-ERR-FLG, so the program FALLS THROUGH and still
-        // PERFORMs READ-USER-SEC-FILE on a blank password. With a real user id but a blank password the read
-        // succeeds and the password compare fails -> "Wrong Password" overwrites "Please enter Password".
+        // COBOL COSGN00C.cbl:123-127 — the PASSWDI = SPACES/LOW-VALUES branch does MOVE 'Y' TO WS-ERR-FLG
+        // (identical to the User-ID branch), so the later IF NOT ERR-FLG-ON (cbl:138) is FALSE and
+        // READ-USER-SEC-FILE is SKIPPED. With a valid user id but a blank password the screen therefore shows
+        // the clean "Please enter Password ..." prompt — NOT "Wrong Password", and the user is NOT logged in.
+        // (An independent 7-track audit found the earlier port dropped this MOVE and invented a non-existent
+        // "FB-1 blank-password-still-reads" bug; this test now locks the COBOL-faithful behaviour.)
         using var db = SeededDb();
         var (usrId, _) = FindUser(db, admin: true);
         var screen = new ScriptedScreenIo
@@ -196,12 +200,13 @@ public sealed class OnlineTests
 
         CicsOutcome outcome = dispatcher.RunTurn("CC00", AidKey.Enter, NonColdCommArea());
 
-        // The faithful bug: a blank password still reads the file; the final message is the password mismatch,
-        // NOT a clean "Please enter Password" stop. This proves the fall-through (FB-1) is preserved.
+        // Err flag set -> no READ-USER-SEC-FILE -> the prompt stays "Please enter Password ...", no XCTL/login.
         Assert.Equal(CicsOutcomeKind.ReturnTransId, outcome.Kind);
         Assert.Equal("CC00", outcome.TransId);
-        Assert.Contains("Wrong Password", screen.LastSentMap!.Field("ERRMSG").Value);
-        // And the COMMAREA user id was set even though sign-on failed (FB-3).
+        Assert.Contains("Please enter Password", screen.LastSentMap!.Field("ERRMSG").Value);
+        Assert.DoesNotContain("Wrong Password", screen.LastSentMap!.Field("ERRMSG").Value);
+        // The unconditional MOVE FUNCTION UPPER-CASE(USERIDI) TO CDEMO-USER-ID after the EVALUATE still runs
+        // (faithful — set even on a validation failure). // source: COSGN00C.cbl:132-134
         Assert.Equal(usrId, outcome.CommArea!.UserId.TrimEnd());
     }
 
@@ -371,6 +376,84 @@ public sealed class OnlineTests
         Assert.NotNull(updated);
         Assert.Equal("Updated", updated!.LastName.TrimEnd());
         Assert.Equal("A", updated.UsrType.TrimEnd());
+    }
+
+    // ===============================================================================================
+    //  Selected-from-list XCTL carries the chosen key through the COMMAREA trailer (regression locks for
+    //  the COTRN00C / COUSR00C selected-key fixes found by the independent 7-track audit).
+    // ===============================================================================================
+
+    [Fact]
+    public void Cousr00c_select_user_xctls_to_update_carrying_selected_id()
+    {
+        // COUSR00C user list: typing 'U' next to a row XCTLs to COUSR02C (update). The chosen user id sits in
+        // the CDEMO-CU00-USR-SELECTED trailer field, which aliases CDEMO-CU02-USR-SELECTED at the same COMMAREA
+        // bytes, so COUSR02C auto-loads that user. The fix made COUSR00C.SaveCu00Info actually serialize
+        // USR-SEL-FLG (byte 25) + USR-SELECTED (bytes 26-33); without it COUSR02C opens blank.
+        using var db = SeededDb();
+        UserSecurity u = new UserSecurityRepository(db.Connection).ReadAll().First();
+        string usrId = u.UsrId.TrimEnd();
+
+        var ca = MenuCommArea(admin: true);
+        ca.SetReenter();
+        var screen = new ScriptedScreenIo
+        {
+            NextAid = AidKey.Enter,
+            OnReceive = map =>
+            {
+                map.Field("SEL0001").SetValue("U");     // type 'U' against row 1
+                map.Field("USRID01").SetValue(usrId);   // that row shows this user id
+            },
+        };
+
+        CicsOutcome outcome = NewDispatcher(db, screen).RunTurn("CU00", AidKey.Enter, ca);
+
+        Assert.Equal(CicsOutcomeKind.ReturnTransId, outcome.Kind);
+        Assert.Equal("CU02", outcome.TransId);                                     // XCTL'd to the update program
+        Assert.NotNull(screen.LastSentMap);
+        // The selected user id survived the trailer and COUSR02C auto-loaded it (USRIDIN populated).
+        Assert.Equal(usrId, screen.LastSentMap!.Field("USRIDIN").Value.TrimEnd());
+        Assert.Equal(u.FirstName.TrimEnd(), screen.LastSentMap.Field("FNAME").Value.TrimEnd());
+    }
+
+    [Fact]
+    public void Cotrn00c_select_transaction_xctls_to_detail_carrying_selected_id()
+    {
+        // COTRN00C transaction list: typing 'S' next to a row XCTLs to COTRN01C (detail view). The chosen
+        // tran id sits in the CDEMO-CT00-TRN-SELECTED trailer field, which aliases CDEMO-CT01-TRN-SELECTED at
+        // the same COMMAREA bytes, so COTRN01C auto-displays that transaction. The fix made
+        // COTRN00C.SaveCt00Info serialize TRN-SEL-FLG (byte 41) + TRN-SELECTED (bytes 42-57).
+        using var db = SeededDb();
+        // Transactions are not a seeded master (they arrive via posting), so insert one to select.
+        const string tranId = "0000000000000077";
+        var txns = new TransactionRepository(db.Connection);
+        Assert.Equal(FileStatus.Ok, txns.Insert(new Transaction
+        {
+            TranId = tranId, TypeCd = "01", CatCd = 1, Source = "POS", Desc = "TEST SELECT TXN",
+            Amt = 12.34m, MerchantId = 1, MerchantName = "ACME", MerchantCity = "ATL", MerchantZip = "30301",
+            CardNum = "4111111111111111", OrigTs = "2026-06-20-09.00.00.000000",
+            ProcTs = "2026-06-20-09.00.00.000000",
+        }));
+
+        var ca = MenuCommArea(admin: false);
+        ca.SetReenter();
+        var screen = new ScriptedScreenIo
+        {
+            NextAid = AidKey.Enter,
+            OnReceive = map =>
+            {
+                map.Field("SEL0001").SetValue("S");     // type 'S' against row 1
+                map.Field("TRNID01").SetValue(tranId);  // that row shows this tran id
+            },
+        };
+
+        CicsOutcome outcome = NewDispatcher(db, screen).RunTurn("CT00", AidKey.Enter, ca);
+
+        Assert.Equal(CicsOutcomeKind.ReturnTransId, outcome.Kind);
+        Assert.Equal("CT01", outcome.TransId);                                     // XCTL'd to the detail program
+        Assert.NotNull(screen.LastSentMap);
+        // The selected tran id survived the trailer and COTRN01C auto-loaded it into the search field.
+        Assert.Equal(tranId, screen.LastSentMap!.Field("TRNIDIN").Value.TrimEnd());
     }
 
     // ===============================================================================================

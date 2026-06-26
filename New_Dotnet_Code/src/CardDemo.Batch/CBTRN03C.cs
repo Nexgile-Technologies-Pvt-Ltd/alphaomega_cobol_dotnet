@@ -80,6 +80,12 @@ public sealed class Cbtrn03c
     // The card-sorted forward cursor over TRANSACTION (mirrors the upstream SORT by TRAN-CARD-NUM).
     private IEnumerator<Transaction>? _transactCursor;
 
+    // The DATEPARM date window captured for the TRANSACT.DALY pre-filter — see Execute / TranfileOpen0000.
+    // On the mainframe TRANFILE = TRANSACT.DALY, which the upstream SORT step has already date-filtered, so
+    // CBTRN03C only ever sees in-window records. Null = empty DATEPARM (no filter; the read loop never runs).
+    private string? _dalyStartDate;
+    private string? _dalyEndDate;
+
     // --- File-status fields (CBTRN03C lines 94-120) --------------------------------------------------
     private string _tranfileStatus = "00"; // TRANFILE-STATUS   // source: CBTRN03C.cbl:94-96
     private string _cardxrefStatus = "00"; // CARDXREF-STATUS   // source: CBTRN03C.cbl:99-101
@@ -214,6 +220,16 @@ public sealed class Cbtrn03c
         // OPEN OUTPUT REPORT-FILE -> create the report dataset fresh (DISP=NEW; delete an existing file).
         if (File.Exists(reportPath)) File.Delete(reportPath);
         _writer = BatchSupport.OpenWriter(reportPath, _host);
+
+        // TRANFILE on the mainframe is TRANSACT.DALY — the date-filtered, card-sorted output of the upstream
+        // SORT (TRANREPT.jcl STEP05R, INCLUDE COND on TRAN-PROC-TS(1:10)). Capture that window now so
+        // TranfileOpen0000 yields only the in-window records (the DALY contents). The in-program
+        // NEXT-SENTENCE date filter (faithful bug #1) therefore never trips on real input, exactly as on the
+        // mainframe where DALY is already pre-filtered. A null start date models an empty DATEPARM (no
+        // filter; the read loop never runs because 0550-DATEPARM-READ sets END-OF-FILE='Y').
+        _dalyStartDate = startDate is null ? null : Alpha(startDate, 10);
+        _dalyEndDate = startDate is null ? null : Alpha(endDate ?? "", 10);
+
         try
         {
             Display("START OF EXECUTION OF PROGRAM CBTRN03C"); // source: CBTRN03C.cbl:160
@@ -241,6 +257,9 @@ public sealed class Cbtrn03c
                     // after that period — 9000-TRANFILE-CLOSE (cbl:208). An out-of-range record therefore
                     // TERMINATES the read loop entirely (it does NOT skip-and-continue): no page/grand totals
                     // are written, processing jumps straight to the close paragraphs. Modelled as `break`.
+                    // NOTE: TRANFILE = TRANSACT.DALY is pre-filtered to this same window in TranfileOpen0000,
+                    // so on real input `inRange` is always true and this break is DORMANT — preserved for
+                    // fidelity but never fired, exactly as on the mainframe (the SORT removed out-of-window rows).
                     string procDate = Substr(_tranRecord.ProcTs, 0, 10); // TRAN-PROC-TS (1:10)  // source: CBTRN03C.cbl:173-174
                     bool inRange =
                         string.CompareOrdinal(procDate, _wsStartDate) >= 0 &&
@@ -549,9 +568,22 @@ public sealed class Cbtrn03c
     private void TranfileOpen0000()
     {
         _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBTRN03C.cbl:377
-        // OPEN INPUT TRANSACT-FILE -> build the forward cursor over TRANSACTION in card-number order
-        // (mirrors the upstream SORT BY TRAN-CARD-NUM in TRANREPT.jcl).  // source: CBTRN03C.cbl:378
-        _transactCursor = _transact.ReadAll()
+        // OPEN INPUT TRANSACT-FILE -> build the forward cursor over the TRANSACT.DALY contents: the
+        // TRANSACTION master date-filtered to the DATEPARM window (modelling TRANREPT.jcl STEP05R SORT
+        // INCLUDE COND on TRAN-PROC-TS(1:10)) then sorted by TRAN-CARD-NUM. Reading the pre-filtered DALY
+        // (rather than the raw master) is what keeps the in-program NEXT-SENTENCE date filter dormant —
+        // faithful to the mainframe, where CBTRN03C never sees an out-of-window record.  // source: CBTRN03C.cbl:378
+        IEnumerable<Transaction> daly = _transact.ReadAll();
+        if (_dalyStartDate is not null && _dalyEndDate is not null)
+        {
+            string lo = _dalyStartDate, hi = _dalyEndDate;
+            daly = daly.Where(t =>
+            {
+                string procDate = Substr(t.ProcTs, 0, 10); // TRAN-PROC-TS(1:10) = CCYY-MM-DD
+                return string.CompareOrdinal(procDate, lo) >= 0 && string.CompareOrdinal(procDate, hi) <= 0;
+            });
+        }
+        _transactCursor = daly
             .OrderBy(t => t.CardNum, StringComparer.Ordinal)
             .GetEnumerator();
         _tranfileStatus = FileStatus.Ok;

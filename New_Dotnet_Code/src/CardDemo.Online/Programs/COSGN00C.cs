@@ -165,8 +165,8 @@ public sealed class Cosgn00c : ITransactionHandler
         else if (IsSpacesOrLowValues(passwdi))
         {
             // WHEN PASSWDI = SPACES OR LOW-VALUES                           // source: COSGN00C.cbl:123
-            //     MOVE 'Y' TO WS-ERR-FLG   <-- NOTE: this MOVE is in the User-ID branch only.
-            //     The Password branch deliberately does NOT set WS-ERR-FLG (FB-1).
+            //     MOVE 'Y' TO WS-ERR-FLG                                    // source: COSGN00C.cbl:124
+            _errFlgOn = true;
             //     MOVE 'Please enter Password ...' TO WS-MESSAGE            // source: COSGN00C.cbl:125
             _wsMessage = "Please enter Password ...";
             //     MOVE -1 TO PASSWDL OF COSGN0AI                            // source: COSGN00C.cbl:126

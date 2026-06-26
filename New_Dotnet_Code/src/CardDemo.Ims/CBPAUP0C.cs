@@ -624,15 +624,15 @@ public sealed class Cbpaup0c
     // =================================================================================================
 
     /// <summary>
-    /// Renders an <c>S9(8) COMP</c> counter as IBM COBOL <c>DISPLAY</c> would: a leading sign position
-    /// (space for non-negative, '-' for negative) followed by 8 unsigned digits, zero-padded.
+    /// Renders an <c>S9(8) COMP</c> counter as IBM Enterprise COBOL <c>DISPLAY</c> would: exactly 8 digit
+    /// positions, zero-padded, with NO leading sign/space byte. IBM <c>DISPLAY</c> of a plain (non-edited)
+    /// signed numeric carries the sign as a trailing-digit overpunch, never a separate leading character.
+    /// Every <c>S9(8)</c> counter in this program only ever <c>ADD 1</c> from 0, so it is non-negative and
+    /// the trailing digit prints as the plain digit — e.g. value 1 -> "00000001" (matching SYSOUT byte-for-byte,
+    /// where any spacing before the value comes from the DISPLAY literal, not the rendered field).
     /// </summary>
     private static string DisplayS9_8(int value)
-    {
-        int magnitude = Math.Abs(value);
-        string digits = (magnitude % 100000000).ToString("D8", CultureInfo.InvariantCulture);
-        return (value < 0 ? "-" : " ") + digits;
-    }
+        => (Math.Abs(value) % 100000000).ToString("D8", CultureInfo.InvariantCulture);
 
     /// <summary>Renders a <c>9(05)</c> unsigned display field as 5 zero-padded digits.</summary>
     private static string Display9_5(int value)
@@ -643,16 +643,16 @@ public sealed class Cbpaup0c
         => (Math.Abs(value) % 100000000000L).ToString("D11", CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// Renders <c>PA-ACCT-ID</c> (S9(11) COMP-3) as DISPLAY would for a signed packed field: a leading
-    /// sign position (space / '-') and 11 unsigned digits. Used in the DEBUG and abend lines that DISPLAY
-    /// PA-ACCT-ID directly. A null io-area renders as the all-zero default.
+    /// Renders <c>PA-ACCT-ID</c> (<c>S9(11) COMP-3</c>) as IBM <c>DISPLAY</c> would for a plain signed packed
+    /// field: exactly 11 digit positions, zero-padded, with NO leading sign/space byte (the sign is a
+    /// trailing-digit overpunch, never a separate leading character). PA-ACCT-ID is a non-negative account
+    /// id, so it prints as 11 plain digits. Used in the DEBUG and abend lines that DISPLAY PA-ACCT-ID
+    /// directly; a null io-area renders as the all-zero default.
     /// </summary>
     private static string DisplayPaAcctId(PautSummary? summary)
     {
         long value = summary?.AcctId ?? 0L;
-        long magnitude = Math.Abs(value);
-        string digits = (magnitude % 100000000000L).ToString("D11", CultureInfo.InvariantCulture);
-        return (value < 0 ? "-" : " ") + digits;
+        return (Math.Abs(value) % 100000000000L).ToString("D11", CultureInfo.InvariantCulture);
     }
 }
 

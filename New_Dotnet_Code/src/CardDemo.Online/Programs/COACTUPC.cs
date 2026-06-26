@@ -1085,10 +1085,14 @@ public sealed class Coactupc : ITransactionHandler
                 _ca.AcctStatus = "\0";                    // MOVE LOW-VALUES TO CDEMO-ACCT-STATUS. :2631
             }
         }
-        // WHEN OTHER → ABEND '0001' "UNEXPECTED DATA SCENARIO". :2633-2640
+        // WHEN OTHER → MOVE '0001' TO ABEND-CODE (a display-only subfield of ABEND-DATA) then
+        // PERFORM ABEND-ROUTINE. :2633-2640
         else
         {
-            throw new AbendException("0001"); // ABEND-ROUTINE → ABEND ABCODE. :2633-2640, 4222-4224
+            // ABEND-ROUTINE (:4203-4224) SENDs ABEND-DATA (the '0001'/'UNEXPECTED DATA SCENARIO' panel — a
+            // text SEND not modeled by the console runtime) and then issues EXEC CICS ABEND ABCODE('9999').
+            // The actual observed CICS abend code is therefore '9999', NOT the displayed ABEND-CODE '0001'.
+            throw new AbendException("9999"); // EXEC CICS ABEND ABCODE('9999'). :4222-4224
         }
     }
 

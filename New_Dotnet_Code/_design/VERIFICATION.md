@@ -1,16 +1,19 @@
 # CardDemo COBOL → .NET 10 — Verification Report
 
 **Status: COMPLETE.** All **44** CardDemo COBOL programs converted to pure C#/.NET 10 over a relational
-SQLite schema. Zero COBOL anywhere in the solution. Full suite verified green **3 independent times**.
+SQLite schema. Zero COBOL anywhere in the solution. Full suite verified green multiple independent times.
 
-This report reflects a second, independent **5-workflow verification pass** (≈110 subagents) that
-re-audited the whole conversion and the remediation that followed it.
+This report reflects TWO independent multi-workflow verification passes: a first **5-workflow** pass
+(≈110 subagents) and then a second, fully independent **7-workflow** pass (≈64 subagents over all 44
+programs, each flagged discrepancy adversarially refuted). The second pass re-confirmed the no-COBOL,
+coverage, anti-hallucination and codec tracks as clean and surfaced a further round of fidelity defects
+(see **§ Second independent 7-track audit** below), all fixed.
 
 ## Build & test
 - `dotnet build CardDemo.sln -m:1` → **0 errors**. ~60 warnings, all the benign faithful-dead-code class
   (CS0414/CS0169/CS0649 = inert WORKING-STORAGE fields carried verbatim; CS1717 = faithful RESP2 self-moves;
   CS0162 = documented unreachable faithful branches). .NET 10.0.201, Microsoft.Data.Sqlite 10.0.9.
-- `dotnet test` (CardDemo.Tests) run **3×** → **74 passed / 0 failed / 0 skipped** every run (deterministic).
+- `dotnet test` (CardDemo.Tests) → **79 passed / 0 failed / 0 skipped**, deterministic across repeated runs.
 
 ## No-COBOL proof (requirement: zero COBOL code in `New_Dotnet_Code`) — INDEPENDENTLY RE-VERIFIED
 A 5-facet audit (embedded source, committed source files, toolchain, identifiers, binaries) → **all PASS**:
@@ -83,11 +86,46 @@ One flagged item was an adversarially-confirmed **false positive** (CSUTLDTC "fa
 numbers ARE derived from the COBOL FEEDBACK-CODE 88-levels). All "FAITHFUL/MINOR" programs with no escalated
 discrepancy carried only LOW documented-boundary/cosmetic notes.
 
-## Tests (77)
+## Second independent 7-track audit (re-run over all 44 programs)
+A fresh, fully independent pass — **7 blind tracks** (A no-COBOL ×3 facets, B coverage, C per-program fidelity
+for all 44 with adversarial refute, D anti-hallucination ×2 facets, E test quality, F codec byte-exactness,
+G completeness critic). Tracks **A / B / D / F PASSED clean** (zero COBOL; 44/44 ported with real logic; no
+stubs/fabrication; no float in money math; copybook/record layouts byte-exact). Track C confirmed the prior 6
+fixes hold and surfaced **8 further real discrepancies**, plus a re-review of 5 programs (whose first-pass
+reviewer failed to emit) found 1 more — **all FIXED:**
+1. **COSGN00C** [HIGH] blank-password branch dropped `MOVE 'Y' TO WS-ERR-FLG` (cbl:124) — it still ran
+   READ-USER-SEC-FILE, so a blank password showed "Wrong Password" or could log in on a blank stored pwd.
+   Now sets the err flag (skips the read; shows "Please enter Password"). A bogus "FB-1" comment was removed.
+2. **COTRN00C → COTRN01C** [HIGH] `SaveCt00Info` packed only 41 bytes, dropping `TRN-SEL-FLG`(41) +
+   `TRN-SELECTED`(42-57) that COTRN01C reads — "type S to view" lost the selected transaction across the XCTL.
+3. **COUSR00C → COUSR02C/COUSR03C** [HIGH] same class: `SaveCu00Info` omitted `USR-SEL-FLG`(25) +
+   `USR-SELECTED`(26-33), so selecting a user to update/delete lost the id across the XCTL. (Surfaced by the
+   COUSR02C re-review's interop flag, then cross-checked against the COBOL `CDEMO-CU00-INFO` layout.)
+4. **CBTRN03C** [HIGH] read the full TRANSACTION master, so its faithful NEXT-SENTENCE date filter truncated
+   the report at the first out-of-window row. The mainframe TRANFILE is `TRANSACT.DALY` (date-filtered +
+   card-sorted by the upstream SORT); the cursor now models DALY, so the NEXT-SENTENCE bug stays in code but
+   is **dormant** (never fires), exactly as on the host — the report covers all in-window rows with totals.
+5. **COACTUPC** [MED] WHEN-OTHER abend threw code "0001" (the display-only ABEND-CODE field); ABEND-ROUTINE
+   actually issues `EXEC CICS ABEND ABCODE('9999')`. Corrected to "9999".
+6. **CBPAUP0C** [MED ×2] `DISPLAY` of `S9(8) COMP` counters and `S9(11) COMP-3 PA-ACCT-ID` emitted a spurious
+   leading sign/space byte; IBM `DISPLAY` of a plain signed numeric carries the sign as a trailing overpunch
+   and no leading byte. The non-negative values now render as bare PICTURE-width digits, abutting the literal.
+7. **COUSR00C** [MED ×2] PF8/PF7 paging rendered `PAGENUM` via `ToString()` ("1") instead of the zoned
+   `9(08)→X(8)` value "00000001". Fixed to `ToString("D8")`, matching sibling COTRN00C.
+8. **COPAUS0C** [LOW] no-summary path used `SetValue("0")`; the BMS fields are `PIC X`, and `MOVE ZERO` to an
+   alphanumeric fills the whole field with '0' (e.g. CREDBAL → "000000000000"). Fixed to width-matched fills.
+
+Also fixed: **COTRTLIC.cs** carried **5 embedded NUL bytes** (corrupted `'\0'` escapes collapsed to raw
+`0x00`) flagged by the codec/critic tracks — de-corrupted to proper `\0` escapes (identical compiled value,
+clean ASCII source). COBTUPDT (whose reviewer never emitted, twice) was reviewed by hand and is FAITHFUL.
+
+## Tests (79)
 SchemaRoundTripTests, BatchTests (incl. CSUTLDTC 2508/2517 classification), OnlineTests, OptionalTests,
 JobControlTests (incl. CREASTMT statement job, UNLDPADB→LOADPADB round-trip job, UNLDGSAM GSAM job), and
 **RemediationTests** (CBSTM03A statement gen; PAUDBUNL→PAUDBLOD round-trip; DBUNLDGS GSAM byte-identity;
-EditedNumeric lowercase; CBTRN03C NEXT-SENTENCE termination; COPAUS2C targeted fraud update).
+EditedNumeric lowercase; COPAUS2C targeted fraud update). Second-audit regression locks: CBTRN03C DALY
+pre-filter (all in-window rows reported, out-of-window excluded, totals written); COSGN00C blank-password
+sets the err flag and skips the read; and the COTRN00C/COUSR00C selected-from-list keys survive the XCTL.
 
 ## Boundaries (documented, not gaps)
 - Verification is pure-.NET (per the no-COBOL directive): byte-exact schema round-trip + EXPORT/IMPORT
@@ -97,3 +135,9 @@ EditedNumeric lowercase; CBTRN03C NEXT-SENTENCE termination; COPAUS2C targeted f
   side store keyed on the full nav-area image — the console runtime round-trips only the 160-byte nav area.
 - The 5 newly-ported programs are exercised directly by tests AND wired into named JobControl sequences
   (CREASTMT, LOADPADB, UNLDPADB, UNLDGSAM), each with a job-level test.
+- **Online test breadth (Track E, documented gap, not a conversion defect):** the batch / JobControl /
+  IMS / MQ / DB2 spine and ~8 online handlers have direct behavioral coverage with specific oracles; the
+  remaining online CICS handlers (e.g. COACTUPC, COCRDLIC/SLC/UPC, COTRN02C, COBIL00C, CORPT00C, COUSR03C)
+  are covered by registry/routing wiring plus per-program source-vs-COBOL fidelity review (both audit passes)
+  rather than a driven screen-flow test each. Closing this fully means one scripted RECEIVE/SEND turn per
+  remaining handler; the ports themselves were read paragraph-by-paragraph against the COBOL in both audits.

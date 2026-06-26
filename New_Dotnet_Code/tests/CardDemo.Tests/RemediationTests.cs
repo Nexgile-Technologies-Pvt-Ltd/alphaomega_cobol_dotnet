@@ -329,19 +329,25 @@ public sealed class RemediationTests
     }
 
     // =================================================================================================
-    // 5. CBTRN03C — NEXT-SENTENCE terminates the loop at an out-of-range record (faithful bug #1).
+    // 5. CBTRN03C — TRANFILE = TRANSACT.DALY (date pre-filtered); the NEXT-SENTENCE bug stays in code but
+    //    never fires, so the report covers ALL in-window records (faithful to the mainframe data flow).
     // =================================================================================================
 
     /// <summary>
-    /// Three transactions on one card are read in card-sorted, then tran-id, order. The MIDDLE record's
-    /// TRAN-PROC-TS falls OUTSIDE the DATEPARM window, so CBTRN03C's inverted date filter executes
-    /// <c>NEXT SENTENCE</c> — which (because the whole read loop is one COBOL sentence) branches past the
-    /// loop terminator to 9000-TRANFILE-CLOSE. The first record is reported, but the record AFTER the
-    /// out-of-range one is NOT, and no page/grand totals are written (the EOF totalling branch is never
-    /// reached). This locks the just-applied NEXT-SENTENCE termination semantics.
+    /// On the mainframe CBTRN03C reads <c>TRANSACT.DALY</c> — the transaction master that the upstream
+    /// <c>TRANREPT.jcl</c> SORT step has already date-filtered (INCLUDE COND on <c>TRAN-PROC-TS(1:10)</c>)
+    /// and card-sorted. So CBTRN03C never sees an out-of-window record, its inverted in-program date filter
+    /// (faithful bug #1, the <c>NEXT SENTENCE</c> loop-terminator) is DORMANT, and the report covers every
+    /// in-window record with the EOF page/grand totals written.
+    /// <para>This test seeds three records on one card — #1 in-range, #2 OUT-of-range (before the window),
+    /// #3 in-range — into the master, then runs the report for the window. It asserts the port models the
+    /// DALY pre-filter: the out-of-window #2 is excluded, BOTH in-window records (#1 AND #3) are reported
+    /// (no premature truncation), and the grand total IS written. This locks the corrected input-source
+    /// behaviour found by the independent 7-track audit (the earlier version of this test wrongly asserted
+    /// the loop truncated at #2 — a scenario that cannot occur once the SORT pre-filter is modelled).</para>
     /// </summary>
     [Fact]
-    public void Cbtrn03c_NextSentence_TerminatesLoop_AtOutOfRangeRecord()
+    public void Cbtrn03c_DalyPreFilter_ReportsAllInWindow_ExcludesOutOfWindow()
     {
         using var db = EmptyDb();
 
@@ -364,14 +370,14 @@ public sealed class RemediationTests
         }));
 
         // Read order = OrderBy(CardNum) then (stable) tran_id ASC. All three share the card, so tran-id
-        // ordering decides: ...001 (in-range), ...002 (OUT-of-range), ...003 (in-range, after the break).
+        // ordering decides: ...001 (in-range), ...002 (OUT-of-range -> filtered out of DALY), ...003 (in-range).
         var txns = new TransactionRepository(db.Connection);
         Assert.Equal(FileStatus.Ok, txns.Insert(NewReportTxn("RPT0000000000001", cardNum, 100.00m,
             procTs: "2026-06-10-00.00.00.000000")));   // in range
         Assert.Equal(FileStatus.Ok, txns.Insert(NewReportTxn("RPT0000000000002", cardNum, 200.00m,
-            procTs: "2026-01-01-00.00.00.000000")));   // BEFORE start -> out of range -> NEXT SENTENCE
+            procTs: "2026-01-01-00.00.00.000000")));   // BEFORE start -> excluded by the DALY date pre-filter
         Assert.Equal(FileStatus.Ok, txns.Insert(NewReportTxn("RPT0000000000003", cardNum, 300.00m,
-            procTs: "2026-06-20-00.00.00.000000")));   // in range, but loop already terminated
+            procTs: "2026-06-20-00.00.00.000000")));   // in range -> reported (NOT truncated)
 
         string reportPath = TempFile("cbtrn03c.report");
         try
@@ -382,24 +388,23 @@ public sealed class RemediationTests
             Assert.Equal("START OF EXECUTION OF PROGRAM CBTRN03C", sysout[0]);
             Assert.Equal("END OF EXECUTION OF PROGRAM CBTRN03C", sysout[^1]);
 
-            // The DISPLAY trail shows the loop saw the first record and then the out-of-range one and
-            // stopped: there is NO DISPLAY for the third transaction (it was never read).
+            // The DISPLAY trail shows BOTH in-window records were read & processed; the out-of-window one
+            // was pre-filtered out of TRANSACT.DALY and never seen.
             Assert.Contains(sysout, l => l.Contains("RPT0000000000001"));
-            Assert.DoesNotContain(sysout, l => l.Contains("RPT0000000000003"));
+            Assert.Contains(sysout, l => l.Contains("RPT0000000000003"));
+            Assert.DoesNotContain(sysout, l => l.Contains("RPT0000000000002"));
 
             // Read the 133-byte fixed-width report back (CBTRN03C defaults to ASCII host encoding).
             string report = File.ReadAllText(reportPath);
 
-            // The first (in-range) record IS reported.
+            // BOTH in-window records ARE reported (no premature NEXT-SENTENCE truncation).
             Assert.Contains("RPT0000000000001", report);
-            // The record AFTER the out-of-range one is NOT reported (loop terminated at record #2).
-            Assert.DoesNotContain("RPT0000000000003", report);
-            // The out-of-range record itself never reaches the detail writer either.
+            Assert.Contains("RPT0000000000003", report);
+            // The out-of-window record is excluded by the DALY date pre-filter (never reaches the detail writer).
             Assert.DoesNotContain("RPT0000000000002", report);
-            // NEXT SENTENCE branches straight to the close paragraphs, so the EOF totalling branch (which
-            // is the ONLY writer of page + grand totals) never runs.
-            Assert.DoesNotContain("Grand Total", report);
-            Assert.DoesNotContain("Page Total", report);
+            // The read loop reaches natural EOF, so the EOF totalling branch runs and writes the totals.
+            Assert.Contains("Grand Total", report);
+            Assert.Contains("Page Total", report);
         }
         finally
         {

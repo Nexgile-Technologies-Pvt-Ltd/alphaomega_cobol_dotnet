@@ -3,6 +3,7 @@ using CardDemo.Cobol.Runtime;
 using CardDemo.Data;
 using CardDemo.Domain;
 using CardDemo.Import;
+using CardDemo.Tooling;
 
 namespace CardDemo.Tests;
 
@@ -330,6 +331,101 @@ public sealed class BatchTests
     }
 
     // =================================================================================================
+    // CBEXPORT / CBIMPORT — PROGRAM-LEVEL round-trip (drive the actual ported programs)
+    // =================================================================================================
+
+    /// <summary>
+    /// End-to-end PROGRAM-LEVEL round-trip through the two ported programs themselves (not a hand-rolled
+    /// re-implementation): seed an in-memory <see cref="RelationalDb"/> from the shipped EBCDIC masters via
+    /// <see cref="MasterImporter"/>, post the daily transactions (<see cref="Cbtrn02c"/>) so the TRANSACTION
+    /// table is non-empty, then run <see cref="Cbexport"/> to write the single multi-record 500-byte EXPORT
+    /// dataset and <see cref="Cbimport"/> to split it back into the five per-type output files (CUSTOUT /
+    /// ACCTOUT / XREFOUT / TRNXOUT / CARDOUT). Each output file must round-trip back to the seeded table
+    /// data: its bytes equal the concatenation of <see cref="RecordSerializer"/>-serialized images of the
+    /// seeded rows, in the program's ascending-PK export order — byte-for-byte.
+    /// </summary>
+    [Fact]
+    public void Cbexport_Then_Cbimport_ProgramLevel_RoundTripsEveryType_ToByteIdenticalOutputs()
+    {
+        using BatchSupport s = OpenSeeded(out _);
+
+        // Populate TRANSACTION so type-'T' is exercised (CBEXPORT reads it; there is no TRANSACT seed file).
+        new Cbtrn02c().Run(s, TempFile("dalyrejs-for-export"), clock: Clock);
+        Assert.NotEmpty(s.Transaction.ReadAll());
+
+        var serializer = new RecordSerializer(new RecordLayouts(SeedPaths.CopybookDir));
+
+        // ---- Run CBEXPORT: every master row -> one 500-byte CVEXPORT record into the flat EXPORT dataset.
+        string exportPath = TempFile("cbexport");
+        IReadOnlyList<string> exportSysout =
+            Cbexport.Run(s, exportPath, SeedPaths.CopybookDir, Clock, HostKind.Ebcdic);
+        Assert.Contains("CBEXPORT: Export completed", exportSysout);
+        Assert.True(File.Exists(exportPath));
+        Assert.Equal(0, new FileInfo(exportPath).Length % 500);  // RECFM=F, LRECL 500
+
+        // ---- Run CBIMPORT: split the EXPORT feed into the five per-type output datasets. A CardOutPath is
+        // supplied (recommended option-b override) so the type-'D' CARD sink is actually written.
+        string custOut = TempFile("custout");
+        string acctOut = TempFile("acctout");
+        string xrefOut = TempFile("xrefout");
+        string trnxOut = TempFile("trnxout");
+        string cardOut = TempFile("cardout");
+        string errOut = TempFile("errout");
+
+        var ctx = NewImportContext(exportPath, custOut, acctOut, xrefOut, trnxOut, errOut, serializer, cardOut);
+        int rc = new Cbimport(ctx).Run();
+        Assert.Equal(0, rc);
+
+        // ---- Assert each output file round-trips back to the seeded table data (re-serialize + byte-compare).
+        // CBEXPORT browses each table ascending by PK; ReadAll() yields the same order, so the expected
+        // output is the per-row serialized images concatenated in that order.
+        AssertFileEquals("CUSTOUT", custOut,
+            s.Customer.ReadAll().Select(c => serializer.Serialize(c, HostKind.Ebcdic)));
+        AssertFileEquals("ACCTOUT", acctOut,
+            s.Account.ReadAll().Select(a => serializer.Serialize(a, HostKind.Ebcdic)));
+        AssertFileEquals("XREFOUT", xrefOut,
+            s.CardXref.ReadAll().Select(x => serializer.Serialize(x, HostKind.Ebcdic)));
+        AssertFileEquals("TRNXOUT", trnxOut,
+            s.Transaction.ReadAll().Select(t => serializer.Serialize(t, HostKind.Ebcdic)));
+        AssertFileEquals("CARDOUT", cardOut,
+            s.Card.ReadAll().Select(d => serializer.Serialize(d, HostKind.Ebcdic)));
+    }
+
+    /// <summary>
+    /// FB-1 (CARDOUT has no JCL DD): with the JCL-faithful Context (<c>CardOutPath == null</c>),
+    /// <see cref="Cbimport"/> abends in 1100-OPEN-FILES on the missing CARDOUT DD. The export here carries a
+    /// type-'D' record so the would-be CARD target is genuinely required; the port models the quirk as an
+    /// <see cref="AbendException"/> (CEE3ABD), thrown before any record is processed.
+    /// </summary>
+    [Fact]
+    public void Cbimport_AbendsOnMissingCardOut_WhenTypeDPresent_FaithfulBug()
+    {
+        // A tiny DB with at least one CARD (type 'D') row to export.
+        using BatchSupport s = BatchSupport.Open();
+        Assert.Equal(FileStatus.Ok, s.Card.Insert(new Card
+        {
+            CardNum = "4111111111111111", AcctId = 11111111111L, CvvCd = 123,
+            EmbossedName = "TEST CARDHOLDER", ExpirationDate = "2030-12-31", ActiveStatus = "Y",
+        }));
+
+        var serializer = new RecordSerializer(new RecordLayouts(SeedPaths.CopybookDir));
+
+        string exportPath = TempFile("cbexport-d");
+        Cbexport.Run(s, exportPath, SeedPaths.CopybookDir, Clock, HostKind.Ebcdic);
+        // The export must actually contain the type-'D' record (one 500-byte record).
+        Assert.Equal(500, new FileInfo(exportPath).Length);
+
+        // JCL-faithful Context: CardOutPath omitted (null) -> OPEN OUTPUT CARD-OUTPUT fails -> abend.
+        var ctx = NewImportContext(
+            exportPath,
+            TempFile("custout-d"), TempFile("acctout-d"), TempFile("xrefout-d"),
+            TempFile("trnxout-d"), TempFile("errout-d"), serializer, cardOutPath: null);
+
+        AbendException abend = Assert.Throws<AbendException>(() => new Cbimport(ctx).Run());
+        Assert.Equal("999", abend.AbendCode);
+    }
+
+    // =================================================================================================
     // Read-and-print drivers (CBACT02C / CBACT03C / CBCUS01C / CBTRN01C)
     // =================================================================================================
 
@@ -654,6 +750,61 @@ public sealed class BatchTests
         CardNum = r.GetText("DALYTRAN-CARD-NUM"), OrigTs = r.GetText("DALYTRAN-ORIG-TS"),
         ProcTs = r.GetText("DALYTRAN-PROC-TS"),
     };
+
+    /// <summary>
+    /// Builds a <see cref="Cbimport.Context"/> for the program-level tests: the five output paths + ERROUT,
+    /// the shared serializer, and the five CVEXPORT record-type variant layouts parsed from
+    /// <c>CVEXPORT.cpy</c>. <paramref name="cardOutPath"/> defaults to <c>null</c> (FB-1, JCL-faithful);
+    /// supply a path to enable the type-'D' CARD sink.
+    /// </summary>
+    private static Cbimport.Context NewImportContext(
+        string exportPath, string custOut, string acctOut, string xrefOut, string trnxOut, string errOut,
+        RecordSerializer serializer, string? cardOutPath)
+    {
+        string cvexport = File.ReadAllText(Path.Combine(SeedPaths.CopybookDir, "CVEXPORT.cpy"));
+        return new Cbimport.Context(
+            ExportPath: exportPath,
+            CustomerOutPath: custOut,
+            AccountOutPath: acctOut,
+            XrefOutPath: xrefOut,
+            TransactionOutPath: trnxOut,
+            ErrorOutPath: errOut,
+            Serializer: serializer,
+            CustomerVariant: CopybookParser.ParseVariant(cvexport, "EXPORT-CUSTOMER-DATA"),
+            AccountVariant: CopybookParser.ParseVariant(cvexport, "EXPORT-ACCOUNT-DATA"),
+            XrefVariant: CopybookParser.ParseVariant(cvexport, "EXPORT-CARD-XREF-DATA"),
+            TransactionVariant: CopybookParser.ParseVariant(cvexport, "EXPORT-TRANSACTION-DATA"),
+            CardVariant: CopybookParser.ParseVariant(cvexport, "EXPORT-CARD-DATA"),
+            Clock: Clock,
+            Host: HostKind.Ebcdic,
+            CardOutPath: cardOutPath);
+    }
+
+    /// <summary>
+    /// Asserts the whole flat output file <paramref name="path"/> equals the concatenation of the
+    /// <paramref name="expectedRecords"/> images, byte-for-byte (record count + each record's bytes).
+    /// </summary>
+    private static void AssertFileEquals(string name, string path, IEnumerable<byte[]> expectedRecords)
+    {
+        Assert.True(File.Exists(path), $"{name}: output file was not written.");
+        byte[] actual = File.ReadAllBytes(path);
+
+        List<byte[]> expected = expectedRecords.ToList();
+        int recLen = expected.Count > 0 ? expected[0].Length : 0;
+        long expectedLen = expected.Sum(r => (long)r.Length);
+        Assert.True(actual.LongLength == expectedLen,
+            $"{name}: file length {actual.LongLength} != expected {expectedLen}.");
+
+        int pos = 0;
+        for (int i = 0; i < expected.Count; i++)
+        {
+            byte[] rec = expected[i];
+            Assert.True(actual.AsSpan(pos, rec.Length).SequenceEqual(rec),
+                $"{name}: record {i} (offset {pos}, len {rec.Length}) differs from the re-serialized seed row.");
+            pos += rec.Length;
+        }
+        _ = recLen;
+    }
 
     private static void AssertSameImages(string table, IEnumerable<byte[]> expected, IEnumerable<byte[]> actual)
     {

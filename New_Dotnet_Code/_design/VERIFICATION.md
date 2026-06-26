@@ -55,9 +55,11 @@ COUSR00C, COUSR01C, COUSR02C, COUSR03C, COBIL00C, CORPT00C — over the CardDemo
 - IMS/DB2/MQ auth: `COPAUS0C/1C/2C`, `CardDemo.Mq/Programs/COPAUA0C.cs`.
 - VSAM-MQ: `CardDemo.Mq/Programs/COACCT01.cs`, `CODATE01.cs`.
 
-### Copybooks 62/62 · BMS maps 17/17 · JCL (app/jcl) fully accounted
-22 runnable batch jobs in `CardDemoJobs`; the remaining members are CICS-online config or GDG/AIX DEFINEs
-modeled by `GdgManager.Define` (all catalogued in `OnlineConfigJobs`, incl. DALYREJS/REPTFILE). 0 missing batch jobs.
+### Copybooks 62/62 · BMS maps 17/17 · JCL fully accounted
+26 runnable batch jobs in `CardDemoJobs` — including **CREASTMT** (CBSTM03A/CBSTM03B statement gen) and the
+IMS **LOADPADB**/**UNLDPADB**/**UNLDGSAM** load/unload jobs (PAUDBLOD/PAUDBUNL/DBUNLDGS) faithful to their JCL
+decks. The remaining JCL members are CICS-online config or GDG/AIX DEFINEs modeled by `GdgManager.Define`
+(all catalogued in `OnlineConfigJobs`, incl. DALYREJS/REPTFILE). 0 missing batch jobs.
 
 ## Per-program fidelity (independent COBOL-vs-C# review of all 39 originally-shipped ports + adversarial verify)
 **33 FAITHFUL** with no real discrepancies. **6 confirmed-real discrepancies were found and FIXED:**
@@ -81,10 +83,11 @@ One flagged item was an adversarially-confirmed **false positive** (CSUTLDTC "fa
 numbers ARE derived from the COBOL FEEDBACK-CODE 88-levels). All "FAITHFUL/MINOR" programs with no escalated
 discrepancy carried only LOW documented-boundary/cosmetic notes.
 
-## Tests (74)
+## Tests (77)
 SchemaRoundTripTests, BatchTests (incl. CSUTLDTC 2508/2517 classification), OnlineTests, OptionalTests,
-JobControlTests, and **RemediationTests** (CBSTM03A statement gen; PAUDBUNL→PAUDBLOD round-trip; DBUNLDGS GSAM
-byte-identity; EditedNumeric lowercase; CBTRN03C NEXT-SENTENCE termination; COPAUS2C targeted fraud update).
+JobControlTests (incl. CREASTMT statement job, UNLDPADB→LOADPADB round-trip job, UNLDGSAM GSAM job), and
+**RemediationTests** (CBSTM03A statement gen; PAUDBUNL→PAUDBLOD round-trip; DBUNLDGS GSAM byte-identity;
+EditedNumeric lowercase; CBTRN03C NEXT-SENTENCE termination; COPAUS2C targeted fraud update).
 
 ## Boundaries (documented, not gaps)
 - Verification is pure-.NET (per the no-COBOL directive): byte-exact schema round-trip + EXPORT/IMPORT
@@ -92,5 +95,5 @@ byte-identity; EditedNumeric lowercase; CBTRN03C NEXT-SENTENCE termination; COPA
 - Online parity is characterization-based (no CICS oracle exists): field values + COMMAREA + next-TRANSID/XCTL.
 - The program-private CICS COMMAREA trailer (COTRTLIC/COTRTUPC/COACTUPC) is carried via a content-stable
   side store keyed on the full nav-area image — the console runtime round-trips only the 160-byte nav area.
-- The 5 newly-ported programs are tested directly; wiring them into named JobControl sequences (CREASTMT,
-  IMS load/unload jobs) is orchestration polish, not conversion scope.
+- The 5 newly-ported programs are exercised directly by tests AND wired into named JobControl sequences
+  (CREASTMT, LOADPADB, UNLDPADB, UNLDGSAM), each with a job-level test.

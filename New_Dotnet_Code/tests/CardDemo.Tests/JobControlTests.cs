@@ -452,8 +452,312 @@ public sealed class JobControlTests
     }
 
     // =================================================================================================
+    // UNLDPADB / LOADPADB / UNLDGSAM — IMS pending-auth DB unload/load jobs (CBSTM03A/PAUDBUNL/PAUDBLOD/DBUNLDGS)
+    // =================================================================================================
+
+    /// <summary>
+    /// UNLDPADB then LOADPADB round-trip the PAUT pending-auth data through the two sequential files:
+    /// UNLDPADB (PAUDBUNL) writes PAUTDB.ROOT.FILEO (100-byte summary images) + PAUTDB.CHILD.FILEO
+    /// (206-byte root-key+detail images); LOADPADB (PAUDBLOD), run over the SAME work-dir but a FRESH empty
+    /// DB, reads those files back and re-inserts every PAUT_SUMMARY root and PAUT_DETAIL child. The reloaded
+    /// rows must match the original keys/fields/counts.
+    /// </summary>
+    [Fact]
+    public void UnldPaDb_Then_LoadPaDb_RoundTripsPautData()
+    {
+        // ---- Source: a small hand-seeded PAUT hierarchy (2 roots x 2 children). ----
+        using var srcDb = new RelationalDb();
+        var srcSummaries = new PautSummaryRepository(srcDb);
+        var srcDetails = new PautDetailRepository(srcDb);
+
+        long[] accts = { 11111111111L, 22222222222L };
+        foreach (long acct in accts)
+        {
+            SeedPautSummary(srcSummaries, acct, approvedCnt: 2);
+            SeedPautDetail(srcDetails, acct, authDate9c: 73822, authTime9c: 909999999L, approved: true,
+                tranId: "T" + acct.ToString().Substring(0, 6) + "001");
+            SeedPautDetail(srcDetails, acct, authDate9c: 73823, authTime9c: 809999999L, approved: false,
+                tranId: "T" + acct.ToString().Substring(0, 6) + "002");
+        }
+        int expectedSummaries = accts.Length;
+        int expectedDetails = accts.Length * 2;
+
+        // ---- UNLDPADB writes the two unload files into ctx1's work-dir. ----
+        JobContext ctx1 = NewContext(srcDb);
+        JobResult unl = new JobRunner().Run(CardDemoJobs.UnldPaDb(), ctx1);
+
+        Assert.True(unl.Succeeded);
+        Assert.Equal(StepStatus.Executed, unl.Step("STEP0")!.Status);  // IEFBR14 pre-delete
+        Assert.Equal(0, unl.Step("STEP01")!.ReturnCode);               // PAUDBUNL clean run
+
+        string rootFile = ctx1.Path("PAUTDB.ROOT.FILEO");
+        string childFile = ctx1.Path("PAUTDB.CHILD.FILEO");
+        Assert.True(File.Exists(rootFile));
+        Assert.True(File.Exists(childFile));
+        // Exact image widths: summary 100 bytes, detail record 206 bytes (6-byte key + 200-byte image).
+        Assert.Equal(0, new FileInfo(rootFile).Length % 100);
+        Assert.Equal(0, new FileInfo(childFile).Length % 206);
+        Assert.Equal(expectedSummaries, new FileInfo(rootFile).Length / 100);
+        Assert.Equal(expectedDetails, new FileInfo(childFile).Length / 206);
+
+        // ---- LOADPADB over the SAME work-dir but a FRESH empty DB reads those files back. ----
+        using var dstDb = new RelationalDb();
+        var dstCtx = new JobContext(dstDb, ctx1.WorkDir, Clock, SeedPaths.EbcdicDataDir, SeedPaths.CopybookDir);
+        JobResult lod = new JobRunner().Run(CardDemoJobs.LoadPaDb(), dstCtx);
+
+        Assert.True(lod.Succeeded);
+        Assert.Equal(0, lod.Step("STEP01")!.ReturnCode);              // PAUDBLOD clean run
+
+        var dstSummaries = new PautSummaryRepository(dstDb);
+        var dstDetails = new PautDetailRepository(dstDb);
+
+        // Every summary round-trips (count + key + non-key fields).
+        Assert.Equal(expectedSummaries, dstSummaries.ReadAll().Count());
+        foreach (long acct in accts)
+        {
+            Assert.Equal(FileStatus.Ok, srcSummaries.ReadByKey(acct, out PautSummary? sOrig));
+            Assert.Equal(FileStatus.Ok, dstSummaries.ReadByKey(acct, out PautSummary? sLoad));
+            Assert.Equal(sOrig!.AcctId, sLoad!.AcctId);
+            Assert.Equal(sOrig.CustId, sLoad.CustId);
+            Assert.Equal(sOrig.AuthStatus.TrimEnd(), sLoad.AuthStatus.TrimEnd());
+            Assert.Equal(sOrig.ApprovedAuthCnt, sLoad.ApprovedAuthCnt);
+            Assert.Equal(sOrig.DeclinedAuthCnt, sLoad.DeclinedAuthCnt);
+            Assert.Equal(sOrig.CreditLimit, sLoad.CreditLimit);
+            Assert.Equal(sOrig.ApprovedAuthAmt, sLoad.ApprovedAuthAmt);
+        }
+
+        // Every detail round-trips (count + key + identifying fields), per parent, in twin-chain order.
+        int totalLoaded = 0;
+        foreach (long acct in accts)
+        {
+            List<PautDetail> orig = srcDetails.ReadAllByParent(acct).ToList();
+            List<PautDetail> load = dstDetails.ReadAllByParent(acct).ToList();
+            Assert.Equal(orig.Count, load.Count);
+            totalLoaded += load.Count;
+            for (int i = 0; i < orig.Count; i++)
+            {
+                Assert.Equal(orig[i].AuthKey, load[i].AuthKey);
+                Assert.Equal(orig[i].AcctId, load[i].AcctId);
+                Assert.Equal(orig[i].AuthDate9c, load[i].AuthDate9c);
+                Assert.Equal(orig[i].AuthTime9c, load[i].AuthTime9c);
+                Assert.Equal(orig[i].TransactionId.TrimEnd(), load[i].TransactionId.TrimEnd());
+                Assert.Equal(orig[i].CardNum.TrimEnd(), load[i].CardNum.TrimEnd());
+                Assert.Equal(orig[i].AuthRespCode.TrimEnd(), load[i].AuthRespCode.TrimEnd());
+                Assert.Equal(orig[i].TransactionAmt, load[i].TransactionAmt);
+                Assert.Equal(orig[i].ApprovedAmt, load[i].ApprovedAmt);
+            }
+        }
+        Assert.Equal(expectedDetails, totalLoaded);
+    }
+
+    /// <summary>
+    /// UNLDGSAM (DBUNLDGS) unloads the PAUT DB to two GSAM files: PAUTDB.ROOT.GSAM (100-byte summary images)
+    /// and PAUTDB.CHILD.GSAM (200-byte detail images, with NO 6-byte root-key prefix). The summary GSAM is
+    /// byte-identical to UNLDPADB's PAUTDB.ROOT.FILEO (the summary images are produced identically).
+    /// </summary>
+    [Fact]
+    public void UnldGsam_ProducesGsamFiles()
+    {
+        using var db = new RelationalDb();
+        var summaries = new PautSummaryRepository(db);
+        var details = new PautDetailRepository(db);
+
+        long[] accts = { 30000000001L, 40000000002L };
+        foreach (long acct in accts)
+        {
+            SeedPautSummary(summaries, acct, approvedCnt: 3);
+            SeedPautDetail(details, acct, authDate9c: 50000, authTime9c: 700000000L, approved: true,
+                tranId: "G" + acct.ToString().Substring(0, 6) + "01");
+            SeedPautDetail(details, acct, authDate9c: 50001, authTime9c: 600000000L, approved: false,
+                tranId: "G" + acct.ToString().Substring(0, 6) + "02");
+        }
+        int expectedSummaries = accts.Length;
+        int expectedDetails = accts.Length * 2;
+
+        // UNLDGSAM writes the two GSAM files.
+        JobContext gsamCtx = NewContext(db);
+        JobResult gsam = new JobRunner().Run(CardDemoJobs.UnldGsam(), gsamCtx);
+
+        Assert.True(gsam.Succeeded);
+        Assert.Equal(0, gsam.Step("STEP01")!.ReturnCode);
+
+        string rootGsam = gsamCtx.Path("PAUTDB.ROOT.GSAM");
+        string childGsam = gsamCtx.Path("PAUTDB.CHILD.GSAM");
+        Assert.True(File.Exists(rootGsam));
+        Assert.True(File.Exists(childGsam));
+        Assert.Equal(0, new FileInfo(rootGsam).Length % 100);   // 100-byte summary images
+        Assert.Equal(0, new FileInfo(childGsam).Length % 200);  // 200-byte detail images (no key prefix)
+        Assert.Equal(expectedSummaries, new FileInfo(rootGsam).Length / 100);
+        Assert.Equal(expectedDetails, new FileInfo(childGsam).Length / 200);
+
+        // UNLDPADB (PAUDBUNL) over the SAME data writes the same 100-byte summary images to ROOT.FILEO.
+        JobContext bunlCtx = NewContext(db);
+        JobResult bunl = new JobRunner().Run(CardDemoJobs.UnldPaDb(), bunlCtx);
+        Assert.True(bunl.Succeeded);
+
+        byte[] gsamSummaryBytes = File.ReadAllBytes(rootGsam);
+        byte[] bunlSummaryBytes = File.ReadAllBytes(bunlCtx.Path("PAUTDB.ROOT.FILEO"));
+        Assert.Equal(bunlSummaryBytes.Length, gsamSummaryBytes.Length);
+        Assert.True(bunlSummaryBytes.AsSpan().SequenceEqual(gsamSummaryBytes),
+            "UNLDGSAM ROOT.GSAM summary images are not byte-identical to UNLDPADB ROOT.FILEO");
+    }
+
+    /// <summary>
+    /// CREASTMT runs DELDEF01/STEP010/STEP020 (RC-0 relational-prep no-ops), STEP030 (IEFBR14 delete prior
+    /// statement datasets) and STEP040 (CBSTM03A). CBSTM03A has a FIXED 51-card x 10-tran in-storage table
+    /// with no bounds guard, so we seed a SMALL DB (1 account + customer + xref card + 2 transactions) rather
+    /// than the full master seed. Every step ends RC 0 and the two statement files are produced and non-empty
+    /// (carrying the account id and a transaction amount).
+    /// </summary>
+    [Fact]
+    public void CreaStmt_ProducesStatementFiles()
+    {
+        using var db = new RelationalDb();
+
+        const long acctId = 12345678901L;
+        const long custId = 222333444L;
+        const string cardNum = "4444333322221111";
+
+        Assert.Equal(FileStatus.Ok, new AccountRepository(db).Insert(new Account
+        {
+            AcctId = acctId, ActiveStatus = "Y", CurrBal = 4275.18m, CreditLimit = 9000.00m,
+            CashCreditLimit = 1000.00m, OpenDate = "2020-01-01", ExpirationDate = "2028-01-01",
+            ReissueDate = "2024-01-01", CurrCycCredit = 0.00m, CurrCycDebit = 0.00m,
+            AddrZip = "90001", GroupId = "GRP0000001",
+        }));
+        Assert.Equal(FileStatus.Ok, new CustomerRepository(db).Insert(new Customer
+        {
+            CustId = custId, FirstName = "ALICE", MiddleName = "Q", LastName = "STMTHOLDER",
+            AddrLine1 = "100 STATEMENT WAY", AddrLine2 = "FLOOR 3", AddrLine3 = "METROCITY",
+            AddrStateCd = "CA", AddrCountryCd = "USA", AddrZip = "90001",
+            PhoneNum1 = "5551112222", PhoneNum2 = "5553334444", Ssn = 123456789,
+            GovtIssuedId = "DL99887766", DobYyyyMmDd = "1980-01-01", EftAccountId = "EFT0000001",
+            PriCardHolderInd = "Y", FicoCreditScore = 765,
+        }));
+        Assert.Equal(FileStatus.Ok, new CardXrefRepository(db).Insert(new CardXref
+        {
+            XrefCardNum = cardNum, CustId = custId, AcctId = acctId,
+        }));
+        var txns = new TransactionRepository(db);
+        Assert.Equal(FileStatus.Ok, txns.Insert(new Transaction
+        {
+            TranId = "TXNSTMT000000001", TypeCd = "01", CatCd = 1, Source = "POS",
+            Desc = "GROCERY STORE PURCHASE", Amt = 123.45m, MerchantId = 1, MerchantName = "GROCERS",
+            MerchantCity = "METROCITY", MerchantZip = "90001", CardNum = cardNum,
+            OrigTs = "2026-06-20-10.00.00.000000", ProcTs = "2026-06-20-10.00.00.000000",
+        }));
+        Assert.Equal(FileStatus.Ok, txns.Insert(new Transaction
+        {
+            TranId = "TXNSTMT000000002", TypeCd = "01", CatCd = 1, Source = "POS",
+            Desc = "ONLINE BOOKSTORE ORDER", Amt = 67.89m, MerchantId = 2, MerchantName = "BOOKS",
+            MerchantCity = "METROCITY", MerchantZip = "90001", CardNum = cardNum,
+            OrigTs = "2026-06-21-11.30.00.000000", ProcTs = "2026-06-21-11.30.00.000000",
+        }));
+
+        JobContext ctx = NewContext(db);
+        JobResult result = new JobRunner().Run(CardDemoJobs.CreaStmt(), ctx);
+
+        Assert.True(result.Succeeded);
+        // All five steps ran and ended RC 0.
+        foreach (string stepName in new[] { "DELDEF01", "STEP010", "STEP020", "STEP030", "STEP040" })
+        {
+            StepResult? step = result.Step(stepName);
+            Assert.NotNull(step);
+            Assert.Equal(StepStatus.Executed, step!.Status);
+            Assert.Equal(0, step.ReturnCode);
+        }
+
+        // CBSTM03A wrote both statement datasets, non-empty, with the identifying data.
+        string psPath = ctx.Path("STATEMNT.PS");
+        string htmlPath = ctx.Path("STATEMNT.HTML");
+        Assert.True(File.Exists(psPath));
+        Assert.True(File.Exists(htmlPath));
+        Assert.True(new FileInfo(psPath).Length > 0, "STATEMNT.PS is empty");
+        Assert.True(new FileInfo(htmlPath).Length > 0, "STATEMNT.HTML is empty");
+
+        // The plain-text statement is EBCDIC-encoded (CBSTM03A writes via StreamWriter -> default UTF-8 text;
+        // assert on the readable content). Read as text and check the account id + an amount appear.
+        string ps = File.ReadAllText(psPath);
+        string html = File.ReadAllText(htmlPath);
+        Assert.Contains("12345678901", ps);   // ACCT-ID
+        Assert.Contains("123.45", ps);          // a transaction amount
+        Assert.Contains("12345678901", html);
+        Assert.Contains("123.45", html);
+    }
+
+    // =================================================================================================
     // Helpers
     // =================================================================================================
+
+    /// <summary>Seeds a PAUT_SUMMARY root with the same shape the RemediationTests round-trip suite uses.</summary>
+    private static void SeedPautSummary(PautSummaryRepository repo, long acctId, int approvedCnt)
+    {
+        Assert.Equal(FileStatus.Ok, repo.Insert(new PautSummary
+        {
+            AcctId = acctId,
+            CustId = acctId % 1000000000,
+            AuthStatus = "A",
+            AccountStatus1 = "Y",
+            AccountStatus2 = "Y",
+            AccountStatus3 = "N",
+            AccountStatus4 = "N",
+            AccountStatus5 = "N",
+            CreditLimit = 9000.00m,
+            CashLimit = 1000.00m,
+            CreditBalance = 100.00m,
+            CashBalance = 0.00m,
+            ApprovedAuthCnt = approvedCnt,
+            DeclinedAuthCnt = 1,
+            ApprovedAuthAmt = approvedCnt * 25.00m,
+            DeclinedAuthAmt = 10.00m,
+        }));
+    }
+
+    /// <summary>
+    /// Inserts a PAUT_DETAIL whose AUTH_KEY equals the canonical (date-9c|time-9c) string the IMS loader
+    /// rebuilds on decode (5-digit AUTH_DATE_9C + 9-digit AUTH_TIME_9C), so the composite key round-trips
+    /// through an unload+load byte-for-byte. (Mirrors the internal PautSegmentImages.BuildAuthKey.)
+    /// </summary>
+    private static void SeedPautDetail(
+        PautDetailRepository repo, long acctId, int authDate9c, long authTime9c, bool approved, string tranId)
+    {
+        string authKey =
+            (Math.Abs((long)authDate9c) % 100000L).ToString("D5") +
+            (Math.Abs(authTime9c) % 1000000000L).ToString("D9");
+
+        Assert.Equal(FileStatus.Ok, repo.Insert(new PautDetail
+        {
+            AcctId = acctId,
+            AuthKey = authKey,
+            AuthDate9c = authDate9c,
+            AuthTime9c = authTime9c,
+            AuthOrigDate = "260626",
+            AuthOrigTime = "090000",
+            CardNum = acctId.ToString("D16"),
+            AuthType = "0100",
+            CardExpiryDate = "1228",
+            MessageType = "0100",
+            MessageSource = "POS",
+            AuthIdCode = "AUT001",
+            AuthRespCode = approved ? "00" : "05",
+            AuthRespReason = approved ? "0000" : "4100",
+            ProcessingCode = 123456,
+            TransactionAmt = 25.00m,
+            ApprovedAmt = approved ? 25.00m : 0.00m,
+            MerchantCatagoryCode = "5411",
+            AcqrCountryCode = "840",
+            PosEntryMode = 1,
+            MerchantId = "MERCH0000000001",
+            MerchantName = "ROUND TRIP MERCHANT",
+            MerchantCity = "TRIPTOWN",
+            MerchantState = "CA",
+            MerchantZip = "900010000",
+            TransactionId = tranId,
+            MatchStatus = "P",
+            AuthFraud = " ",
+            FraudRptDate = " ",
+        }));
+    }
 
     private static void SeedOneInterestAccount(
         RelationalDb db, long acctId, string groupId, string typeCd, int catCd,

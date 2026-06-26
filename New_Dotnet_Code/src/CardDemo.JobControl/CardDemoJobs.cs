@@ -2,6 +2,7 @@ using CardDemo.Batch;
 using CardDemo.Runtime;
 using CardDemo.Data;
 using CardDemo.Import;
+using CardDemo.Ims;
 
 namespace CardDemo.JobControl;
 
@@ -452,6 +453,89 @@ public static class CardDemoJobs
         [
             new JobStep("STEP05", "CBACT03C", ctx =>
                 new Cbact03c().Run(ctx.Db, ctx.Path("READXREF.sysout"))),
+        ]);
+
+    // =================================================================================================
+    // CREASTMT — statement generation (CBSTM03A, which CALLs the I/O subroutine CBSTM03B)
+    // =================================================================================================
+
+    /// <summary>
+    /// CREASTMT (app/jcl/CREASTMT.JCL) — produce a per-card statement in plain text and HTML. The JCL first
+    /// builds a card+id-keyed copy of the TRANSACT file (DELDEF01 IDCAMS DELETE/DEFINE, STEP010 SORT by
+    /// card-num+tran-id, STEP020 IDCAMS REPRO) and then runs CBSTM03A. In the relational model the called
+    /// subroutine CBSTM03B reads the TRANSACTION table directly in (card-num, tran-id) order, so the
+    /// intermediate <c>TRXFL</c> KSDS is never materialised — DELDEF01/STEP010/STEP020 are modelled as
+    /// RC-0 prep steps (the ordering is the relational query, mirroring how TRANFILE's AIX needs no build
+    /// step). STEP030 (IEFBR14) deletes the prior statement datasets; STEP040 runs CBSTM03A, writing the
+    /// plain-text STMTFILE and the HTML HTMLFILE. STEP020/030/040 carry COND=(0,NE) (run only if all prior
+    /// steps ended RC=0). Note: CBSTM03A's WS-TRNX-TABLE is a fixed 51-card × 10-tran array with no bounds
+    /// guard (faithful), so this job is meant for normal per-cycle volumes.
+    /// </summary>
+    public static Job CreaStmt() => new(
+        "CREASTMT", "Create Statement",
+        [
+            new JobStep("DELDEF01", "IDCAMS", _ => 0),
+            new JobStep("STEP010", "SORT", _ => 0),
+            new JobStep("STEP020", "IDCAMS", _ => 0, conditions: [new CondCode(0, CondOperator.Ne)]),
+            new JobStep("STEP030", "IEFBR14",
+                ctx => UtilitySteps.Iefbr14(ctx.Path("STATEMNT.PS"), ctx.Path("STATEMNT.HTML")),
+                conditions: [new CondCode(0, CondOperator.Ne)]),
+            new JobStep("STEP040", "CBSTM03A", ctx =>
+            {
+                // CBSTM03A reads TRNXFILE(TRANSACTION)/XREFFILE/ACCTFILE/CUSTFILE via CBSTM03B and writes the
+                // STMTFILE (plain text) + HTMLFILE (HTML) statements.
+                Cbstm03a.Run(ctx.Db, ctx.Path("STATEMNT.PS"), ctx.Path("STATEMNT.HTML"), HostKind.Ebcdic);
+                return 0;
+            }, conditions: [new CondCode(0, CondOperator.Ne)]),
+        ]);
+
+    // =================================================================================================
+    // IMS pending-authorization DB load / unload (PAUDBLOD, PAUDBUNL, DBUNLDGS)
+    // =================================================================================================
+
+    /// <summary>
+    /// LOADPADB (app-authorization-ims-db2-mq/jcl/LOADPADB.JCL) — IMS BMP that loads the pending-auth DB
+    /// (PAUT_SUMMARY roots + PAUT_DETAIL children) from the two sequential unload files INFILE1 (100-byte
+    /// summary images) and INFILE2 (206-byte root-key+detail images). The IMS region/PSB/DBD DDs are IMS
+    /// infrastructure with no relational equivalent; the single PGM step is PAUDBLOD over the PAUT repositories.
+    /// </summary>
+    public static Job LoadPaDb() => new(
+        "LOADPADB", "M2APP — Load pending-auth IMS DB",
+        [
+            new JobStep("STEP01", "PAUDBLOD", ctx => Paudblod.Run(
+                new PautSummaryRepository(ctx.Db), new PautDetailRepository(ctx.Db),
+                ctx.Path("PAUTDB.ROOT.FILEO"), ctx.Path("PAUTDB.CHILD.FILEO"),
+                ctx.Clock, HostKind.Ebcdic).ReturnCode),
+        ]);
+
+    /// <summary>
+    /// UNLDPADB (app-authorization-ims-db2-mq/jcl/UNLDPADB.JCL) — STEP0 (IEFBR14) deletes the prior unload
+    /// datasets; STEP01 runs PAUDBUNL (DLI), GN/GNP-scanning the PAUT DB and writing OUTFIL1 (100-byte
+    /// summary images) + OUTFIL2 (206-byte root-key+detail images) — exactly what LOADPADB reads back.
+    /// </summary>
+    public static Job UnldPaDb() => new(
+        "UNLDPADB", "M2APP — Unload pending-auth IMS DB",
+        [
+            new JobStep("STEP0", "IEFBR14", ctx => UtilitySteps.Iefbr14(
+                ctx.Path("PAUTDB.ROOT.FILEO"), ctx.Path("PAUTDB.CHILD.FILEO"))),
+            new JobStep("STEP01", "PAUDBUNL", ctx => Paudbunl.Run(
+                new PautSummaryRepository(ctx.Db), new PautDetailRepository(ctx.Db),
+                ctx.Path("PAUTDB.ROOT.FILEO"), ctx.Path("PAUTDB.CHILD.FILEO"),
+                ctx.Clock, HostKind.Ebcdic).ReturnCode),
+        ]);
+
+    /// <summary>
+    /// UNLDGSAM (app-authorization-ims-db2-mq/jcl/UNLDGSAM.JCL) — a single DLI PGM step that unloads the PAUT
+    /// DB to two GSAM output files: PASFILOP (100-byte summary images) and PADFILOP (200-byte detail images),
+    /// modelled here as DBUNLDGS over the PAUT repositories.
+    /// </summary>
+    public static Job UnldGsam() => new(
+        "UNLDGSAM", "M2APP — Unload pending-auth IMS DB to GSAM",
+        [
+            new JobStep("STEP01", "DBUNLDGS", ctx => Dbunldgs.Run(
+                new PautSummaryRepository(ctx.Db), new PautDetailRepository(ctx.Db),
+                ctx.Path("PAUTDB.ROOT.GSAM"), ctx.Path("PAUTDB.CHILD.GSAM"),
+                ctx.Clock, HostKind.Ebcdic).ReturnCode),
         ]);
 
     // =================================================================================================

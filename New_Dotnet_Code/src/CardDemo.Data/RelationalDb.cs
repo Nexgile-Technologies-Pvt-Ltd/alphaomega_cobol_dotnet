@@ -71,12 +71,14 @@ public sealed class RelationalDb : IDisposable
     /// </summary>
     public void Clear()
     {
-        // Order respects the single FK (TRANSACTION_TYPE_CATEGORY -> TRANSACTION_TYPE): child first.
+        // Order respects the FKs (TRANSACTION_TYPE_CATEGORY -> TRANSACTION_TYPE, PAUT_DETAIL -> PAUT_SUMMARY):
+        // child first.
         string[] tables =
         {
             "ACCOUNT", "CARD", "CARD_XREF", "CUSTOMER", "\"TRANSACTION\"", "DAILY_TRANSACTION",
             "TRAN_CAT_BAL", "DISCLOSURE_GROUP", "TRAN_TYPE", "TRAN_CATEGORY", "USER_SECURITY",
             "TRANSACTION_TYPE_CATEGORY", "TRANSACTION_TYPE", "AUTHFRDS",
+            "PAUT_DETAIL", "PAUT_SUMMARY",
         };
         using SqliteTransaction tx = Connection.BeginTransaction();
         foreach (string t in tables)

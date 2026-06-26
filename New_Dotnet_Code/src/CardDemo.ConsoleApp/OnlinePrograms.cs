@@ -6,11 +6,12 @@ using CardDemo.Online.Programs;
 namespace CardDemo.ConsoleApp;
 
 /// <summary>
-/// The single wiring point that turns the 17 ported online CICS handlers (<c>CardDemo.Online.Programs</c>)
-/// into a live <see cref="IProgramRegistry"/> and a matching <see cref="BmsMapCatalog"/> over one shared
-/// <see cref="RelationalDb"/>. Each handler is registered under its CICS <c>PROGRAM</c> name (the XCTL/LINK
-/// target) and its self-declared <c>TRANSID</c> (per <c>_design/specs/optional/CSD_TRANSACTIONS.md</c>),
-/// constructed with the shared DB so every transaction sees the same seeded VSAM-equivalent tables.
+/// The single wiring point that turns the 17 base + 5 optional ported online CICS handlers
+/// (<c>CardDemo.Online.Programs</c>) into a live <see cref="IProgramRegistry"/> and a matching
+/// <see cref="BmsMapCatalog"/> over one shared <see cref="RelationalDb"/>. Each handler is registered under
+/// its CICS <c>PROGRAM</c> name (the XCTL/LINK target) and its self-declared <c>TRANSID</c> (per
+/// <c>_design/specs/optional/CSD_TRANSACTIONS.md</c>), constructed with the shared DB so every transaction
+/// sees the same seeded VSAM-equivalent tables.
 /// </summary>
 /// <remarks>
 /// <para>Every handler in <c>CardDemo.Online.Programs</c> is a near-mechanical port of its COBOL
@@ -28,7 +29,7 @@ namespace CardDemo.ConsoleApp;
 public static class OnlinePrograms
 {
     /// <summary>
-    /// Builds the program registry for all 17 base online transactions over the shared
+    /// Builds the program registry for all 17 base + 5 optional online transactions over the shared
     /// <paramref name="db"/>. Program and transaction routing follow the consolidated CSD dispatcher map.
     /// Delegates to <see cref="OnlineProgramRegistry.Build"/> (the registry lives in
     /// <c>CardDemo.Online</c> so headless tests share it without referencing the console executable).
@@ -36,9 +37,9 @@ public static class OnlinePrograms
     public static ProgramRegistry BuildRegistry(RelationalDb db) => OnlineProgramRegistry.Build(db);
 
     /// <summary>
-    /// Builds the BMS map catalog covering every map driven by the 17 handlers, keyed by DFHMDI map name.
-    /// Each entry is the handler's own static map builder, so a by-name lookup produces the same field
-    /// model the handler would build itself.
+    /// Builds the BMS map catalog covering every map driven by the 17 base + 5 optional handlers, keyed by
+    /// DFHMDI map name. Each entry is the handler's own static map builder, so a by-name lookup produces the
+    /// same field model the handler would build itself.
     /// </summary>
     public static BmsMapCatalog BuildMapCatalog()
     {
@@ -59,6 +60,11 @@ public static class OnlinePrograms
             .Register(Cousr00c.MapName, Cousr00c.BuildMap)
             .Register(Cousr01c.MapName, Cousr01c.BuildMap)
             .Register(Cousr02c.MapName, Cousr02c.BuildMap)
-            .Register(Cousr03c.MapName, Cousr03c.BuildMap);
+            .Register(Cousr03c.MapName, Cousr03c.BuildMap)
+            // ---- Optional add-on maps (DB2 transaction-type + IMS/DB2/MQ pending-auth) ----
+            .Register(Cotrtlic.MapName, Cotrtlic.BuildMap)     // CTRTLIA — tran-type list/update (DB2)
+            .Register(Cotrtupc.MapName, Cotrtupc.BuildBmsMap)  // CTRTUPA — tran-type maintenance (DB2)
+            .Register(Copaus0c.MapName, Copaus0c.BuildMap)     // COPAU0A — pending-auth summary (IMS)
+            .Register(Copaus1c.MapName, Copaus1c.BuildMap);    // COPAU1A — pending-auth detail (IMS)
     }
 }

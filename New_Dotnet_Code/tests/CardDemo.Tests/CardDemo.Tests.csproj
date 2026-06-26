@@ -26,6 +26,10 @@
     <ProjectReference Include="..\..\src\CardDemo.Tooling\CardDemo.Tooling.csproj" />
     <ProjectReference Include="..\..\src\CardDemo.Batch\CardDemo.Batch.csproj" />
     <ProjectReference Include="..\..\src\CardDemo.Online\CardDemo.Online.csproj" />
+    <!-- Optional DB2 / IMS / MQ add-on modules (COBTUPDT, CBPAUP0C, COACCT01/CODATE01/COPAUA0C). -->
+    <ProjectReference Include="..\..\src\CardDemo.Db2\CardDemo.Db2.csproj" />
+    <ProjectReference Include="..\..\src\CardDemo.Ims\CardDemo.Ims.csproj" />
+    <ProjectReference Include="..\..\src\CardDemo.Mq\CardDemo.Mq.csproj" />
   </ItemGroup>
 
 </Project>

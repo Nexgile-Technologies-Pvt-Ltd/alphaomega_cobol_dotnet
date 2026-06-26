@@ -205,5 +205,78 @@ CREATE TABLE IF NOT EXISTS AUTHFRDS (
     CUST_ID                NUMERIC,           -- DECIMAL(9)
     PRIMARY KEY (CARD_NUM, AUTH_TS)
 );
--- XAUTHFRD.ddl alt index on AUTHFRDS (alternate access path)
+-- XAUTHFRD.ddl alt index on AUTHFRDS (alternate access path).
+-- The DDL's XAUTHFRD is UNIQUE on (CARD_NUM ASC, AUTH_TS DESC); since CARD_NUM+AUTH_TS is already the PK,
+-- only the AUTH_TS DESC ordering is materialised as a real index. ACCT_ID alt access keeps a plain index.
+CREATE UNIQUE INDEX IF NOT EXISTS XAUTHFRD ON AUTHFRDS (CARD_NUM ASC, AUTH_TS DESC);
 CREATE INDEX IF NOT EXISTS IX_AUTHFRDS_ACCT_ID ON AUTHFRDS (ACCT_ID);
+
+-- =====================================================================
+-- Optional-module tables (IMS hierarchical DB re-hosted as relational)
+-- Source: app/app-authorization-ims-db2-mq IMS "Pending Authorization" DB (HIDAM, DBPAUTP0).
+-- The two IMS segments PAUTSUM0 (root) / PAUTDTL1 (child) become two tables; the HIDAM primary
+-- index over ACCNTID collapses into PAUT_SUMMARY's PK. See _design/specs/optional/IMS_SCHEMA.md.
+-- =====================================================================
+
+-- PAUT_SUMMARY (IMS root segment PAUTSUM0, copybook CIPAUSMY). PK ACCT_ID (= IMS root key ACCNTID).
+-- OCCURS 5 ACCOUNT-STATUS flattened to ACCOUNT_STATUS_1..5 (fixed small occurs).
+CREATE TABLE IF NOT EXISTS PAUT_SUMMARY (
+    ACCT_ID           INTEGER NOT NULL,  -- PA-ACCT-ID         S9(11) COMP-3  (DECIMAL(11,0))
+    CUST_ID           INTEGER,           -- PA-CUST-ID         9(09)
+    AUTH_STATUS       TEXT,              -- PA-AUTH-STATUS     X(01)
+    ACCOUNT_STATUS_1  TEXT,              -- PA-ACCOUNT-STATUS  X(02) OCCURS 5 (1)
+    ACCOUNT_STATUS_2  TEXT,              -- PA-ACCOUNT-STATUS  X(02) OCCURS 5 (2)
+    ACCOUNT_STATUS_3  TEXT,              -- PA-ACCOUNT-STATUS  X(02) OCCURS 5 (3)
+    ACCOUNT_STATUS_4  TEXT,              -- PA-ACCOUNT-STATUS  X(02) OCCURS 5 (4)
+    ACCOUNT_STATUS_5  TEXT,              -- PA-ACCOUNT-STATUS  X(02) OCCURS 5 (5)
+    CREDIT_LIMIT      NUMERIC,           -- PA-CREDIT-LIMIT    S9(09)V99 COMP-3 (DECIMAL(11,2))
+    CASH_LIMIT        NUMERIC,           -- PA-CASH-LIMIT      S9(09)V99 COMP-3
+    CREDIT_BALANCE    NUMERIC,           -- PA-CREDIT-BALANCE  S9(09)V99 COMP-3
+    CASH_BALANCE      NUMERIC,           -- PA-CASH-BALANCE    S9(09)V99 COMP-3
+    APPROVED_AUTH_CNT INTEGER,           -- PA-APPROVED-AUTH-CNT S9(04) COMP (SMALLINT)
+    DECLINED_AUTH_CNT INTEGER,           -- PA-DECLINED-AUTH-CNT S9(04) COMP (SMALLINT)
+    APPROVED_AUTH_AMT NUMERIC,           -- PA-APPROVED-AUTH-AMT S9(09)V99 COMP-3
+    DECLINED_AUTH_AMT NUMERIC,           -- PA-DECLINED-AUTH-AMT S9(09)V99 COMP-3
+    PRIMARY KEY (ACCT_ID)                -- = IMS root key ACCNTID; replaces DBPAUTX0/PAUTINDX index
+);
+
+-- PAUT_DETAIL (IMS child segment PAUTDTL1, copybook CIPAUDTY). Composite PK (ACCT_ID, AUTH_KEY).
+-- ACCT_ID is the FK to PAUT_SUMMARY (IMS parentage, ON DELETE CASCADE = IMS root-delete cascade).
+-- AUTH_KEY = PAUT9CTS (date-9C + time-9C, 9s-complement) so ascending key order == newest-first.
+CREATE TABLE IF NOT EXISTS PAUT_DETAIL (
+    ACCT_ID                INTEGER NOT NULL,  -- parent PA-ACCT-ID (FK -> PAUT_SUMMARY.ACCT_ID, PK part 1)
+    AUTH_KEY               TEXT    NOT NULL,  -- PAUT9CTS / PA-AUTHORIZATION-KEY CHAR(8) (PK part 2)
+    AUTH_DATE_9C           INTEGER,           -- PA-AUTH-DATE-9C  S9(05) COMP-3 (sort component, 99999-yyddd)
+    AUTH_TIME_9C           INTEGER,           -- PA-AUTH-TIME-9C  S9(09) COMP-3 (sort component, descending)
+    AUTH_ORIG_DATE         TEXT,              -- PA-AUTH-ORIG-DATE X(06) YYMMDD
+    AUTH_ORIG_TIME         TEXT,              -- PA-AUTH-ORIG-TIME X(06) HHMMSS
+    CARD_NUM               TEXT,              -- PA-CARD-NUM       X(16)
+    AUTH_TYPE              TEXT,              -- PA-AUTH-TYPE      X(04)
+    CARD_EXPIRY_DATE       TEXT,              -- PA-CARD-EXPIRY-DATE X(04)
+    MESSAGE_TYPE           TEXT,              -- PA-MESSAGE-TYPE   X(06)
+    MESSAGE_SOURCE         TEXT,              -- PA-MESSAGE-SOURCE X(06)
+    AUTH_ID_CODE           TEXT,              -- PA-AUTH-ID-CODE   X(06)
+    AUTH_RESP_CODE         TEXT,              -- PA-AUTH-RESP-CODE X(02) ('00' = approved)
+    AUTH_RESP_REASON       TEXT,              -- PA-AUTH-RESP-REASON X(04)
+    PROCESSING_CODE        INTEGER,           -- PA-PROCESSING-CODE 9(06) (DECIMAL(6,0))
+    TRANSACTION_AMT        NUMERIC,           -- PA-TRANSACTION-AMT S9(10)V99 COMP-3 (DECIMAL(12,2))
+    APPROVED_AMT           NUMERIC,           -- PA-APPROVED-AMT    S9(10)V99 COMP-3 (DECIMAL(12,2))
+    MERCHANT_CATAGORY_CODE TEXT,              -- PA-MERCHANT-CATAGORY-CODE X(04) [sic spelling]
+    ACQR_COUNTRY_CODE      TEXT,              -- PA-ACQR-COUNTRY-CODE X(03)
+    POS_ENTRY_MODE         INTEGER,           -- PA-POS-ENTRY-MODE 9(02) (SMALLINT)
+    MERCHANT_ID            TEXT,              -- PA-MERCHANT-ID    X(15)
+    MERCHANT_NAME          TEXT,              -- PA-MERCHANT-NAME  X(22)
+    MERCHANT_CITY          TEXT,              -- PA-MERCHANT-CITY  X(13)
+    MERCHANT_STATE         TEXT,              -- PA-MERCHANT-STATE X(02)
+    MERCHANT_ZIP           TEXT,              -- PA-MERCHANT-ZIP   X(09)
+    TRANSACTION_ID         TEXT,              -- PA-TRANSACTION-ID X(15)
+    MATCH_STATUS           TEXT,              -- PA-MATCH-STATUS   X(01)
+    AUTH_FRAUD             TEXT,              -- PA-AUTH-FRAUD     X(01)
+    FRAUD_RPT_DATE         TEXT,              -- PA-FRAUD-RPT-DATE X(08)
+    PRIMARY KEY (ACCT_ID, AUTH_KEY),
+    -- FK note: IMS PARENT=PAUTSUM0; ON DELETE CASCADE mirrors IMS physical delete of children
+    -- when a root segment is deleted. Enforced only with PRAGMA foreign_keys = ON.
+    FOREIGN KEY (ACCT_ID) REFERENCES PAUT_SUMMARY (ACCT_ID) ON DELETE CASCADE
+);
+-- Hierarchical GN/GNP scan order = newest first. ASC on the 9s-complement values == IMS twin order.
+CREATE INDEX IF NOT EXISTS IX_PAUT_DETAIL_SEQ ON PAUT_DETAIL (ACCT_ID, AUTH_DATE_9C ASC, AUTH_TIME_9C ASC);

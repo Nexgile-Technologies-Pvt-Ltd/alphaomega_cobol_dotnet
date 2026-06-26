@@ -195,4 +195,28 @@ internal static class ReaderExtensions
     /// <summary>Reads an INTEGER column as <see cref="int"/>.</summary>
     public static int GetInt32(this SqliteDataReader rd, string column)
         => rd.GetInt32(rd.GetOrdinal(column));
+
+    /// <summary>
+    /// Reads a NUMERIC money column as an exact <see cref="decimal"/>, treating SQL NULL as 0. The
+    /// optional DB2/IMS tables declare most amount columns nullable, so a NULL must not throw.
+    /// </summary>
+    public static decimal GetMoneyOrZero(this SqliteDataReader rd, string column)
+    {
+        int o = rd.GetOrdinal(column);
+        return rd.IsDBNull(o) ? 0m : rd.GetDecimal(o);
+    }
+
+    /// <summary>Reads an INTEGER column as <see cref="int"/>, treating SQL NULL as 0.</summary>
+    public static int GetInt32OrZero(this SqliteDataReader rd, string column)
+    {
+        int o = rd.GetOrdinal(column);
+        return rd.IsDBNull(o) ? 0 : rd.GetInt32(o);
+    }
+
+    /// <summary>Reads an INTEGER column as <see cref="long"/>, treating SQL NULL as 0.</summary>
+    public static long GetInt64OrZero(this SqliteDataReader rd, string column)
+    {
+        int o = rd.GetOrdinal(column);
+        return rd.IsDBNull(o) ? 0L : rd.GetInt64(o);
+    }
 }

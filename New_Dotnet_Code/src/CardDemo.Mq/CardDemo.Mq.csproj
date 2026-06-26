@@ -3,6 +3,11 @@
   <ItemGroup>
     <ProjectReference Include="..\CardDemo.Cobol.Runtime\CardDemo.Cobol.Runtime.csproj" />
     <ProjectReference Include="..\CardDemo.Records\CardDemo.Records.csproj" />
+    <!-- COPAUA0C (the auth-decision server) reads ACCOUNT/CUSTOMER/CARD_XREF and writes the IMS
+         PAUT_SUMMARY/PAUT_DETAIL re-host through the relational repositories in CardDemo.Data
+         (which transitively brings in the CardDemo.Domain entities). See COPAUA0C.md §8. -->
+    <ProjectReference Include="..\CardDemo.Data\CardDemo.Data.csproj" />
+    <ProjectReference Include="..\CardDemo.Domain\CardDemo.Domain.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

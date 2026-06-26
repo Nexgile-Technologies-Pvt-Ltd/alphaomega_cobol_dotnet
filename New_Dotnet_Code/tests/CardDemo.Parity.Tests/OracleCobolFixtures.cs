@@ -333,6 +333,40 @@ internal static class OracleCobolFixtures
            STOP RUN.
 ";
 
+    // Unloads the INDEXED EXPORT file (keyed by the COMP sequence number) to a 500-byte sequential file.
+    public const string UnloadExp = @"       IDENTIFICATION DIVISION.
+       PROGRAM-ID. UNLDEXP.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT IN-F  ASSIGN TO EXPFILE
+                  ORGANIZATION INDEXED ACCESS SEQUENTIAL
+                  RECORD KEY IS K-SEQ.
+           SELECT OUT-F ASSIGN TO UNLOAD
+                  ORGANIZATION SEQUENTIAL.
+       DATA DIVISION.
+       FILE SECTION.
+       FD IN-F.
+       01 IN-REC.
+          05 FILLER PIC X(27).
+          05 K-SEQ  PIC 9(9) COMP.
+          05 FILLER PIC X(469).
+       FD OUT-F.
+       01 OUT-REC PIC X(500).
+       WORKING-STORAGE SECTION.
+       01 WS-EOF PIC X VALUE 'N'.
+       PROCEDURE DIVISION.
+           OPEN INPUT IN-F
+           OPEN OUTPUT OUT-F
+           PERFORM UNTIL WS-EOF = 'Y'
+              READ IN-F NEXT AT END MOVE 'Y' TO WS-EOF
+                NOT AT END MOVE IN-REC TO OUT-REC WRITE OUT-REC
+              END-READ
+           END-PERFORM
+           CLOSE IN-F OUT-F
+           STOP RUN.
+";
+
     // Driver: invokes CBACT04C exactly as JCL EXEC PGM=CBACT04C,PARM='2022071800' would.
     public const string RunB04 = @"       IDENTIFICATION DIVISION.
        PROGRAM-ID. RUNB04.

@@ -4,7 +4,9 @@
     <ProjectReference Include="..\CardDemo.Cobol.Runtime\CardDemo.Cobol.Runtime.csproj" />
     <ProjectReference Include="..\CardDemo.Utilities\CardDemo.Utilities.csproj" />
     <ProjectReference Include="..\CardDemo.Records\CardDemo.Records.csproj" />
+    <ProjectReference Include="..\CardDemo.Domain\CardDemo.Domain.csproj" />
     <ProjectReference Include="..\CardDemo.Data\CardDemo.Data.csproj" />
+    <ProjectReference Include="..\CardDemo.Import\CardDemo.Import.csproj" />
     <ProjectReference Include="..\CardDemo.JobControl\CardDemo.JobControl.csproj" />
   </ItemGroup>
 

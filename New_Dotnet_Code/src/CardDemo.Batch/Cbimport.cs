@@ -33,15 +33,16 @@ public sealed class Cbimport(Cbimport.Context ctx)
 
         while (_ctx.Export.Read(out byte[]? image) == FileStatus.Ok)
         {
-            string recType = HostEncoding.For(_ctx.Host).GetString(image!.AsSpan(0, 1));
+            byte[] rec = image!; // status '00' guarantees a record image
+            string recType = HostEncoding.For(_ctx.Host).GetString(rec.AsSpan(0, 1));
             switch (recType)
             {
-                case "C": Split(image, _ctx.CustomerVariant, _ctx.CustomerLayout, _ctx.Customer, CustomerMap); break;
-                case "A": Split(image, _ctx.AccountVariant, _ctx.AccountLayout, _ctx.Account, AccountMap); break;
-                case "X": Split(image, _ctx.XrefVariant, _ctx.XrefLayout, _ctx.Xref, XrefMap); break;
-                case "T": Split(image, _ctx.TransactionVariant, _ctx.TransactionLayout, _ctx.Transaction, TransactionMap); break;
-                case "D": Split(image, _ctx.CardVariant, _ctx.CardLayout, _ctx.Card, CardMap); break;
-                default: WriteError(image); break;
+                case "C": Split(rec, _ctx.CustomerVariant, _ctx.CustomerLayout, _ctx.Customer, CustomerMap); break;
+                case "A": Split(rec, _ctx.AccountVariant, _ctx.AccountLayout, _ctx.Account, AccountMap); break;
+                case "X": Split(rec, _ctx.XrefVariant, _ctx.XrefLayout, _ctx.Xref, XrefMap); break;
+                case "T": Split(rec, _ctx.TransactionVariant, _ctx.TransactionLayout, _ctx.Transaction, TransactionMap); break;
+                case "D": Split(rec, _ctx.CardVariant, _ctx.CardLayout, _ctx.Card, CardMap); break;
+                default: WriteError(rec); break;
             }
         }
 

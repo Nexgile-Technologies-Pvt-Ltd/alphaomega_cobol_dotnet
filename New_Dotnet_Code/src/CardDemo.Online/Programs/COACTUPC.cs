@@ -1804,8 +1804,8 @@ public sealed class Coactupc : ITransactionHandler
     private static string FileErrorMessage(string op, string file) =>
         $"File Error: {ClampOrPad(op, 8)} on {ClampOrPad(file, 9)} returned RESP {RespText()} ,RESP2 {ReasText()}     "; // :389-408
 
-    // === Currency formatting via the +ZZZ,ZZZ,ZZZ.99 edited PIC. source: :371, CobolEditedNumeric ===
-    private static string FmtCurrency(decimal v) => CobolEditedNumeric.Format(v, CurrencyPic);
+    // === Currency formatting via the +ZZZ,ZZZ,ZZZ.99 edited PIC. source: :371, EditedNumeric ===
+    private static string FmtCurrency(decimal v) => EditedNumeric.Format(v, CurrencyPic);
 
     // === Numeric formatting helpers (zoned DISPLAY) ===
     private static string Fmt11(long v) => Math.Abs(v).ToString("D11", CultureInfo.InvariantCulture);

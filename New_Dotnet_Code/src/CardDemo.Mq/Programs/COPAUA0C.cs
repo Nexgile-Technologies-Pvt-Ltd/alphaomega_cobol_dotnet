@@ -647,7 +647,7 @@ public sealed class Copaua0c : IMqServer
         }
 
         // MOVE WS-APPROVED-AMT TO WS-APPROVED-AMT-DIS (edit into -zzzzzzzzz9.99). source: :720
-        _wsApprovedAmtDis = CobolEditedNumeric.Format(_wsApprovedAmt, "-ZZZZZZZZZ9.99");
+        _wsApprovedAmtDis = EditedNumeric.Format(_wsApprovedAmt, "-ZZZZZZZZZ9.99");
 
         // STRING the 6-field CSV (each followed by ',', trailing comma included) WITH POINTER
         // WS-RESP-LENGTH. The pointer is NOT reset per message (FB-6). source: :722-731

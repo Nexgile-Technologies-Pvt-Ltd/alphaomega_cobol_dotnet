@@ -2184,7 +2184,7 @@ public sealed class Cotrtlic : ITransactionHandler
     private static bool IsBlankProgram(string? s) => string.IsNullOrEmpty(s) || s.All(c => c is ' ' or '\0');
 
     /// <summary>WS-DISP-SQLCODE PIC ----9 — leading-sign-suppress edited, 5-char field.</summary>
-    private static string FormatSqlcode(int sqlcode) => CobolEditedNumeric.Format(sqlcode, "----9");
+    private static string FormatSqlcode(int sqlcode) => EditedNumeric.Format(sqlcode, "----9");
 
     /// <summary>Maps a SQLite exception to a negative SQLCODE stand-in (any hard error -> -1, FK -> -532).</summary>
     private static int NegativeSqlcode(SqliteException e)

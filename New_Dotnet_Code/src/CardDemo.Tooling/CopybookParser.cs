@@ -73,7 +73,7 @@ public static class CopybookParser
         string Name,
         bool IsFiller,
         string? Picture,
-        CobolUsage Usage,
+        PicUsage Usage,
         string? Redefines,
         int Occurs);
 
@@ -111,7 +111,7 @@ public static class CopybookParser
         string? picture = null;
         string? redefines = null;
         int occurs = 1;
-        CobolUsage usage = CobolUsage.Display;
+        PicUsage usage = PicUsage.Display;
 
         for (int i = 2; i < tok.Length; i++)
         {
@@ -132,17 +132,17 @@ public static class CopybookParser
                 case "COMP-3":
                 case "COMPUTATIONAL-3":
                 case "PACKED-DECIMAL":
-                    usage = CobolUsage.Comp3;
+                    usage = PicUsage.Comp3;
                     break;
                 case "COMP":
                 case "COMP-4":
                 case "COMPUTATIONAL":
                 case "COMPUTATIONAL-4":
                 case "BINARY":
-                    usage = CobolUsage.Comp;
+                    usage = PicUsage.Comp;
                     break;
                 case "DISPLAY":
-                    usage = CobolUsage.Display;
+                    usage = PicUsage.Display;
                     break;
             }
         }

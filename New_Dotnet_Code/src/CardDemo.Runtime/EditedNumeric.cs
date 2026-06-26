@@ -13,7 +13,7 @@ namespace CardDemo.Runtime;
 /// negative and a space for non-negative; a leading <c>+</c> shows '+' for non-negative and '-' for
 /// negative.
 /// </remarks>
-public static class CobolEditedNumeric
+public static class EditedNumeric
 {
     /// <summary>Formats <paramref name="value"/> into <paramref name="picture"/>, returning a fixed-width string.</summary>
     public static string Format(decimal value, string picture)

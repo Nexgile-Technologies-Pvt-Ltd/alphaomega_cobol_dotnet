@@ -34,7 +34,7 @@ public sealed class FixedRecord
     public object? GetValue(string name)
     {
         int i = IndexOf(name);
-        return Layout.Fields[i].Category == CobolCategory.Alphanumeric ? ValueAsText(i) : ValueAsNumber(i);
+        return Layout.Fields[i].Category == PicCategory.Alphanumeric ? ValueAsText(i) : ValueAsNumber(i);
     }
 
     /// <summary>Decodes a single record image (length must equal <see cref="RecordLayout.Length"/>).</summary>
@@ -49,7 +49,7 @@ public sealed class FixedRecord
         {
             FieldDef f = layout.Fields[i];
             ReadOnlySpan<byte> slice = image.Slice(f.Offset, f.Length);
-            values[i] = f.Category == CobolCategory.Alphanumeric
+            values[i] = f.Category == PicCategory.Alphanumeric
                 ? HostEncoding.For(host).GetString(slice)
                 : DecodeNumeric(f, slice, host);
         }
@@ -79,7 +79,7 @@ public sealed class FixedRecord
         for (int i = 0; i < layout.Fields.Count; i++)
         {
             FieldDef f = layout.Fields[i];
-            values[i] = f.Category == CobolCategory.Alphanumeric ? new string(' ', f.Length) : (object)0m;
+            values[i] = f.Category == PicCategory.Alphanumeric ? new string(' ', f.Length) : (object)0m;
         }
         return new FixedRecord(layout, values, host);
     }
@@ -92,7 +92,7 @@ public sealed class FixedRecord
     {
         int i = IndexOf(name);
         FieldDef f = Layout.Fields[i];
-        if (f.Category != CobolCategory.Alphanumeric)
+        if (f.Category != PicCategory.Alphanumeric)
             throw new InvalidOperationException($"Field '{name}' is numeric; use SetNumber.");
         _values[i] = value.Length >= f.Length ? value[..f.Length] : value.PadRight(f.Length, ' ');
         return this;
@@ -106,7 +106,7 @@ public sealed class FixedRecord
     {
         int i = IndexOf(name);
         FieldDef f = Layout.Fields[i];
-        if (f.Category != CobolCategory.Numeric)
+        if (f.Category != PicCategory.Numeric)
             throw new InvalidOperationException($"Field '{name}' is alphanumeric; use SetText.");
         _values[i] = Decimals.Store(value, f.IntegerDigits, f.Scale, f.Signed);
         return this;
@@ -192,9 +192,9 @@ public sealed class FixedRecord
 
     private static decimal DecodeNumeric(FieldDef f, ReadOnlySpan<byte> slice, HostKind host) => f.Usage switch
     {
-        CobolUsage.Display => ZonedDecimalCodec.Decode(slice, f.Scale, f.Signed, host),
-        CobolUsage.Comp3 => PackedDecimalCodec.Decode(slice, f.Scale),
-        CobolUsage.Comp => BinaryCodec.Decode(slice, f.Scale, f.Signed),
+        PicUsage.Display => ZonedDecimalCodec.Decode(slice, f.Scale, f.Signed, host),
+        PicUsage.Comp3 => PackedDecimalCodec.Decode(slice, f.Scale),
+        PicUsage.Comp => BinaryCodec.Decode(slice, f.Scale, f.Signed),
         _ => throw new NotSupportedException($"Unsupported usage {f.Usage} for field {f.Name}."),
     };
 
@@ -202,9 +202,9 @@ public sealed class FixedRecord
     {
         switch (f.Usage)
         {
-            case CobolUsage.Display: ZonedDecimalCodec.Encode(value, slice, f.TotalDigits, f.Scale, f.Signed, host); break;
-            case CobolUsage.Comp3: PackedDecimalCodec.Encode(value, slice, f.TotalDigits, f.Scale, f.Signed); break;
-            case CobolUsage.Comp: BinaryCodec.Encode(value, slice, f.TotalDigits, f.Scale, f.Signed); break;
+            case PicUsage.Display: ZonedDecimalCodec.Encode(value, slice, f.TotalDigits, f.Scale, f.Signed, host); break;
+            case PicUsage.Comp3: PackedDecimalCodec.Encode(value, slice, f.TotalDigits, f.Scale, f.Signed); break;
+            case PicUsage.Comp: BinaryCodec.Encode(value, slice, f.TotalDigits, f.Scale, f.Signed); break;
             default: throw new NotSupportedException($"Unsupported usage {f.Usage} for field {f.Name}.");
         }
     }

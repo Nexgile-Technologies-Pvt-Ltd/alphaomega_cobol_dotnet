@@ -213,8 +213,8 @@ public sealed class Copaus2c
     /// WS-SQLCODE PIC +9(06) rendering of an SQLCODE (FB #2 territory): leading sign + 6 zero-filled digits.
     /// Exact DB2 SQLCODE/SQLSTATE values are unverifiable against SQLite; characterization only.
     /// </summary>
-    private static string EditSqlCode(int sqlcode) => CobolEditedNumeric.Format(sqlcode, "+999999");
+    private static string EditSqlCode(int sqlcode) => EditedNumeric.Format(sqlcode, "+999999");
 
     /// <summary>WS-SQLSTATE PIC +9(09) rendering (FB #2: SQLSTATE forced into a numeric-edited field).</summary>
-    private static string EditSqlState(long sqlstate) => CobolEditedNumeric.Format(sqlstate, "+999999999");
+    private static string EditSqlState(long sqlstate) => EditedNumeric.Format(sqlstate, "+999999999");
 }

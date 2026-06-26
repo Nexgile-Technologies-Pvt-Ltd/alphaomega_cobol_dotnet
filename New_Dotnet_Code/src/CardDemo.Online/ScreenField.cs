@@ -42,7 +42,7 @@ public sealed class ScreenField
     /// <summary>The PICIN edit pattern (input picture), if any. Currently informational (handlers de-edit raw text).</summary>
     public string? PicIn { get; init; }
 
-    /// <summary>The PICOUT edit pattern (output picture), if any — delegated to <see cref="CobolEditedNumeric"/> on render.</summary>
+    /// <summary>The PICOUT edit pattern (output picture), if any — delegated to <see cref="EditedNumeric"/> on render.</summary>
     public string? PicOut { get; init; }
 
     // ---- mutable runtime state (the symbolic-map cell) -------------------------------------------
@@ -123,7 +123,7 @@ public sealed class ScreenField
     {
         if (PicOut is { Length: > 0 } pic && decimal.TryParse(Value, out decimal n))
         {
-            string edited = CobolEditedNumeric.Format(n, pic);
+            string edited = EditedNumeric.Format(n, pic);
             return edited.Length >= Length ? edited[..Length] : edited.PadRight(Length, ' ');
         }
         return Padded();

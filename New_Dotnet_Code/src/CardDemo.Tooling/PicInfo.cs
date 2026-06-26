@@ -11,7 +11,7 @@ namespace CardDemo.Tooling;
 /// <param name="Scale">9-positions after V.</param>
 /// <param name="ByteCount">Character-position count for alphanumeric pictures.</param>
 public sealed record PicInfo(
-    CobolCategory Category,
+    PicCategory Category,
     bool Signed,
     int IntegerDigits,
     int Scale,
@@ -70,7 +70,7 @@ public sealed record PicInfo(
         }
 
         return alpha
-            ? new PicInfo(CobolCategory.Alphanumeric, false, 0, 0, positions)
-            : new PicInfo(CobolCategory.Numeric, signed, intDigits, scale, positions);
+            ? new PicInfo(PicCategory.Alphanumeric, false, 0, 0, positions)
+            : new PicInfo(PicCategory.Numeric, signed, intDigits, scale, positions);
     }
 }

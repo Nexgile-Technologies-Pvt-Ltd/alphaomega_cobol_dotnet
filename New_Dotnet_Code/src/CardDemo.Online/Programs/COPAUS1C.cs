@@ -390,7 +390,7 @@ public sealed class Copaus1c : ITransactionHandler
         SetOut("AUTHTM", _wsAuthTime);                       // MOVE WS-AUTH-TIME TO AUTHTMO. :306
 
         // Amount — PA-APPROVED-AMT into PIC -zzzzzzz9.99, truncate toward zero. :308-309
-        string wsAuthAmt = CobolEditedNumeric.Format(pa.ApprovedAmt, "-zzzzzzz9.99");
+        string wsAuthAmt = EditedNumeric.Format(pa.ApprovedAmt, "-zzzzzzz9.99");
         SetOut("AUTHAMT", wsAuthAmt);                        // MOVE WS-AUTH-AMT TO AUTHAMTO.
 
         // Response indicator. :311-317

@@ -1,7 +1,7 @@
 namespace CardDemo.Runtime;
 
 /// <summary>COBOL data category of an elementary item.</summary>
-public enum CobolCategory
+public enum PicCategory
 {
     /// <summary>PIC X — alphanumeric text.</summary>
     Alphanumeric,
@@ -11,7 +11,7 @@ public enum CobolCategory
 }
 
 /// <summary>COBOL <c>USAGE</c> of a numeric item (alphanumeric items are always <see cref="Display"/>).</summary>
-public enum CobolUsage
+public enum PicUsage
 {
     /// <summary>Zoned decimal — one byte per digit.</summary>
     Display,
@@ -40,8 +40,8 @@ public sealed record FieldDef(
     string Name,
     int Offset,
     int Length,
-    CobolCategory Category,
-    CobolUsage Usage,
+    PicCategory Category,
+    PicUsage Usage,
     bool Signed,
     int IntegerDigits,
     int Scale,

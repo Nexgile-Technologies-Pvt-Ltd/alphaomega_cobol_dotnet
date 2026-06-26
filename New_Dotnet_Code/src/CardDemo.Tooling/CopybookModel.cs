@@ -13,7 +13,7 @@ internal sealed class CopybookNode
     public required string Name { get; init; }
     public bool IsFiller { get; init; }
     public PicInfo? Pic { get; init; }
-    public CobolUsage Usage { get; init; } = CobolUsage.Display;
+    public PicUsage Usage { get; init; } = PicUsage.Display;
     public int Occurs { get; init; } = 1;
     public string? Redefines { get; init; }
     public List<CopybookNode> Children { get; } = [];
@@ -75,12 +75,12 @@ public sealed class CopybookModel
     private static int ElementaryLength(CopybookNode node)
     {
         PicInfo pic = node.Pic!;
-        if (pic.Category == CobolCategory.Alphanumeric) return pic.ByteCount;
+        if (pic.Category == PicCategory.Alphanumeric) return pic.ByteCount;
         return node.Usage switch
         {
-            CobolUsage.Display => pic.TotalDigits,
-            CobolUsage.Comp3 => PackedDecimalCodec.ByteLength(pic.TotalDigits),
-            CobolUsage.Comp => BinaryCodec.ByteLength(pic.TotalDigits),
+            PicUsage.Display => pic.TotalDigits,
+            PicUsage.Comp3 => PackedDecimalCodec.ByteLength(pic.TotalDigits),
+            PicUsage.Comp => BinaryCodec.ByteLength(pic.TotalDigits),
             _ => throw new NotSupportedException($"Unsupported usage {node.Usage} for field {node.Name}."),
         };
     }

@@ -1105,9 +1105,9 @@ public sealed class Copaus0c : ITransactionHandler
     // =============================================================================================
     /// <summary>
     /// MOVE numeric TO an edited PIC (<c>-ZZZZZZZ9.99</c> or <c>-ZZZZ9.99</c>): truncate toward zero (no
-    /// rounding), zero-suppress, leading floating sign. Delegates to <see cref="CobolEditedNumeric"/>.
+    /// rounding), zero-suppress, leading floating sign. Delegates to <see cref="EditedNumeric"/>.
     /// </summary>
-    private static string EditAmt(decimal value, string picture) => CobolEditedNumeric.Format(value, picture);
+    private static string EditAmt(decimal value, string picture) => EditedNumeric.Format(value, picture);
 
     /// <summary>MOVE count TO WS-DISPLAY-COUNT PIC 9(03): low-order 3 digits, zero-padded. source: :58,788-791</summary>
     private static string DisplayCount(int value)

@@ -27,7 +27,7 @@ namespace CardDemo.Batch;
 /// a start/end date pair to <see cref="Run(RelationalDb,string,string?,string?,HostKind)"/>. The
 /// <c>TRANREPT</c> report is a flat fixed-width 133-byte dataset written via <see cref="FixedFileWriter"/>.</para>
 /// <para>Money math uses <see cref="decimal"/> with COBOL truncate-toward-zero / silent-overflow semantics
-/// (<see cref="Decimals.Store"/> into S9(9)V99); the edited amount fields use <see cref="CobolEditedNumeric"/>
+/// (<see cref="Decimals.Store"/> into S9(9)V99); the edited amount fields use <see cref="EditedNumeric"/>
 /// (<c>-ZZZ,ZZZ,ZZZ.ZZ</c> for detail, <c>+ZZZ,ZZZ,ZZZ.ZZ</c> for totals).</para>
 /// <para>FAITHFUL BUGS reproduced verbatim (see <c>_design/specs/CBTRN03C.md</c> §7):
 /// <list type="number">
@@ -952,7 +952,7 @@ public sealed class Cbtrn03c
         sb.Append(' ');                       // FILLER X(01) sp
         sb.Append(Alpha(source, 10));         // TRAN-REPORT-SOURCE X(10)
         sb.Append("    ");                     // FILLER X(04) sp
-        sb.Append(CobolEditedNumeric.Format(StoreMoney(amt), DetailAmtPic)); // TRAN-REPORT-AMT -ZZZ,ZZZ,ZZZ.ZZ
+        sb.Append(EditedNumeric.Format(StoreMoney(amt), DetailAmtPic)); // TRAN-REPORT-AMT -ZZZ,ZZZ,ZZZ.ZZ
         sb.Append("  ");                       // FILLER X(02) sp
         return sb.ToString();
     }
@@ -980,7 +980,7 @@ public sealed class Cbtrn03c
         var sb = new System.Text.StringBuilder(ReportRecLen);
         sb.Append(Alpha("Page Total", 11));  // FILLER X(11) VALUE 'Page Total'
         sb.Append(new string('.', 86));       // FILLER X(86) VALUE ALL '.'
-        sb.Append(CobolEditedNumeric.Format(StoreMoney(pageTotal), TotalAmtPic)); // REPT-PAGE-TOTAL +ZZZ,ZZZ,ZZZ.ZZ
+        sb.Append(EditedNumeric.Format(StoreMoney(pageTotal), TotalAmtPic)); // REPT-PAGE-TOTAL +ZZZ,ZZZ,ZZZ.ZZ
         return sb.ToString();
     }
 
@@ -990,7 +990,7 @@ public sealed class Cbtrn03c
         var sb = new System.Text.StringBuilder(ReportRecLen);
         sb.Append(Alpha("Account Total", 13)); // FILLER X(13) VALUE 'Account Total'
         sb.Append(new string('.', 84));         // FILLER X(84) VALUE ALL '.'
-        sb.Append(CobolEditedNumeric.Format(StoreMoney(accountTotal), TotalAmtPic)); // REPT-ACCOUNT-TOTAL
+        sb.Append(EditedNumeric.Format(StoreMoney(accountTotal), TotalAmtPic)); // REPT-ACCOUNT-TOTAL
         return sb.ToString();
     }
 
@@ -1000,7 +1000,7 @@ public sealed class Cbtrn03c
         var sb = new System.Text.StringBuilder(ReportRecLen);
         sb.Append(Alpha("Grand Total", 11)); // FILLER X(11) VALUE 'Grand Total'
         sb.Append(new string('.', 86));       // FILLER X(86) VALUE ALL '.'
-        sb.Append(CobolEditedNumeric.Format(StoreMoney(grandTotal), TotalAmtPic)); // REPT-GRAND-TOTAL
+        sb.Append(EditedNumeric.Format(StoreMoney(grandTotal), TotalAmtPic)); // REPT-GRAND-TOTAL
         return sb.ToString();
     }
 

@@ -17,7 +17,7 @@ namespace CardDemo.Tests;
 /// reading USRSEC); COMEN01C/COADM01C menu fan-out; a COUSR01C-add → COUSR02C-update CRUD round-trip
 /// over USRSEC; and COACTVWC reading a known account.
 /// </summary>
-public sealed class OnlineTests
+public sealed partial class OnlineTests
 {
     // ---- shared seeded DB ---------------------------------------------------------------------------
 

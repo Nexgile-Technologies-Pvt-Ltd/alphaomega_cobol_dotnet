@@ -1193,20 +1193,23 @@ public sealed class Cocrdlic : ITransactionHandler
     // without disturbing any field the program uses. (CDEMO-CUSTOMER-INFO is untouched by COCRDLIC.)
     private void SaveProgCommarea(CicsContext ctx)
     {
-        // Pack: FIRST-CARD-NUM(16) | LAST-CARD-NUM(16) | SCREEN-NUM(1) | LAST-PAGE-DISPLAYED(1) | NEXT-IND(1)
+        // Pack the program-private paging trailer into the 75 spare CustName bytes. The byte layout mirrors
+        // RestoreProgCommarea exactly (offsets 0/16/32/33/34/35/46):
+        //   FIRST-CARD-NUM(16) | LAST-CARD-NUM(16) | SCREEN-NUM(1) | LAST-PAGE-DISPLAYED(1) | NEXT-IND(1) |
+        //   FIRST-CARD-ACCT-ID(11) | LAST-CARD-ACCT-ID(11)  = 57 bytes.
         string packed =
             PadX(_wsCaFirstCardNum, 16) +
             PadX(_wsCaLastCardNum, 16) +
             (char)('0' + (_wsCaScreenNum % 10)) +
             (char)('0' + (_wsCaLastPageDisplayed % 10)) +
-            (_wsCaNextPageInd == '\0' ? ' ' : _wsCaNextPageInd);
-        // 51 chars -> CustFName(25)+CustMName(25)+CustLName(1).
+            (_wsCaNextPageInd == '\0' ? ' ' : _wsCaNextPageInd) +
+            Zoned(_wsCaFirstCardAcctId, 11) +
+            Zoned(_wsCaLastCardAcctId, 11);
+        // Spread the 57-byte image across CustFName(25)+CustMName(25)+CustLName(25); pad to the full 75.
+        packed = PadX(packed, 75);
         _commArea.CustFName = packed.Substring(0, 25);
         _commArea.CustMName = packed.Substring(25, 25);
-        _commArea.CustLName = packed.Substring(50, 1);
-        // Carry the first/last acct-ids in the spare bytes too (within CustLName tail).
-        _commArea.CustLName = packed.Substring(50, 1)
-            + Zoned(_wsCaFirstCardAcctId, 11) + Zoned(_wsCaLastCardAcctId, 11);
+        _commArea.CustLName = packed.Substring(50, 25);
     }
 
     private void RestoreProgCommarea(CicsContext ctx)

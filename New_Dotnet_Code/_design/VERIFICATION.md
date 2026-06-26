@@ -13,7 +13,7 @@ coverage, anti-hallucination and codec tracks as clean and surfaced a further ro
 - `dotnet build CardDemo.sln -m:1` → **0 errors**. ~60 warnings, all the benign faithful-dead-code class
   (CS0414/CS0169/CS0649 = inert WORKING-STORAGE fields carried verbatim; CS1717 = faithful RESP2 self-moves;
   CS0162 = documented unreachable faithful branches). .NET 10.0.201, Microsoft.Data.Sqlite 10.0.9.
-- `dotnet test` (CardDemo.Tests) → **79 passed / 0 failed / 0 skipped**, deterministic across repeated runs.
+- `dotnet test` (CardDemo.Tests) → **88 passed / 0 failed / 0 skipped**, deterministic across repeated runs.
 
 ## No-COBOL proof (requirement: zero COBOL code in `New_Dotnet_Code`) — INDEPENDENTLY RE-VERIFIED
 A 5-facet audit (embedded source, committed source files, toolchain, identifiers, binaries) → **all PASS**:
@@ -119,13 +119,27 @@ Also fixed: **COTRTLIC.cs** carried **5 embedded NUL bytes** (corrupted `'\0'` e
 `0x00`) flagged by the codec/critic tracks — de-corrupted to proper `\0` escapes (identical compiled value,
 clean ASCII source). COBTUPDT (whose reviewer never emitted, twice) was reviewed by hand and is FAITHFUL.
 
-## Tests (79)
+**Closing the Track-E online breadth gap — 9 driven screen-flow tests added (one per remaining handler).**
+Each drives a real RECEIVE/SEND turn through the dispatcher and asserts observable behaviour (painted master
+values / DB-row effects / exact message literals, incl. preserved faithful bugs). Authoring this coverage
+surfaced one more real defect — **COCRDLIC** [HIGH] `SaveProgCommarea` built a 35-char trailer image but then
+sliced `Substring(25,25)`/`Substring(50,1)` (needs ≥51), throwing `ArgumentOutOfRangeException` on **every**
+card-list turn — never caught because the list path had no behavioural test. Fixed to pack the full 57-byte
+image (incl. the two 11-digit acct-ids) padded to 75, symmetric with `RestoreProgCommarea`. The new tests:
+COCRDLIC (list page from CARD master), COCRDSLC (card detail paint), COCRDUPC (3-turn load→validate→F5 REWRITE,
+asserting status flip + 3 faithful bugs), COACTUPC (account detail paint), COTRN01C (txn detail paint),
+COTRN02C (keyed add → confirm prompt + card resolve), COBIL00C (confirm-Y pays full balance: writes the
+bill-pay TRANSACTION + debits the account to zero), CORPT00C (monthly report submit + green confirmation),
+COUSR03C (PF5 delete → row physically gone + confirmation literal).
+
+## Tests (88)
 SchemaRoundTripTests, BatchTests (incl. CSUTLDTC 2508/2517 classification), OnlineTests, OptionalTests,
 JobControlTests (incl. CREASTMT statement job, UNLDPADB→LOADPADB round-trip job, UNLDGSAM GSAM job), and
 **RemediationTests** (CBSTM03A statement gen; PAUDBUNL→PAUDBLOD round-trip; DBUNLDGS GSAM byte-identity;
 EditedNumeric lowercase; COPAUS2C targeted fraud update). Second-audit regression locks: CBTRN03C DALY
 pre-filter (all in-window rows reported, out-of-window excluded, totals written); COSGN00C blank-password
-sets the err flag and skips the read; and the COTRN00C/COUSR00C selected-from-list keys survive the XCTL.
+sets the err flag and skips the read; the COTRN00C/COUSR00C selected-from-list keys survive the XCTL; plus
+the **9 driven online screen-flow tests** above (all 17 online handlers now have behavioural coverage).
 
 ## Boundaries (documented, not gaps)
 - Verification is pure-.NET (per the no-COBOL directive): byte-exact schema round-trip + EXPORT/IMPORT
@@ -135,9 +149,8 @@ sets the err flag and skips the read; and the COTRN00C/COUSR00C selected-from-li
   side store keyed on the full nav-area image — the console runtime round-trips only the 160-byte nav area.
 - The 5 newly-ported programs are exercised directly by tests AND wired into named JobControl sequences
   (CREASTMT, LOADPADB, UNLDPADB, UNLDGSAM), each with a job-level test.
-- **Online test breadth (Track E, documented gap, not a conversion defect):** the batch / JobControl /
-  IMS / MQ / DB2 spine and ~8 online handlers have direct behavioral coverage with specific oracles; the
-  remaining online CICS handlers (e.g. COACTUPC, COCRDLIC/SLC/UPC, COTRN02C, COBIL00C, CORPT00C, COUSR03C)
-  are covered by registry/routing wiring plus per-program source-vs-COBOL fidelity review (both audit passes)
-  rather than a driven screen-flow test each. Closing this fully means one scripted RECEIVE/SEND turn per
-  remaining handler; the ports themselves were read paragraph-by-paragraph against the COBOL in both audits.
+- **Online test breadth (Track E) — NOW CLOSED.** Every one of the 17 online CICS handlers has a driven
+  behavioural screen-flow test (the prior ~8 plus the 9 added above), in addition to per-program
+  source-vs-COBOL fidelity review in both audit passes. Online parity remains characterization-based (no CICS
+  oracle exists) — asserted on field values + COMMAREA + next-TRANSID/XCTL + DB effects, not 3270 datastream
+  bytes — but no online handler is now wiring-only.

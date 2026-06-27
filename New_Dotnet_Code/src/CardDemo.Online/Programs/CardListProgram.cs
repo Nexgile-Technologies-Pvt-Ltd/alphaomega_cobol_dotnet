@@ -60,133 +60,133 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     //  WS-CONSTANTS — source: COCRDLIC.cbl:176-217
     // =============================================================================================
-    private const int WS_MAX_SCREEN_LINES = 7;          // source: COCRDLIC.cbl:177-178
-    private const string LIT_THISPGM = "COCRDLIC";      // source: COCRDLIC.cbl:179-180
-    private const string LIT_THISTRANID = "CCLI";       // source: COCRDLIC.cbl:181-182
-    private const string LIT_THISMAPSET = "COCRDLI";    // source: COCRDLIC.cbl:183-184 ('COCRDLI' X(7))
-    private const string LIT_THISMAP = "CCRDLIA";       // source: COCRDLIC.cbl:185-186
-    private const string LIT_MENUPGM = "COMEN01C";      // source: COCRDLIC.cbl:187-188
-    private const string LIT_MENUTRANID = "CM00";       // source: COCRDLIC.cbl:189-190
-    private const string LIT_MENUMAPSET = "COMEN01";    // source: COCRDLIC.cbl:191-192
-    private const string LIT_MENUMAP = "COMEN1A";       // source: COCRDLIC.cbl:193-194
-    private const string LIT_CARDDTLPGM = "COCRDSLC";   // source: COCRDLIC.cbl:195-196
-    private const string LIT_CARDDTLTRANID = "CCDL";    // source: COCRDLIC.cbl:197-198
-    private const string LIT_CARDDTLMAPSET = "COCRDSL"; // source: COCRDLIC.cbl:199-200
-    private const string LIT_CARDDTLMAP = "CCRDSLA";    // source: COCRDLIC.cbl:201-202
-    private const string LIT_CARDUPDPGM = "COCRDUPC";   // source: COCRDLIC.cbl:203-204
-    private const string LIT_CARDUPDTRANID = "CCUP";    // source: COCRDLIC.cbl:205-206
-    private const string LIT_CARDUPDMAPSET = "COCRDUP"; // source: COCRDLIC.cbl:207-208
-    private const string LIT_CARDUPDMAP = "CCRDUPA";    // source: COCRDLIC.cbl:209-210
-    private const string LIT_CARD_FILE = "CARDDAT ";    // source: COCRDLIC.cbl:213-214
+    private const int MaxScreenLines = 7;          // source: COCRDLIC.cbl:177-178 // WS-MAX-SCREEN-LINES
+    private const string ThisProgramId = "COCRDLIC";      // source: COCRDLIC.cbl:179-180 // LIT-THISPGM
+    private const string ThisTranId = "CCLI";       // source: COCRDLIC.cbl:181-182 // LIT-THISTRANID
+    private const string ThisMapSet = "COCRDLI";    // source: COCRDLIC.cbl:183-184 ('COCRDLI' X(7)) // LIT-THISMAPSET
+    private const string ThisMap = "CCRDLIA";       // source: COCRDLIC.cbl:185-186 // LIT-THISMAP
+    private const string MenuProgramId = "COMEN01C";      // source: COCRDLIC.cbl:187-188 // LIT-MENUPGM
+    private const string MenuTranId = "CM00";       // source: COCRDLIC.cbl:189-190 // LIT-MENUTRANID
+    private const string MenuMapSet = "COMEN01";    // source: COCRDLIC.cbl:191-192 // LIT-MENUMAPSET
+    private const string MenuMap = "COMEN1A";       // source: COCRDLIC.cbl:193-194 // LIT-MENUMAP
+    private const string CardDetailProgramId = "COCRDSLC";   // source: COCRDLIC.cbl:195-196 // LIT-CARDDTLPGM
+    private const string CardDetailTranId = "CCDL";    // source: COCRDLIC.cbl:197-198 // LIT-CARDDTLTRANID
+    private const string CardDetailMapSet = "COCRDSL"; // source: COCRDLIC.cbl:199-200 // LIT-CARDDTLMAPSET
+    private const string CardDetailMap = "CCRDSLA";    // source: COCRDLIC.cbl:201-202 // LIT-CARDDTLMAP
+    private const string CardUpdateProgramId = "COCRDUPC";   // source: COCRDLIC.cbl:203-204 // LIT-CARDUPDPGM
+    private const string CardUpdateTranId = "CCUP";    // source: COCRDLIC.cbl:205-206 // LIT-CARDUPDTRANID
+    private const string CardUpdateMapSet = "COCRDUP"; // source: COCRDLIC.cbl:207-208 // LIT-CARDUPDMAPSET
+    private const string CardUpdateMap = "CCRDUPA";    // source: COCRDLIC.cbl:209-210 // LIT-CARDUPDMAP
+    private const string CardFileName = "CARDDAT ";    // source: COCRDLIC.cbl:213-214 // LIT-CARD-FILE
     // B-8: LIT-CARD-FILE-ACCT-PATH = 'CARDAIX ' declared but never referenced. source: COCRDLIC.cbl:215-217
-    private const string LIT_CARD_FILE_ACCT_PATH = "CARDAIX ";
+    private const string CardFileAcctPath = "CARDAIX "; // LIT-CARD-FILE-ACCT-PATH
 
     // CCDA-TITLE01/02 (COTTL01Y) — shared screen header. source: COTTL01Y.cpy.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
+    private const string Title01 = "      AWS Mainframe Modernization       "; // CCDA-TITLE01
+    private const string Title02 = "              CardDemo                  "; // CCDA-TITLE02
 
     // =============================================================================================
     //  WS-MISC-STORAGE — input edits + flags. source: COCRDLIC.cbl:41-171
     // =============================================================================================
 
     // 07 WS-RESP-CD / WS-REAS-CD PIC S9(09) COMP. source: COCRDLIC.cbl:47-50
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode; // WS-RESP-CD
+    private int _reasonCode; // WS-REAS-CD
 
     // 05 WS-INPUT-FLAG: 88 INPUT-OK={'0',' ',LOW-VALUES} / INPUT-ERROR='1'. source: COCRDLIC.cbl:56-60
-    private char _wsInputFlag = '\0';
-    private bool InputOk => _wsInputFlag is '0' or ' ' or '\0'; // 88 INPUT-OK
-    private bool InputError => _wsInputFlag == '1';             // 88 INPUT-ERROR
-    private void SetInputOk() => _wsInputFlag = '0';
-    private void SetInputError() => _wsInputFlag = '1';
+    private char _inputFlag = '\0'; // WS-INPUT-FLAG
+    private bool InputOk => _inputFlag is '0' or ' ' or '\0'; // 88 INPUT-OK
+    private bool InputError => _inputFlag == '1';             // 88 INPUT-ERROR
+    private void SetInputOk() => _inputFlag = '0';
+    private void SetInputError() => _inputFlag = '1';
 
     // 05 WS-EDIT-ACCT-FLAG: 88 NOT-OK='0' / ISVALID='1' / BLANK=' '. source: COCRDLIC.cbl:61-64
-    private char _wsEditAcctFlag = '\0';
-    private bool FlgAcctFilterNotOk => _wsEditAcctFlag == '0';  // 88 FLG-ACCTFILTER-NOT-OK
-    private bool FlgAcctFilterIsValid => _wsEditAcctFlag == '1'; // 88 FLG-ACCTFILTER-ISVALID
-    private void SetFlgAcctFilterNotOk() => _wsEditAcctFlag = '0';
-    private void SetFlgAcctFilterIsValid() => _wsEditAcctFlag = '1';
-    private void SetFlgAcctFilterBlank() => _wsEditAcctFlag = ' ';
+    private char _editAcctFlag = '\0'; // WS-EDIT-ACCT-FLAG
+    private bool FlgAcctFilterNotOk => _editAcctFlag == '0';  // 88 FLG-ACCTFILTER-NOT-OK
+    private bool FlgAcctFilterIsValid => _editAcctFlag == '1'; // 88 FLG-ACCTFILTER-ISVALID
+    private void SetFlgAcctFilterNotOk() => _editAcctFlag = '0';
+    private void SetFlgAcctFilterIsValid() => _editAcctFlag = '1';
+    private void SetFlgAcctFilterBlank() => _editAcctFlag = ' ';
 
     // 05 WS-EDIT-CARD-FLAG: 88 NOT-OK='0' / ISVALID='1' / BLANK=' '. source: COCRDLIC.cbl:65-68
-    private char _wsEditCardFlag = '\0';
-    private bool FlgCardFilterNotOk => _wsEditCardFlag == '0';  // 88 FLG-CARDFILTER-NOT-OK
-    private bool FlgCardFilterIsValid => _wsEditCardFlag == '1'; // 88 FLG-CARDFILTER-ISVALID
-    private void SetFlgCardFilterNotOk() => _wsEditCardFlag = '0';
-    private void SetFlgCardFilterIsValid() => _wsEditCardFlag = '1';
-    private void SetFlgCardFilterBlank() => _wsEditCardFlag = ' ';
+    private char _editCardFlag = '\0'; // WS-EDIT-CARD-FLAG
+    private bool FlgCardFilterNotOk => _editCardFlag == '0';  // 88 FLG-CARDFILTER-NOT-OK
+    private bool FlgCardFilterIsValid => _editCardFlag == '1'; // 88 FLG-CARDFILTER-ISVALID
+    private void SetFlgCardFilterNotOk() => _editCardFlag = '0';
+    private void SetFlgCardFilterIsValid() => _editCardFlag = '1';
+    private void SetFlgCardFilterBlank() => _editCardFlag = ' ';
 
     // 05 WS-EDIT-SELECT-COUNTER PIC S9(04) COMP-3 (used as the INSPECT tally I). source: COCRDLIC.cbl:69-71
     // 05 WS-EDIT-SELECT-FLAGS X(7) redef WS-EDIT-SELECT OCCURS 7. source: COCRDLIC.cbl:72-82
     // Init LOW-VALUES. 88 SELECT-OK={'S','U'} VIEW='S' UPDATE='U' BLANK={' ',LOW-VALUES}.
-    private readonly char[] _wsEditSelect = { '\0', '\0', '\0', '\0', '\0', '\0', '\0' };
-    private bool SelectOk(int i1) => _wsEditSelect[i1 - 1] is 'S' or 'U';          // 88 SELECT-OK
-    private bool ViewRequestedOn(int i1) => _wsEditSelect[i1 - 1] == 'S';          // 88 VIEW-REQUESTED-ON
-    private bool UpdateRequestedOn(int i1) => _wsEditSelect[i1 - 1] == 'U';        // 88 UPDATE-REQUESTED-ON
-    private bool SelectBlank(int i1) => _wsEditSelect[i1 - 1] is ' ' or '\0';      // 88 SELECT-BLANK
+    private readonly char[] _editSelect = { '\0', '\0', '\0', '\0', '\0', '\0', '\0' }; // WS-EDIT-SELECT
+    private bool SelectOk(int i1) => _editSelect[i1 - 1] is 'S' or 'U';          // 88 SELECT-OK
+    private bool ViewRequestedOn(int i1) => _editSelect[i1 - 1] == 'S';          // 88 VIEW-REQUESTED-ON
+    private bool UpdateRequestedOn(int i1) => _editSelect[i1 - 1] == 'U';        // 88 UPDATE-REQUESTED-ON
+    private bool SelectBlank(int i1) => _editSelect[i1 - 1] is ' ' or '\0';      // 88 SELECT-BLANK
 
     // 05 WS-EDIT-SELECT-ERROR-FLAGS X(7) redef WS-EDIT-SELECT-ERRORS OCCURS 7 -> WS-ROW-CRDSELECT-ERROR
     //    88 WS-ROW-SELECT-ERROR = '1'. source: COCRDLIC.cbl:83-88
-    private readonly char[] _wsRowCrdselectError = { '0', '0', '0', '0', '0', '0', '0' };
+    private readonly char[] _rowCardSelectError = { '0', '0', '0', '0', '0', '0', '0' }; // WS-ROW-CRDSELECT-ERROR
 
     // 05 WS-SUBSCRIPT-VARS: I (tally) / I-SELECTED (88 DETAIL-WAS-REQUESTED 1 THRU 7). source: COCRDLIC.cbl:89-94
-    private int _i;
-    private int _iSelected;
+    private int _tally; // I
+    private int _selectedRow; // I-SELECTED
 
     // 05 CICS-OUTPUT-EDIT-VARS: FLG-PROTECT-SELECT-ROWS X(1) 88 NO='0' YES='1'. source: COCRDLIC.cbl:98-107
-    private char _flgProtectSelectRows = '\0';
-    private bool FlgProtectSelectRowsYes => _flgProtectSelectRows == '1'; // 88 FLG-PROTECT-SELECT-ROWS-YES
-    private void SetFlgProtectSelectRowsNo() => _flgProtectSelectRows = '0';
-    private void SetFlgProtectSelectRowsYes() => _flgProtectSelectRows = '1';
+    private char _protectSelectRows = '\0'; // FLG-PROTECT-SELECT-ROWS
+    private bool FlgProtectSelectRowsYes => _protectSelectRows == '1'; // 88 FLG-PROTECT-SELECT-ROWS-YES
+    private void SetFlgProtectSelectRowsNo() => _protectSelectRows = '0';
+    private void SetFlgProtectSelectRowsYes() => _protectSelectRows = '1';
 
     // 05 WS-INFO-MSG X(45): 88 NO-INFO-MESSAGE={SPACES,LOW-VALUES} ; INFORM-REC-ACTIONS. source: COCRDLIC.cbl:112-116
-    private string _wsInfoMsg = "";
-    private const string INFORM_REC_ACTIONS = "TYPE S FOR DETAIL, U TO UPDATE ANY RECORD"; // source: :115-116
-    private bool WsNoInfoMessage => IsSpacesOrLowValues(_wsInfoMsg);     // 88 WS-NO-INFO-MESSAGE
-    private void SetWsNoInfoMessage() => _wsInfoMsg = "";                // SET WS-NO-INFO-MESSAGE (SPACES)
-    private void SetWsInformRecActions() => _wsInfoMsg = INFORM_REC_ACTIONS;
+    private string _infoMessage = ""; // WS-INFO-MSG
+    private const string InformRecActions = "TYPE S FOR DETAIL, U TO UPDATE ANY RECORD"; // source: :115-116 // INFORM-REC-ACTIONS
+    private bool HasNoInfoMessage => IsSpacesOrLowValues(_infoMessage);     // 88 WS-NO-INFO-MESSAGE
+    private void SetHasNoInfoMessage() => _infoMessage = "";                // SET WS-NO-INFO-MESSAGE (SPACES)
+    private void SetWsInformRecActions() => _infoMessage = InformRecActions;
 
     // 05 WS-ERROR-MSG X(75): 88 OFF=SPACES ; EXIT-MESSAGE ; NO-RECORDS-FOUND ; etc. source: COCRDLIC.cbl:117-126
-    private string _wsErrorMsg = "";
-    private const string EXIT_MESSAGE = "PF03 PRESSED.EXITING";                                  // source: :119-120
-    private const string NO_RECORDS_FOUND = "NO RECORDS FOUND FOR THIS SEARCH CONDITION.";       // source: :121-122
-    private const string MORE_THAN_1_ACTION = "PLEASE SELECT ONLY ONE RECORD TO VIEW OR UPDATE"; // source: :123-124
-    private const string INVALID_ACTION_CODE = "INVALID ACTION CODE";                            // source: :125-126
-    private bool WsErrorMsgOff => IsSpaces(_wsErrorMsg) || _wsErrorMsg.Length == 0; // 88 WS-ERROR-MSG-OFF (SPACES)
-    private bool WsNoRecordsFound => _wsErrorMsg == NO_RECORDS_FOUND;               // 88 WS-NO-RECORDS-FOUND
-    private void SetWsErrorMsgOff() => _wsErrorMsg = "";                            // SET WS-ERROR-MSG-OFF (SPACES)
-    private void SetWsExitMessage() => _wsErrorMsg = EXIT_MESSAGE;
-    private void SetWsNoRecordsFound() => _wsErrorMsg = NO_RECORDS_FOUND;
-    private void SetWsMoreThan1Action() => _wsErrorMsg = MORE_THAN_1_ACTION;
-    private void SetWsInvalidActionCode() => _wsErrorMsg = INVALID_ACTION_CODE;
+    private string _errorMessage = ""; // WS-ERROR-MSG
+    private const string ExitMessage = "PF03 PRESSED.EXITING";                                  // source: :119-120 // EXIT-MESSAGE
+    private const string NoRecordsFound = "NO RECORDS FOUND FOR THIS SEARCH CONDITION.";       // source: :121-122 // NO-RECORDS-FOUND
+    private const string MoreThan1Action = "PLEASE SELECT ONLY ONE RECORD TO VIEW OR UPDATE"; // source: :123-124 // MORE-THAN-1-ACTION
+    private const string InvalidActionCode = "INVALID ACTION CODE";                            // source: :125-126 // INVALID-ACTION-CODE
+    private bool ErrorMessageIsBlank => IsSpaces(_errorMessage) || _errorMessage.Length == 0; // 88 WS-ERROR-MSG-OFF (SPACES)
+    private bool IsNoRecordsFoundError => _errorMessage == NoRecordsFound;               // 88 WS-NO-RECORDS-FOUND
+    private void SetErrorMessageIsBlank() => _errorMessage = "";                            // SET WS-ERROR-MSG-OFF (SPACES)
+    private void SetWsExitMessage() => _errorMessage = ExitMessage;
+    private void SetIsNoRecordsFoundError() => _errorMessage = NoRecordsFound;
+    private void SetHasMoreThanOneAction() => _errorMessage = MoreThan1Action;
+    private void SetWsInvalidActionCode() => _errorMessage = InvalidActionCode;
 
     // 05 WS-PFK-FLAG: 88 PFK-VALID='0' / PFK-INVALID='1'. source: COCRDLIC.cbl:127-129
-    private char _wsPfkFlag = '\0';
-    private bool PfkInvalid => _wsPfkFlag == '1';
-    private void SetPfkValid() => _wsPfkFlag = '0';
-    private void SetPfkInvalid() => _wsPfkFlag = '1';
+    private char _pfKeyFlag = '\0'; // WS-PFK-FLAG
+    private bool PfkInvalid => _pfKeyFlag == '1';
+    private void SetPfkValid() => _pfKeyFlag = '0';
+    private void SetPfkInvalid() => _pfKeyFlag = '1';
 
     // =============================================================================================
     //  WS-FILE-HANDLING-VARS — source: COCRDLIC.cbl:136-171
     // =============================================================================================
     // 10 WS-CARD-RID: WS-CARD-RID-CARDNUM X(16) + WS-CARD-RID-ACCT-ID 9(11) (redef -X). source: :137-141
     // The browse start key (RIDFLD). Empty string models LOW-VALUES (= browse from first record).
-    private string _wsCardRidCardnum = "";
+    private string _cardRidCardNum = ""; // WS-CARD-RID-CARDNUM
 
     // 05 WS-SCRN-COUNTER PIC S9(4) COMP. source: COCRDLIC.cbl:145
-    private int _wsScrnCounter;
+    private int _screenCounter; // WS-SCRN-COUNTER
 
     // 05 WS-FILTER-RECORD-FLAG: 88 EXCLUDE='0' / DONOT-EXCLUDE='1'. source: COCRDLIC.cbl:147-149
-    private char _wsFilterRecordFlag = '\0';
-    private bool WsDonotExcludeThisRecord => _wsFilterRecordFlag == '1'; // 88 WS-DONOT-EXCLUDE-THIS-RECORD
-    private void SetWsExcludeThisRecord() => _wsFilterRecordFlag = '0';
-    private void SetWsDonotExcludeThisRecord() => _wsFilterRecordFlag = '1';
+    private char _filterRecordFlag = '\0'; // WS-FILTER-RECORD-FLAG
+    private bool IncludeThisRecord => _filterRecordFlag == '1'; // 88 WS-DONOT-EXCLUDE-THIS-RECORD
+    private void SetWsExcludeThisRecord() => _filterRecordFlag = '0';
+    private void SetIncludeThisRecord() => _filterRecordFlag = '1';
 
     // 05 WS-RECORDS-TO-PROCESS-FLAG: 88 READ-LOOP-EXIT='0' / MORE-RECORDS-TO-READ='1'. source: COCRDLIC.cbl:150-152
-    private char _wsRecordsToProcessFlag = '\0';
-    private bool ReadLoopExit => _wsRecordsToProcessFlag == '0';        // 88 READ-LOOP-EXIT
-    private void SetReadLoopExit() => _wsRecordsToProcessFlag = '0';
-    private void SetMoreRecordsToRead() => _wsRecordsToProcessFlag = '1';
+    private char _recordsToProcessFlag = '\0'; // WS-RECORDS-TO-PROCESS-FLAG
+    private bool ReadLoopExit => _recordsToProcessFlag == '0';        // 88 READ-LOOP-EXIT
+    private void SetReadLoopExit() => _recordsToProcessFlag = '0';
+    private void SetMoreRecordsToRead() => _recordsToProcessFlag = '1';
 
     // 05 WS-FILE-ERROR-MESSAGE group. source: COCRDLIC.cbl:153-171
     private string _errorOpname = "        "; // ERROR-OPNAME X(8)
@@ -199,42 +199,42 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     // CC-ACCT-ID X(11) (redef CC-ACCT-ID-N 9(11)); CC-CARD-NUM X(16) (redef CC-CARD-NUM-N 9(16)).
     // Empty string models LOW-VALUES on the field (the not-supplied test).
-    private string _ccAcctId = "";  // CC-ACCT-ID  X(11)
-    private string _ccCardNum = ""; // CC-CARD-NUM X(16)
+    private string _filterAcctId = "";  // CC-ACCT-ID  X(11)
+    private string _filterCardNum = ""; // CC-CARD-NUM X(16)
 
     // CCARD-AID — set by YYYY-STORE-PFKEY, then remapped by the validity gate. source: CVCRD01Y.cpy; :349,378-380
-    private CcardAid _ccardAid = CcardAid.None;
-    private bool CcardAidEnter => _ccardAid == CcardAid.Enter; // 88 CCARD-AID-ENTER
-    private bool CcardAidPfk03 => _ccardAid == CcardAid.Pfk03; // 88 CCARD-AID-PFK03
-    private bool CcardAidPfk07 => _ccardAid == CcardAid.Pfk07; // 88 CCARD-AID-PFK07
-    private bool CcardAidPfk08 => _ccardAid == CcardAid.Pfk08; // 88 CCARD-AID-PFK08
-    private void SetCcardAidEnter() => _ccardAid = CcardAid.Enter;
+    private CcardAid _aidKey = CcardAid.None; // CCARD-AID
+    private bool CcardAidEnter => _aidKey == CcardAid.Enter; // 88 CCARD-AID-ENTER
+    private bool CcardAidPfk03 => _aidKey == CcardAid.Pfk03; // 88 CCARD-AID-PFK03
+    private bool CcardAidPfk07 => _aidKey == CcardAid.Pfk07; // 88 CCARD-AID-PFK07
+    private bool CcardAidPfk08 => _aidKey == CcardAid.Pfk08; // 88 CCARD-AID-PFK08
+    private void SetCcardAidEnter() => _aidKey = CcardAid.Enter;
 
     // =============================================================================================
     //  WS-THIS-PROGCOMMAREA — program-private commarea trailer. source: COCRDLIC.cbl:229-248
     // =============================================================================================
     // WS-CA-LAST-CARDKEY = (LAST-CARD-NUM X16 + LAST-CARD-ACCT-ID 9(11)).
-    private string _wsCaLastCardNum = "";
-    private long _wsCaLastCardAcctId;
+    private string _lastCardNum = ""; // WS-CA-LAST-CARD-NUM
+    private long _lastCardAcctId; // WS-CA-LAST-CARD-ACCT-ID
     // WS-CA-FIRST-CARDKEY = (FIRST-CARD-NUM X16 + FIRST-CARD-ACCT-ID 9(11)).
-    private string _wsCaFirstCardNum = "";
-    private long _wsCaFirstCardAcctId;
+    private string _firstCardNum = ""; // WS-CA-FIRST-CARD-NUM
+    private long _firstCardAcctId; // WS-CA-FIRST-CARD-ACCT-ID
     // WS-CA-SCREEN-NUM 9(1). 88 CA-FIRST-PAGE=1. source: :237-238
-    private int _wsCaScreenNum;
-    private bool CaFirstPage => _wsCaScreenNum == 1; // 88 CA-FIRST-PAGE
-    private void SetCaFirstPage() => _wsCaScreenNum = 1;
+    private int _screenNum; // WS-CA-SCREEN-NUM
+    private bool CaFirstPage => _screenNum == 1; // 88 CA-FIRST-PAGE
+    private void SetCaFirstPage() => _screenNum = 1;
     // WS-CA-LAST-PAGE-DISPLAYED 9(1). 88 SHOWN=0 / NOT-SHOWN=9. source: :239-241
-    private int _wsCaLastPageDisplayed;
-    private bool CaLastPageShown => _wsCaLastPageDisplayed == 0;     // 88 CA-LAST-PAGE-SHOWN
-    private bool CaLastPageNotShown => _wsCaLastPageDisplayed == 9;  // 88 CA-LAST-PAGE-NOT-SHOWN
-    private void SetCaLastPageShown() => _wsCaLastPageDisplayed = 0;
-    private void SetCaLastPageNotShown() => _wsCaLastPageDisplayed = 9;
+    private int _lastPageDisplayed; // WS-CA-LAST-PAGE-DISPLAYED
+    private bool CaLastPageShown => _lastPageDisplayed == 0;     // 88 CA-LAST-PAGE-SHOWN
+    private bool CaLastPageNotShown => _lastPageDisplayed == 9;  // 88 CA-LAST-PAGE-NOT-SHOWN
+    private void SetCaLastPageShown() => _lastPageDisplayed = 0;
+    private void SetCaLastPageNotShown() => _lastPageDisplayed = 9;
     // WS-CA-NEXT-PAGE-IND X(1). 88 NOT-EXISTS=LOW-VALUES / EXISTS='Y'. source: :242-244
-    private char _wsCaNextPageInd = '\0';
-    private bool CaNextPageExists => _wsCaNextPageInd == 'Y';        // 88 CA-NEXT-PAGE-EXISTS
-    private bool CaNextPageNotExists => _wsCaNextPageInd == '\0';    // 88 CA-NEXT-PAGE-NOT-EXISTS (LOW-VALUES)
-    private void SetCaNextPageExists() => _wsCaNextPageInd = 'Y';
-    private void SetCaNextPageNotExists() => _wsCaNextPageInd = '\0';
+    private char _nextPageInd = '\0'; // WS-CA-NEXT-PAGE-IND
+    private bool CaNextPageExists => _nextPageInd == 'Y';        // 88 CA-NEXT-PAGE-EXISTS
+    private bool CaNextPageNotExists => _nextPageInd == '\0';    // 88 CA-NEXT-PAGE-NOT-EXISTS (LOW-VALUES)
+    private void SetCaNextPageExists() => _nextPageInd = 'Y';
+    private void SetCaNextPageNotExists() => _nextPageInd = '\0';
 
     // =============================================================================================
     //  WS-SCREEN-DATA — the 7-row page buffer. source: COCRDLIC.cbl:252-260
@@ -275,10 +275,10 @@ public sealed class CardListProgram : ITransactionHandler
     public CardListProgram() => _db = null!;
 
     /// <inheritdoc/>
-    public string ProgramName => LIT_THISPGM; // PROGRAM-ID. COCRDLIC. source: COCRDLIC.cbl:26-27
+    public string ProgramName => ThisProgramId; // PROGRAM-ID. COCRDLIC. source: COCRDLIC.cbl:26-27
 
     /// <inheritdoc/>
-    public string TransId => LIT_THISTRANID;  // CSD: CCLI -> COCRDLIC. source: CSD_TRANSACTIONS.md:75; cbl:181-182
+    public string TransId => ThisTranId;  // CSD: CCLI -> COCRDLIC. source: CSD_TRANSACTIONS.md:75; cbl:181-182
 
     // =============================================================================================
     //  0000-MAIN — source: COCRDLIC.cbl:298-602
@@ -293,10 +293,10 @@ public sealed class CardListProgram : ITransactionHandler
         // (Working-storage starts at its COBOL VALUE/SPACES/LOW-VALUES; the handler instance is fresh.)
 
         // MOVE LIT-THISTRANID TO WS-TRANID. source: :307 (WS-TRANID is informational only.)
-        _ = LIT_CARD_FILE_ACCT_PATH; // B-8: declared, never used.
+        _ = CardFileAcctPath; // B-8: declared, never used.
 
         // SET WS-ERROR-MSG-OFF TO TRUE. source: :311
-        SetWsErrorMsgOff();
+        SetErrorMessageIsBlank();
 
         // Retrieve passed data if any; initialize on first run. source: :315-332
         if (ctx.EibCalen == 0)
@@ -304,12 +304,12 @@ public sealed class CardListProgram : ITransactionHandler
             // INITIALIZE CARDDEMO-COMMAREA WS-THIS-PROGCOMMAREA. source: :316-317
             _commArea = new CardDemoCommArea();
             InitializeProgCommarea();
-            _commArea.FromTranId = LIT_THISTRANID; // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :318
-            _commArea.FromProgram = LIT_THISPGM;   // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :319
+            _commArea.FromTranId = ThisTranId; // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :318
+            _commArea.FromProgram = ThisProgramId;   // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :319
             _commArea.SetUser();                   // SET CDEMO-USRTYP-USER TO TRUE. source: :320
             _commArea.SetFirstEntry();             // SET CDEMO-PGM-ENTER   TO TRUE. source: :321
-            _commArea.LastMap = LIT_THISMAP;       // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :322
-            _commArea.LastMapSet = LIT_THISMAPSET; // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :323
+            _commArea.LastMap = ThisMap;       // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :322
+            _commArea.LastMapSet = ThisMapSet; // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :323
             SetCaFirstPage();                      // SET CA-FIRST-PAGE          TO TRUE. source: :324
             SetCaLastPageNotShown();               // SET CA-LAST-PAGE-NOT-SHOWN TO TRUE. source: :325
         }
@@ -325,23 +325,23 @@ public sealed class CardListProgram : ITransactionHandler
         }
 
         // If coming in from menu, forget the past and start afresh. source: :336-343
-        if (_commArea.IsFirstEntry && _commArea.FromProgram.TrimEnd() != LIT_THISPGM)
+        if (_commArea.IsFirstEntry && _commArea.FromProgram.TrimEnd() != ThisProgramId)
         {
             InitializeProgCommarea();              // INITIALIZE WS-THIS-PROGCOMMAREA. source: :338
             _commArea.SetFirstEntry();             // SET CDEMO-PGM-ENTER TO TRUE. source: :339
-            _commArea.LastMap = LIT_THISMAP;       // MOVE LIT-THISMAP TO CDEMO-LAST-MAP. source: :340
+            _commArea.LastMap = ThisMap;       // MOVE LIT-THISMAP TO CDEMO-LAST-MAP. source: :340
             SetCaFirstPage();                      // SET CA-FIRST-PAGE TO TRUE. source: :341
             SetCaLastPageNotShown();               // SET CA-LAST-PAGE-NOT-SHOWN TO TRUE. source: :342
         }
 
         // PERFORM YYYY-STORE-PFKEY. source: :349-350 — EIBAID -> CCARD-AID-*.
-        Yyyy_StorePfkey(ctx);
+        StorePfKeyAid(ctx);
 
         // If something is present in commarea and the from-program is this program, read & edit inputs.
         // source: :357-362
-        if (ctx.EibCalen > 0 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM)
+        if (ctx.EibCalen > 0 && _commArea.FromProgram.TrimEnd() == ThisProgramId)
         {
-            Receive2000Map(ctx); // PERFORM 2000-RECEIVE-MAP. source: :359-360
+            ReceiveMapData(ctx); // PERFORM 2000-RECEIVE-MAP. source: :359-360
         }
 
         // Check the mapped key to see if it is valid at this point. source: :370-380
@@ -352,20 +352,20 @@ public sealed class CardListProgram : ITransactionHandler
             SetCcardAidEnter();                                    // SET CCARD-AID-ENTER TO TRUE. source: :379
 
         // If the user pressed PF3 go back to main menu. source: :384-406
-        if (CcardAidPfk03 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM)
+        if (CcardAidPfk03 && _commArea.FromProgram.TrimEnd() == ThisProgramId)
         {
-            _commArea.FromTranId = LIT_THISTRANID; // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :386
-            _commArea.FromProgram = LIT_THISPGM;   // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :387
+            _commArea.FromTranId = ThisTranId; // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :386
+            _commArea.FromProgram = ThisProgramId;   // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :387
             _commArea.SetUser();                   // SET CDEMO-USRTYP-USER TO TRUE. source: :388
             _commArea.SetFirstEntry();             // SET CDEMO-PGM-ENTER   TO TRUE. source: :389
-            _commArea.LastMapSet = LIT_THISMAPSET; // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :390
-            _commArea.LastMap = LIT_THISMAP;       // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :391
-            _commArea.ToProgram = LIT_MENUPGM;     // MOVE LIT-MENUPGM    TO CDEMO-TO-PROGRAM. source: :392
+            _commArea.LastMapSet = ThisMapSet; // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :390
+            _commArea.LastMap = ThisMap;       // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :391
+            _commArea.ToProgram = MenuProgramId;     // MOVE LIT-MENUPGM    TO CDEMO-TO-PROGRAM. source: :392
             // MOVE LIT-MENUMAPSET TO CCARD-NEXT-MAPSET; MOVE LIT-THISMAP TO CCARD-NEXT-MAP. source: :394-395
             SetWsExitMessage();                    // SET WS-EXIT-MESSAGE TO TRUE. source: :396
             _commArea.SetFirstEntry();             // SET CDEMO-PGM-ENTER TO TRUE. source: :400
             // EXEC CICS XCTL PROGRAM(LIT-MENUPGM) COMMAREA(CARDDEMO-COMMAREA). source: :402-405
-            ctx.Xctl(LIT_MENUPGM, _commArea);
+            ctx.Xctl(MenuProgramId, _commArea);
             return;
         }
 
@@ -384,15 +384,15 @@ public sealed class CardListProgram : ITransactionHandler
         {
             // WHEN INPUT-ERROR — ask for corrections to inputs. source: :419-438
             // MOVE WS-ERROR-MSG TO CCARD-ERROR-MSG. source: :423 (staged into ERRMSG by 1400.)
-            _commArea.FromProgram = LIT_THISPGM;   // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :424
-            _commArea.LastMapSet = LIT_THISMAPSET; // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :425
-            _commArea.LastMap = LIT_THISMAP;       // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :426
+            _commArea.FromProgram = ThisProgramId;   // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :424
+            _commArea.LastMapSet = ThisMapSet; // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :425
+            _commArea.LastMap = ThisMap;       // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :426
             // MOVE LIT-THISPGM/MAPSET/MAP TO CCARD-NEXT-PROG/MAPSET/MAP. source: :428-430
 
             // B-2: IF NOT FLG-ACCTFILTER-NOT-OK AND NOT FLG-CARDFILTER-NOT-OK -> 9000-READ-FORWARD. source: :431-435
             if (!FlgAcctFilterNotOk && !FlgCardFilterNotOk)
-                Read9000Forward();                 // PERFORM 9000-READ-FORWARD. source: :433-434
-            Send1000Map(ctx);                      // PERFORM 1000-SEND-MAP. source: :436-437
+                ReadForward();                 // PERFORM 9000-READ-FORWARD. source: :433-434
+            SendMapToScreen(ctx);                      // PERFORM 1000-SEND-MAP. source: :436-437
             CommonReturn(ctx);                     // GO TO COMMON-RETURN. source: :438
             return;
         }
@@ -400,93 +400,93 @@ public sealed class CardListProgram : ITransactionHandler
         {
             // WHEN CCARD-AID-PFK07 AND CA-FIRST-PAGE (declared twice; first empty WHEN falls into this).
             // PAGE UP - PF7 - BUT ALREADY ON FIRST PAGE. source: :439-454
-            _wsCardRidCardnum = _wsCaFirstCardNum; // MOVE WS-CA-FIRST-CARD-NUM TO WS-CARD-RID-CARDNUM. source: :446-447
-            Read9000Forward();                     // PERFORM 9000-READ-FORWARD. source: :450-451
-            Send1000Map(ctx);                      // PERFORM 1000-SEND-MAP. source: :452-453
+            _cardRidCardNum = _firstCardNum; // MOVE WS-CA-FIRST-CARD-NUM TO WS-CARD-RID-CARDNUM. source: :446-447
+            ReadForward();                     // PERFORM 9000-READ-FORWARD. source: :450-451
+            SendMapToScreen(ctx);                      // PERFORM 1000-SEND-MAP. source: :452-453
             CommonReturn(ctx);                     // GO TO COMMON-RETURN. source: :454
             return;
         }
-        else if (CcardAidPfk03 || (_commArea.IsReenter && _commArea.FromProgram.TrimEnd() != LIT_THISPGM))
+        else if (CcardAidPfk03 || (_commArea.IsReenter && _commArea.FromProgram.TrimEnd() != ThisProgramId))
         {
             // WHEN CCARD-AID-PFK03 / WHEN CDEMO-PGM-REENTER AND FROM != this. source: :458-482
             _commArea = new CardDemoCommArea();    // INITIALIZE CARDDEMO-COMMAREA. source: :462
             InitializeProgCommarea();              // INITIALIZE WS-THIS-PROGCOMMAREA. source: :463
-            _commArea.FromTranId = LIT_THISTRANID; // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :464
-            _commArea.FromProgram = LIT_THISPGM;   // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :465
+            _commArea.FromTranId = ThisTranId; // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :464
+            _commArea.FromProgram = ThisProgramId;   // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :465
             _commArea.SetUser();                   // SET CDEMO-USRTYP-USER TO TRUE. source: :466
             _commArea.SetFirstEntry();             // SET CDEMO-PGM-ENTER   TO TRUE. source: :467
-            _commArea.LastMap = LIT_THISMAP;       // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :468
-            _commArea.LastMapSet = LIT_THISMAPSET; // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :469
+            _commArea.LastMap = ThisMap;       // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :468
+            _commArea.LastMapSet = ThisMapSet; // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :469
             SetCaFirstPage();                      // SET CA-FIRST-PAGE        TO TRUE. source: :470
             SetCaLastPageNotShown();               // SET CA-LAST-PAGE-NOT-SHOWN TO TRUE. source: :471
-            _wsCardRidCardnum = _wsCaFirstCardNum; // MOVE WS-CA-FIRST-CARD-NUM TO WS-CARD-RID-CARDNUM. source: :473-474
-            Read9000Forward();                     // PERFORM 9000-READ-FORWARD. source: :478-479
-            Send1000Map(ctx);                      // PERFORM 1000-SEND-MAP. source: :480-481
+            _cardRidCardNum = _firstCardNum; // MOVE WS-CA-FIRST-CARD-NUM TO WS-CARD-RID-CARDNUM. source: :473-474
+            ReadForward();                     // PERFORM 9000-READ-FORWARD. source: :478-479
+            SendMapToScreen(ctx);                      // PERFORM 1000-SEND-MAP. source: :480-481
             CommonReturn(ctx);                     // GO TO COMMON-RETURN. source: :482
             return;
         }
         else if (CcardAidPfk08 && CaNextPageExists)
         {
             // WHEN CCARD-AID-PFK08 AND CA-NEXT-PAGE-EXISTS — PAGE DOWN. source: :486-497
-            _wsCardRidCardnum = _wsCaLastCardNum;  // MOVE WS-CA-LAST-CARD-NUM TO WS-CARD-RID-CARDNUM. source: :488-489
+            _cardRidCardNum = _lastCardNum;  // MOVE WS-CA-LAST-CARD-NUM TO WS-CARD-RID-CARDNUM. source: :488-489
             AddOneToScreenNum();                   // ADD +1 TO WS-CA-SCREEN-NUM. source: :492 (B-9: 9(1) truncation)
-            Read9000Forward();                     // PERFORM 9000-READ-FORWARD. source: :493-494
-            Send1000Map(ctx);                      // PERFORM 1000-SEND-MAP. source: :495-496
+            ReadForward();                     // PERFORM 9000-READ-FORWARD. source: :493-494
+            SendMapToScreen(ctx);                      // PERFORM 1000-SEND-MAP. source: :495-496
             CommonReturn(ctx);                     // GO TO COMMON-RETURN. source: :497
             return;
         }
         else if (CcardAidPfk07 && !CaFirstPage)
         {
             // WHEN CCARD-AID-PFK07 AND NOT CA-FIRST-PAGE — PAGE UP. source: :501-513
-            _wsCardRidCardnum = _wsCaFirstCardNum; // MOVE WS-CA-FIRST-CARD-NUM TO WS-CARD-RID-CARDNUM. source: :504-505
+            _cardRidCardNum = _firstCardNum; // MOVE WS-CA-FIRST-CARD-NUM TO WS-CARD-RID-CARDNUM. source: :504-505
             SubtractOneFromScreenNum();            // SUBTRACT 1 FROM WS-CA-SCREEN-NUM. source: :508
-            Read9100Backwards();                   // PERFORM 9100-READ-BACKWARDS. source: :509-510
-            Send1000Map(ctx);                      // PERFORM 1000-SEND-MAP. source: :511-512
+            ReadBackwards();                   // PERFORM 9100-READ-BACKWARDS. source: :509-510
+            SendMapToScreen(ctx);                      // PERFORM 1000-SEND-MAP. source: :511-512
             CommonReturn(ctx);                     // GO TO COMMON-RETURN. source: :513
             return;
         }
-        else if (CcardAidEnter && _iSelected != 0 && ViewRequestedOn(_iSelected)
-                 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM)
+        else if (CcardAidEnter && _selectedRow != 0 && ViewRequestedOn(_selectedRow)
+                 && _commArea.FromProgram.TrimEnd() == ThisProgramId)
         {
             // WHEN CCARD-AID-ENTER AND VIEW-REQUESTED-ON(I-SELECTED) AND FROM=this. source: :517-541
             // B-1: I-SELECTED may be 0 (no selection); the COBOL subscripts offset 0 which is not 'S',
-            // so the WHEN is false and control falls through. Guarded here by `_iSelected != 0`.
-            _commArea.FromTranId = LIT_THISTRANID;     // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :520
-            _commArea.FromProgram = LIT_THISPGM;       // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :521
+            // so the WHEN is false and control falls through. Guarded here by `_selectedRow != 0`.
+            _commArea.FromTranId = ThisTranId;     // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :520
+            _commArea.FromProgram = ThisProgramId;       // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :521
             _commArea.SetUser();                       // SET CDEMO-USRTYP-USER TO TRUE. source: :522
             _commArea.SetFirstEntry();                 // SET CDEMO-PGM-ENTER   TO TRUE. source: :523
-            _commArea.LastMapSet = LIT_THISMAPSET;     // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :524
-            _commArea.LastMap = LIT_THISMAP;           // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :525
+            _commArea.LastMapSet = ThisMapSet;     // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :524
+            _commArea.LastMap = ThisMap;           // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :525
             // MOVE LIT-CARDDTLPGM/MAPSET/MAP TO CCARD-NEXT-PROG/MAPSET/MAP. source: :526-529
-            _commArea.AcctId = ParseLong(_rows[_iSelected - 1]?.AcctNo);  // MOVE WS-ROW-ACCTNO(I-SELECTED) TO CDEMO-ACCT-ID. source: :531-532
-            _commArea.CardNum = ParseLong(_rows[_iSelected - 1]?.CardNum); // MOVE WS-ROW-CARD-NUM(I-SELECTED) TO CDEMO-CARD-NUM. source: :533-534
+            _commArea.AcctId = ParseLong(_rows[_selectedRow - 1]?.AcctNo);  // MOVE WS-ROW-ACCTNO(I-SELECTED) TO CDEMO-ACCT-ID. source: :531-532
+            _commArea.CardNum = ParseLong(_rows[_selectedRow - 1]?.CardNum); // MOVE WS-ROW-CARD-NUM(I-SELECTED) TO CDEMO-CARD-NUM. source: :533-534
             // EXEC CICS XCTL PROGRAM(CCARD-NEXT-PROG) COMMAREA(CARDDEMO-COMMAREA). source: :538-541
-            ctx.Xctl(LIT_CARDDTLPGM, _commArea);
+            ctx.Xctl(CardDetailProgramId, _commArea);
             return;
         }
-        else if (CcardAidEnter && _iSelected != 0 && UpdateRequestedOn(_iSelected)
-                 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM)
+        else if (CcardAidEnter && _selectedRow != 0 && UpdateRequestedOn(_selectedRow)
+                 && _commArea.FromProgram.TrimEnd() == ThisProgramId)
         {
             // WHEN CCARD-AID-ENTER AND UPDATE-REQUESTED-ON(I-SELECTED) AND FROM=this. source: :545-569
-            _commArea.FromTranId = LIT_THISTRANID;     // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :548
-            _commArea.FromProgram = LIT_THISPGM;       // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :549
+            _commArea.FromTranId = ThisTranId;     // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :548
+            _commArea.FromProgram = ThisProgramId;       // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :549
             _commArea.SetUser();                       // SET CDEMO-USRTYP-USER TO TRUE. source: :550
             _commArea.SetFirstEntry();                 // SET CDEMO-PGM-ENTER   TO TRUE. source: :551
-            _commArea.LastMapSet = LIT_THISMAPSET;     // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :552
-            _commArea.LastMap = LIT_THISMAP;           // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :553
+            _commArea.LastMapSet = ThisMapSet;     // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :552
+            _commArea.LastMap = ThisMap;           // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :553
             // MOVE LIT-CARDUPDPGM/MAPSET/MAP TO CCARD-NEXT-PROG/MAPSET/MAP. source: :554-557
-            _commArea.AcctId = ParseLong(_rows[_iSelected - 1]?.AcctNo);  // MOVE WS-ROW-ACCTNO(I-SELECTED) TO CDEMO-ACCT-ID. source: :559-560
-            _commArea.CardNum = ParseLong(_rows[_iSelected - 1]?.CardNum); // MOVE WS-ROW-CARD-NUM(I-SELECTED) TO CDEMO-CARD-NUM. source: :561-562
+            _commArea.AcctId = ParseLong(_rows[_selectedRow - 1]?.AcctNo);  // MOVE WS-ROW-ACCTNO(I-SELECTED) TO CDEMO-ACCT-ID. source: :559-560
+            _commArea.CardNum = ParseLong(_rows[_selectedRow - 1]?.CardNum); // MOVE WS-ROW-CARD-NUM(I-SELECTED) TO CDEMO-CARD-NUM. source: :561-562
             // EXEC CICS XCTL PROGRAM(CCARD-NEXT-PROG) COMMAREA(CARDDEMO-COMMAREA). source: :566-569
-            ctx.Xctl(LIT_CARDUPDPGM, _commArea);
+            ctx.Xctl(CardUpdateProgramId, _commArea);
             return;
         }
         else
         {
             // WHEN OTHER — plain ENTER / nothing selected: (re)list from first key. source: :572-582
-            _wsCardRidCardnum = _wsCaFirstCardNum; // MOVE WS-CA-FIRST-CARD-NUM TO WS-CARD-RID-CARDNUM. source: :574-575
-            Read9000Forward();                     // PERFORM 9000-READ-FORWARD. source: :578-579
-            Send1000Map(ctx);                      // PERFORM 1000-SEND-MAP. source: :580-581
+            _cardRidCardNum = _firstCardNum; // MOVE WS-CA-FIRST-CARD-NUM TO WS-CARD-RID-CARDNUM. source: :574-575
+            ReadForward();                     // PERFORM 9000-READ-FORWARD. source: :578-579
+            SendMapToScreen(ctx);                      // PERFORM 1000-SEND-MAP. source: :580-581
             CommonReturn(ctx);                     // GO TO COMMON-RETURN. source: :582
             return;
         }
@@ -501,35 +501,35 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     private void CommonReturn(CicsContext ctx)
     {
-        _commArea.FromTranId = LIT_THISTRANID; // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :605
-        _commArea.FromProgram = LIT_THISPGM;   // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :606
-        _commArea.LastMapSet = LIT_THISMAPSET; // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :607
-        _commArea.LastMap = LIT_THISMAP;       // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :608
+        _commArea.FromTranId = ThisTranId; // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :605
+        _commArea.FromProgram = ThisProgramId;   // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :606
+        _commArea.LastMapSet = ThisMapSet; // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :607
+        _commArea.LastMap = ThisMap;       // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :608
 
         // Reassemble WS-COMMAREA = [CARDDEMO-COMMAREA][WS-THIS-PROGCOMMAREA] and RETURN. source: :609-619
         SaveProgCommarea(ctx);
 
         // EXEC CICS RETURN TRANSID(LIT-THISTRANID) COMMAREA(WS-COMMAREA) LENGTH(LENGTH OF WS-COMMAREA).
-        ctx.ReturnTransId(LIT_THISTRANID, _commArea); // source: :615-619
+        ctx.ReturnTransId(ThisTranId, _commArea); // source: :615-619
     }
 
     // =============================================================================================
     //  1000-SEND-MAP — source: COCRDLIC.cbl:624-641
     // =============================================================================================
-    private void Send1000Map(CicsContext ctx)
+    private void SendMapToScreen(CicsContext ctx)  // COBOL paragraph: 1000-SEND-MAP
     {
-        Screen1100Init(ctx);          // PERFORM 1100-SCREEN-INIT. source: :625-626
-        ScreenArray1200Init();        // PERFORM 1200-SCREEN-ARRAY-INIT. source: :627-628
-        SetupArray1250Attribs();      // PERFORM 1250-SETUP-ARRAY-ATTRIBS. source: :629-630
-        SetupScreen1300Attrs(ctx);    // PERFORM 1300-SETUP-SCREEN-ATTRS. source: :631-632
-        Setup1400Message();           // PERFORM 1400-SETUP-MESSAGE. source: :633-634
-        SendScreen1500(ctx);          // PERFORM 1500-SEND-SCREEN. source: :635-636
+        ScreenInit(ctx);          // PERFORM 1100-SCREEN-INIT. source: :625-626
+        ScreenArrayInit();        // PERFORM 1200-SCREEN-ARRAY-INIT. source: :627-628
+        SetupArrayAttribs();      // PERFORM 1250-SETUP-ARRAY-ATTRIBS. source: :629-630
+        SetupScreenAttrs(ctx);    // PERFORM 1300-SETUP-SCREEN-ATTRS. source: :631-632
+        SetupMessage();           // PERFORM 1400-SETUP-MESSAGE. source: :633-634
+        SendScreen(ctx);          // PERFORM 1500-SEND-SCREEN. source: :635-636
     }
 
     // =============================================================================================
     //  1100-SCREEN-INIT — source: COCRDLIC.cbl:642-676
     // =============================================================================================
-    private void Screen1100Init(CicsContext ctx)
+    private void ScreenInit(CicsContext ctx)  // COBOL paragraph: 1100-SCREEN-INIT
     {
         // MOVE LOW-VALUES TO CCRDLIAO (clear map). source: :643
         MoveLowValuesToMapOut();
@@ -537,10 +537,10 @@ public sealed class CardListProgram : ITransactionHandler
         // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA (twice). source: :645,652
         DateTime now = ctx.Clock.Now;
 
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01); // MOVE CCDA-TITLE01 TO TITLE01O. source: :647
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02); // MOVE CCDA-TITLE02 TO TITLE02O. source: :648
-        _map.Field("TRNNAME").SetValue(LIT_THISTRANID); // MOVE LIT-THISTRANID TO TRNNAMEO. source: :649
-        _map.Field("PGMNAME").SetValue(LIT_THISPGM);    // MOVE LIT-THISPGM    TO PGMNAMEO. source: :650
+        _map.Field("TITLE01").SetValue(Title01); // MOVE CCDA-TITLE01 TO TITLE01O. source: :647
+        _map.Field("TITLE02").SetValue(Title02); // MOVE CCDA-TITLE02 TO TITLE02O. source: :648
+        _map.Field("TRNNAME").SetValue(ThisTranId); // MOVE LIT-THISTRANID TO TRNNAMEO. source: :649
+        _map.Field("PGMNAME").SetValue(ThisProgramId);    // MOVE LIT-THISPGM    TO PGMNAMEO. source: :650
 
         // CURDATEO = mm/dd/yy (year = WS-CURDATE-YEAR(3:2), last two digits). source: :654-658
         string mm = Two(now.Month);
@@ -552,18 +552,18 @@ public sealed class CardListProgram : ITransactionHandler
         _map.Field("CURTIME").SetValue($"{Two(now.Hour)}:{Two(now.Minute)}:{Two(now.Second)}");
 
         // MOVE WS-CA-SCREEN-NUM TO PAGENOO (9(1) -> X(3)). source: :667
-        _map.Field("PAGENO").SetValue(_wsCaScreenNum.ToString());
+        _map.Field("PAGENO").SetValue(_screenNum.ToString());
 
         // SET WS-NO-INFO-MESSAGE; MOVE WS-INFO-MSG TO INFOMSGO; MOVE DFHBMDAR TO INFOMSGC (dark). source: :669-671
-        SetWsNoInfoMessage();
-        _map.Field("INFOMSG").SetValue(_wsInfoMsg, setMdt: false);
+        SetHasNoInfoMessage();
+        _map.Field("INFOMSG").SetValue(_infoMessage, setMdt: false);
         _map.Field("INFOMSG").AttributeOverride = _map.Field("INFOMSG").Attribute | BmsAttribute.Dark; // DFHBMDAR
     }
 
     // =============================================================================================
     //  1200-SCREEN-ARRAY-INIT — source: COCRDLIC.cbl:678-747
     // =============================================================================================
-    private void ScreenArray1200Init()
+    private void ScreenArrayInit()  // COBOL paragraph: 1200-SCREEN-ARRAY-INIT
     {
         // For each row: if WS-EACH-CARD(n) = LOW-VALUES leave blank; else move row values to CRDSELn/
         // ACCTNOn/CRDNUMn/CRDSTSn. (Unrolled in COBOL, one IF per row.) source: :680-742
@@ -572,7 +572,7 @@ public sealed class CardListProgram : ITransactionHandler
             if (EachCardIsLowValues(n))
                 continue; // CONTINUE
             Row r = _rows[n - 1]!;
-            _map.Field($"CRDSEL{n}").SetValue(_wsEditSelect[n - 1] == '\0' ? "" : _wsEditSelect[n - 1].ToString()); // WS-EDIT-SELECT(n)
+            _map.Field($"CRDSEL{n}").SetValue(_editSelect[n - 1] == '\0' ? "" : _editSelect[n - 1].ToString()); // WS-EDIT-SELECT(n)
             _map.Field($"ACCTNO{n}").SetValue(r.AcctNo);  // WS-ROW-ACCTNO(n)
             _map.Field($"CRDNUM{n}").SetValue(r.CardNum); // WS-ROW-CARD-NUM(n)
             _map.Field($"CRDSTS{n}").SetValue(r.Status);  // WS-ROW-CARD-STATUS(n)
@@ -582,7 +582,7 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     //  1250-SETUP-ARRAY-ATTRIBS — source: COCRDLIC.cbl:748-836
     // =============================================================================================
-    private void SetupArray1250Attribs()
+    private void SetupArrayAttribs()  // COBOL paragraph: 1250-SETUP-ARRAY-ATTRIBS
     {
         // Row 1 — protected-empty uses DFHBMPRF (B-5); error highlight writes '*' when blank (B-6). source: :751-762
         if (EachCardIsLowValues(1) || FlgProtectSelectRowsYes)
@@ -592,11 +592,11 @@ public sealed class CardListProgram : ITransactionHandler
         }
         else
         {
-            if (_wsRowCrdselectError[0] == '1') // IF WS-ROW-CRDSELECT-ERROR(1) = '1'. source: :755
+            if (_rowCardSelectError[0] == '1') // IF WS-ROW-CRDSELECT-ERROR(1) = '1'. source: :755
             {
                 _map.Field("CRDSEL1").ColorOverride = BmsColor.Red; // MOVE DFHRED TO CRDSEL1C. source: :756
                 // B-6: row 1 writes '*' when the select char is blank/low. source: :757-759
-                if (_wsEditSelect[0] is ' ' or '\0')
+                if (_editSelect[0] is ' ' or '\0')
                     _map.Field("CRDSEL1").SetValue("*"); // MOVE '*' TO CRDSEL1O
             }
             // MOVE DFHBMFSE TO CRDSEL1A (unprotect + FSET). source: :761
@@ -615,7 +615,7 @@ public sealed class CardListProgram : ITransactionHandler
             }
             else
             {
-                if (_wsRowCrdselectError[n - 1] == '1') // IF WS-ROW-CRDSELECT-ERROR(n) = '1'. source: :768,...
+                if (_rowCardSelectError[n - 1] == '1') // IF WS-ROW-CRDSELECT-ERROR(n) = '1'. source: :768,...
                 {
                     _map.Field($"CRDSEL{n}").ColorOverride = BmsColor.Red; // MOVE DFHRED TO CRDSELnC. source: :769,...
                     _map.Field($"CRDSEL{n}").CursorLength = -1;            // MOVE -1 TO CRDSELnL. source: :770,... (B-6)
@@ -630,11 +630,11 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     //  1300-SETUP-SCREEN-ATTRS — source: COCRDLIC.cbl:837-892
     // =============================================================================================
-    private void SetupScreen1300Attrs(CicsContext ctx)
+    private void SetupScreenAttrs(CicsContext ctx)  // COBOL paragraph: 1300-SETUP-SCREEN-ATTRS
     {
         // INITIALIZE SEARCH CRITERIA — if first entry OR (PGM-ENTER from menu) CONTINUE; else echo filters.
         // source: :839-868
-        if (ctx.EibCalen == 0 || (_commArea.IsFirstEntry && _commArea.FromProgram.TrimEnd() == LIT_MENUPGM))
+        if (ctx.EibCalen == 0 || (_commArea.IsFirstEntry && _commArea.FromProgram.TrimEnd() == MenuProgramId))
         {
             // CONTINUE (leave filters blank). source: :842
         }
@@ -643,7 +643,7 @@ public sealed class CardListProgram : ITransactionHandler
             // Account filter EVALUATE TRUE. source: :844-854
             if (FlgAcctFilterIsValid || FlgAcctFilterNotOk)
             {
-                _map.Field("ACCTSID").SetValue(_ccAcctId, setMdt: false); // MOVE CC-ACCT-ID TO ACCTSIDO. source: :847
+                _map.Field("ACCTSID").SetValue(_filterAcctId, setMdt: false); // MOVE CC-ACCT-ID TO ACCTSIDO. source: :847
                 _map.Field("ACCTSID").AttributeOverride =
                     BmsAttribute.Unprotected | BmsAttribute.Fset;         // MOVE DFHBMFSE TO ACCTSIDA. source: :848
             }
@@ -661,7 +661,7 @@ public sealed class CardListProgram : ITransactionHandler
             // Card filter EVALUATE TRUE. source: :856-867
             if (FlgCardFilterIsValid || FlgCardFilterNotOk)
             {
-                _map.Field("CARDSID").SetValue(_ccCardNum, setMdt: false); // MOVE CC-CARD-NUM TO CARDSIDO. source: :859
+                _map.Field("CARDSID").SetValue(_filterCardNum, setMdt: false); // MOVE CC-CARD-NUM TO CARDSIDO. source: :859
                 _map.Field("CARDSID").AttributeOverride =
                     BmsAttribute.Unprotected | BmsAttribute.Fset;          // MOVE DFHBMFSE TO CARDSIDA. source: :860
             }
@@ -698,7 +698,7 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     //  1400-SETUP-MESSAGE — source: COCRDLIC.cbl:895-935
     // =============================================================================================
-    private void Setup1400Message()
+    private void SetupMessage()  // COBOL paragraph: 1400-SETUP-MESSAGE
     {
         // EVALUATE TRUE — choose status message (first true wins). source: :897-922
         if (FlgAcctFilterNotOk || FlgCardFilterNotOk)
@@ -707,11 +707,11 @@ public sealed class CardListProgram : ITransactionHandler
         }
         else if (CcardAidPfk07 && CaFirstPage)
         {
-            _wsErrorMsg = "NO PREVIOUS PAGES TO DISPLAY"; // source: :901-904
+            _errorMessage = "NO PREVIOUS PAGES TO DISPLAY"; // source: :901-904
         }
         else if (CcardAidPfk08 && CaNextPageNotExists && CaLastPageShown)
         {
-            _wsErrorMsg = "NO MORE PAGES TO DISPLAY"; // source: :905-909
+            _errorMessage = "NO MORE PAGES TO DISPLAY"; // source: :905-909
         }
         else if (CcardAidPfk08 && CaNextPageNotExists)
         {
@@ -719,22 +719,22 @@ public sealed class CardListProgram : ITransactionHandler
             if (CaLastPageNotShown && CaNextPageNotExists) // source: :913-914
                 SetCaLastPageShown();                      // SET CA-LAST-PAGE-SHOWN TO TRUE. source: :915
         }
-        else if (WsNoInfoMessage || CaNextPageExists)
+        else if (HasNoInfoMessage || CaNextPageExists)
         {
             SetWsInformRecActions(); // SET WS-INFORM-REC-ACTIONS TO TRUE. source: :917-919
         }
         else
         {
-            SetWsNoInfoMessage(); // SET WS-NO-INFO-MESSAGE TO TRUE. source: :920-921
+            SetHasNoInfoMessage(); // SET WS-NO-INFO-MESSAGE TO TRUE. source: :920-921
         }
 
         // MOVE WS-ERROR-MSG TO ERRMSGO. source: :924
-        _map.Field("ERRMSG").SetValue(_wsErrorMsg, setMdt: false);
+        _map.Field("ERRMSG").SetValue(_errorMessage, setMdt: false);
 
         // IF NOT WS-NO-INFO-MESSAGE AND NOT WS-NO-RECORDS-FOUND -> INFOMSGO + DFHNEUTR. source: :926-930
-        if (!WsNoInfoMessage && !WsNoRecordsFound)
+        if (!HasNoInfoMessage && !IsNoRecordsFoundError)
         {
-            _map.Field("INFOMSG").SetValue(_wsInfoMsg, setMdt: false); // MOVE WS-INFO-MSG TO INFOMSGO. source: :928
+            _map.Field("INFOMSG").SetValue(_infoMessage, setMdt: false); // MOVE WS-INFO-MSG TO INFOMSGO. source: :928
             _map.Field("INFOMSG").AttributeOverride = _map.Field("INFOMSG").Attribute; // clear the DFHBMDAR dark set by 1100
             _map.Field("INFOMSG").ColorOverride = BmsColor.Neutral;   // MOVE DFHNEUTR TO INFOMSGC. source: :929
         }
@@ -743,70 +743,70 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     //  1500-SEND-SCREEN — source: COCRDLIC.cbl:938-950
     // =============================================================================================
-    private void SendScreen1500(CicsContext ctx)
+    private void SendScreen(CicsContext ctx)  // COBOL paragraph: 1500-SEND-SCREEN
     {
         // EXEC CICS SEND MAP(CCRDLIA) MAPSET(COCRDLI) FROM(CCRDLIAO) CURSOR ERASE RESP FREEKB. source: :939-946
-        ctx.SendMap(LIT_THISMAP, LIT_THISMAPSET, _map, new SendMapOptions
+        ctx.SendMap(ThisMap, ThisMapSet, _map, new SendMapOptions
         {
             Erase = true,
             FreeKb = true,
             Cursor = -1,
         });
-        _wsRespCd = (int)Resp.Normal;
+        _responseCode = (int)Resp.Normal;
     }
 
     // =============================================================================================
     //  2000-RECEIVE-MAP — source: COCRDLIC.cbl:951-961
     // =============================================================================================
-    private void Receive2000Map(CicsContext ctx)
+    private void ReceiveMapData(CicsContext ctx)  // COBOL paragraph: 2000-RECEIVE-MAP
     {
-        Receive2100Screen(ctx); // PERFORM 2100-RECEIVE-SCREEN. source: :952-953
-        Edit2200Inputs();       // PERFORM 2200-EDIT-INPUTS. source: :955-956
+        ReceiveScreen(ctx); // PERFORM 2100-RECEIVE-SCREEN. source: :952-953
+        EditInputs();       // PERFORM 2200-EDIT-INPUTS. source: :955-956
     }
 
     // =============================================================================================
     //  2100-RECEIVE-SCREEN — source: COCRDLIC.cbl:962-983
     // =============================================================================================
-    private void Receive2100Screen(CicsContext ctx)
+    private void ReceiveScreen(CicsContext ctx)  // COBOL paragraph: 2100-RECEIVE-SCREEN
     {
         // EXEC CICS RECEIVE MAP(CCRDLIA) MAPSET(COCRDLI) INTO(CCRDLIAI) RESP. source: :963-967
-        ctx.ReceiveMap(LIT_THISMAP, LIT_THISMAPSET, _map);
-        _wsRespCd = (int)Resp.Normal;
+        ctx.ReceiveMap(ThisMap, ThisMapSet, _map);
+        _responseCode = (int)Resp.Normal;
 
         // MOVE ACCTSIDI TO CC-ACCT-ID ; MOVE CARDSIDI TO CC-CARD-NUM. source: :969-970
-        _ccAcctId = _map.Field("ACCTSID").Value;
-        _ccCardNum = _map.Field("CARDSID").Value;
+        _filterAcctId = _map.Field("ACCTSID").Value;
+        _filterCardNum = _map.Field("CARDSID").Value;
 
         // MOVE CRDSEL1I..CRDSEL7I TO WS-EDIT-SELECT(1..7). source: :972-978
         for (int n = 1; n <= 7; n++)
         {
             string v = _map.Field($"CRDSEL{n}").Value;
-            _wsEditSelect[n - 1] = v.Length > 0 ? v[0] : '\0';
+            _editSelect[n - 1] = v.Length > 0 ? v[0] : '\0';
         }
     }
 
     // =============================================================================================
     //  2200-EDIT-INPUTS — source: COCRDLIC.cbl:985-1001
     // =============================================================================================
-    private void Edit2200Inputs()
+    private void EditInputs()  // COBOL paragraph: 2200-EDIT-INPUTS
     {
         SetInputOk();                 // SET INPUT-OK TO TRUE. source: :986
         SetFlgProtectSelectRowsNo();  // SET FLG-PROTECT-SELECT-ROWS-NO TO TRUE. source: :987
 
-        Edit2210Account(); // PERFORM 2210-EDIT-ACCOUNT. source: :989-990
-        Edit2220Card();    // PERFORM 2220-EDIT-CARD. source: :992-993
-        Edit2250Array();   // PERFORM 2250-EDIT-ARRAY. source: :995-996
+        EditAccount(); // PERFORM 2210-EDIT-ACCOUNT. source: :989-990
+        EditCard();    // PERFORM 2220-EDIT-CARD. source: :992-993
+        EditArray();   // PERFORM 2250-EDIT-ARRAY. source: :995-996
     }
 
     // =============================================================================================
     //  2210-EDIT-ACCOUNT — source: COCRDLIC.cbl:1003-1034
     // =============================================================================================
-    private void Edit2210Account()
+    private void EditAccount()  // COBOL paragraph: 2210-EDIT-ACCOUNT
     {
         SetFlgAcctFilterBlank(); // SET FLG-ACCTFILTER-BLANK TO TRUE. source: :1004
 
         // Not supplied: IF CC-ACCT-ID = LOW-VALUES OR SPACES OR CC-ACCT-ID-N = ZEROS. source: :1007-1013
-        if (IsLowValues(_ccAcctId) || IsSpaces(_ccAcctId) || IsZeroesNum(_ccAcctId))
+        if (IsLowValues(_filterAcctId) || IsSpaces(_filterAcctId) || IsZeroesNum(_filterAcctId))
         {
             SetFlgAcctFilterBlank();  // SET FLG-ACCTFILTER-BLANK TO TRUE. source: :1010
             _commArea.AcctId = 0;     // MOVE ZEROES TO CDEMO-ACCT-ID. source: :1011
@@ -814,18 +814,18 @@ public sealed class CardListProgram : ITransactionHandler
         }
 
         // Not numeric: IF CC-ACCT-ID IS NOT NUMERIC. source: :1017-1029
-        if (!IsNumericX(_ccAcctId, 11))
+        if (!IsNumericX(_filterAcctId, 11))
         {
             SetInputError();                // SET INPUT-ERROR TO TRUE. source: :1018
             SetFlgAcctFilterNotOk();        // SET FLG-ACCTFILTER-NOT-OK TO TRUE. source: :1019
             SetFlgProtectSelectRowsYes();   // SET FLG-PROTECT-SELECT-ROWS-YES TO TRUE. source: :1020
-            _wsErrorMsg = "ACCOUNT FILTER,IF SUPPLIED MUST BE A 11 DIGIT NUMBER"; // source: :1021-1023
+            _errorMessage = "ACCOUNT FILTER,IF SUPPLIED MUST BE A 11 DIGIT NUMBER"; // source: :1021-1023
             _commArea.AcctId = 0;           // MOVE ZERO TO CDEMO-ACCT-ID. source: :1024
             return;                         // GO TO 2210-EDIT-ACCOUNT-EXIT. source: :1025
         }
         else
         {
-            _commArea.AcctId = ParseLong(_ccAcctId); // MOVE CC-ACCT-ID TO CDEMO-ACCT-ID. source: :1027
+            _commArea.AcctId = ParseLong(_filterAcctId); // MOVE CC-ACCT-ID TO CDEMO-ACCT-ID. source: :1027
             SetFlgAcctFilterIsValid();               // SET FLG-ACCTFILTER-ISVALID TO TRUE. source: :1028
         }
     }
@@ -833,12 +833,12 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     //  2220-EDIT-CARD — source: COCRDLIC.cbl:1036-1071
     // =============================================================================================
-    private void Edit2220Card()
+    private void EditCard()  // COBOL paragraph: 2220-EDIT-CARD
     {
         SetFlgCardFilterBlank(); // SET FLG-CARDFILTER-BLANK TO TRUE. source: :1039
 
         // Not supplied: IF CC-CARD-NUM = LOW-VALUES OR SPACES OR CC-CARD-NUM-N = ZEROS. source: :1042-1048
-        if (IsLowValues(_ccCardNum) || IsSpaces(_ccCardNum) || IsZeroesNum(_ccCardNum))
+        if (IsLowValues(_filterCardNum) || IsSpaces(_filterCardNum) || IsZeroesNum(_filterCardNum))
         {
             SetFlgCardFilterBlank();  // SET FLG-CARDFILTER-BLANK TO TRUE. source: :1045
             _commArea.CardNum = 0;    // MOVE ZEROES TO CDEMO-CARD-NUM. source: :1046
@@ -846,20 +846,20 @@ public sealed class CardListProgram : ITransactionHandler
         }
 
         // Not numeric: IF CC-CARD-NUM IS NOT NUMERIC. source: :1052-1066
-        if (!IsNumericX(_ccCardNum, 16))
+        if (!IsNumericX(_filterCardNum, 16))
         {
             SetInputError();              // SET INPUT-ERROR TO TRUE. source: :1053
             SetFlgCardFilterNotOk();      // SET FLG-CARDFILTER-NOT-OK TO TRUE. source: :1054
             SetFlgProtectSelectRowsYes(); // SET FLG-PROTECT-SELECT-ROWS-YES TO TRUE. source: :1055
             // B-3: only set the card message IF WS-ERROR-MSG-OFF (acct error message wins). source: :1056-1060
-            if (WsErrorMsgOff)
-                _wsErrorMsg = "CARD ID FILTER,IF SUPPLIED MUST BE A 16 DIGIT NUMBER"; // source: :1057-1059
+            if (ErrorMessageIsBlank)
+                _errorMessage = "CARD ID FILTER,IF SUPPLIED MUST BE A 16 DIGIT NUMBER"; // source: :1057-1059
             _commArea.CardNum = 0;        // MOVE ZERO TO CDEMO-CARD-NUM. source: :1061
             return;                       // GO TO 2220-EDIT-CARD-EXIT. source: :1062
         }
         else
         {
-            _commArea.CardNum = ParseLong(_ccCardNum); // MOVE CC-CARD-NUM-N TO CDEMO-CARD-NUM. source: :1064
+            _commArea.CardNum = ParseLong(_filterCardNum); // MOVE CC-CARD-NUM-N TO CDEMO-CARD-NUM. source: :1064
             SetFlgCardFilterIsValid();                 // SET FLG-CARDFILTER-ISVALID TO TRUE. source: :1065
         }
     }
@@ -867,50 +867,50 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     //  2250-EDIT-ARRAY — source: COCRDLIC.cbl:1073-1121
     // =============================================================================================
-    private void Edit2250Array()
+    private void EditArray()  // COBOL paragraph: 2250-EDIT-ARRAY
     {
         // IF INPUT-ERROR GO TO 2250-EDIT-ARRAY-EXIT. source: :1075-1077
         if (InputError)
             return;
 
         // INSPECT WS-EDIT-SELECT-FLAGS TALLYING I FOR ALL 'S' ALL 'U'. source: :1079-1082
-        _i = 0;
+        _tally = 0;
         for (int k = 0; k < 7; k++)
-            if (_wsEditSelect[k] is 'S' or 'U')
-                _i++;
+            if (_editSelect[k] is 'S' or 'U')
+                _tally++;
 
         // IF I > +1 -> MORE-THAN-1-ACTION + build error flags. source: :1084-1095
-        if (_i > 1)
+        if (_tally > 1)
         {
             SetInputError();        // SET INPUT-ERROR TO TRUE. source: :1085
-            SetWsMoreThan1Action(); // SET WS-MORE-THAN-1-ACTION TO TRUE. source: :1086
+            SetHasMoreThanOneAction(); // SET WS-MORE-THAN-1-ACTION TO TRUE. source: :1086
             // MOVE WS-EDIT-SELECT-FLAGS TO WS-EDIT-SELECT-ERROR-FLAGS; INSPECT REPLACING ALL 'S'/'U' BY '1'
             //   CHARACTERS BY '0'. source: :1088-1093
             for (int k = 0; k < 7; k++)
-                _wsRowCrdselectError[k] = _wsEditSelect[k] is 'S' or 'U' ? '1' : '0';
+                _rowCardSelectError[k] = _editSelect[k] is 'S' or 'U' ? '1' : '0';
         }
 
         // MOVE ZERO TO I-SELECTED. source: :1097
-        _iSelected = 0;
+        _selectedRow = 0;
 
         // PERFORM VARYING I FROM 1 BY 1 UNTIL I > 7. source: :1099-1115
-        for (_i = 1; _i <= 7; _i++)
+        for (_tally = 1; _tally <= 7; _tally++)
         {
-            if (SelectOk(_i)) // WHEN SELECT-OK(I). source: :1101
+            if (SelectOk(_tally)) // WHEN SELECT-OK(I). source: :1101
             {
-                _iSelected = _i; // MOVE I TO I-SELECTED. source: :1102
-                if (_wsErrorMsg == MORE_THAN_1_ACTION) // IF WS-MORE-THAN-1-ACTION. source: :1103
-                    _wsRowCrdselectError[_i - 1] = '1'; // MOVE '1' TO WS-ROW-CRDSELECT-ERROR(I). source: :1104
+                _selectedRow = _tally; // MOVE I TO I-SELECTED. source: :1102
+                if (_errorMessage == MoreThan1Action) // IF WS-MORE-THAN-1-ACTION. source: :1103
+                    _rowCardSelectError[_tally - 1] = '1'; // MOVE '1' TO WS-ROW-CRDSELECT-ERROR(I). source: :1104
             }
-            else if (SelectBlank(_i)) // WHEN SELECT-BLANK(I). source: :1106
+            else if (SelectBlank(_tally)) // WHEN SELECT-BLANK(I). source: :1106
             {
                 // CONTINUE. source: :1107
             }
             else // WHEN OTHER. source: :1108
             {
                 SetInputError();                    // SET INPUT-ERROR TO TRUE. source: :1109
-                _wsRowCrdselectError[_i - 1] = '1'; // MOVE '1' TO WS-ROW-CRDSELECT-ERROR(I). source: :1110
-                if (WsErrorMsgOff)                  // IF WS-ERROR-MSG-OFF. source: :1111
+                _rowCardSelectError[_tally - 1] = '1'; // MOVE '1' TO WS-ROW-CRDSELECT-ERROR(I). source: :1110
+                if (ErrorMessageIsBlank)                  // IF WS-ERROR-MSG-OFF. source: :1111
                     SetWsInvalidActionCode();       // SET WS-INVALID-ACTION-CODE TO TRUE. source: :1112
             }
         }
@@ -919,7 +919,7 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     //  9000-READ-FORWARD — source: COCRDLIC.cbl:1123-1263
     // =============================================================================================
-    private void Read9000Forward()
+    private void ReadForward()  // COBOL paragraph: 9000-READ-FORWARD
     {
         MoveLowValuesToAllRows(); // MOVE LOW-VALUES TO WS-ALL-ROWS. source: :1124
 
@@ -927,9 +927,9 @@ public sealed class CardListProgram : ITransactionHandler
 
         // EXEC CICS STARTBR DATASET(CARDDAT) RIDFLD(WS-CARD-RID-CARDNUM) KEYLENGTH(16) GTEQ. source: :1129-1136
         // LOW-VALUES (empty) start key positions at the first record.
-        card.StartBrowse(string.IsNullOrEmpty(_wsCardRidCardnum) ? null : _wsCardRidCardnum);
+        card.StartBrowse(string.IsNullOrEmpty(_cardRidCardNum) ? null : _cardRidCardNum);
 
-        _wsScrnCounter = 0;          // MOVE ZEROES TO WS-SCRN-COUNTER. source: :1140
+        _screenCounter = 0;          // MOVE ZEROES TO WS-SCRN-COUNTER. source: :1140
         SetCaNextPageExists();       // SET CA-NEXT-PAGE-EXISTS    TO TRUE. source: :1141
         SetMoreRecordsToRead();      // SET MORE-RECORDS-TO-READ   TO TRUE. source: :1142
 
@@ -940,27 +940,27 @@ public sealed class CardListProgram : ITransactionHandler
             string fs = card.ReadNext(out _cardRecord);
             SetResp(fs);
 
-            if (_wsRespCd == (int)Resp.Normal || _wsRespCd == (int)Resp.DupRec) // WHEN NORMAL/DUPREC. source: :1157-1158
+            if (_responseCode == (int)Resp.Normal || _responseCode == (int)Resp.DupRec) // WHEN NORMAL/DUPREC. source: :1157-1158
             {
-                Filter9500Records(); // PERFORM 9500-FILTER-RECORDS. source: :1159-1160
+                FilterRecords(); // PERFORM 9500-FILTER-RECORDS. source: :1159-1160
 
-                if (WsDonotExcludeThisRecord) // IF WS-DONOT-EXCLUDE-THIS-RECORD. source: :1162
+                if (IncludeThisRecord) // IF WS-DONOT-EXCLUDE-THIS-RECORD. source: :1162
                 {
-                    _wsScrnCounter++; // ADD 1 TO WS-SCRN-COUNTER. source: :1163
+                    _screenCounter++; // ADD 1 TO WS-SCRN-COUNTER. source: :1163
 
                     // MOVE CARD-NUM/ACCT-ID/ACTIVE-STATUS TO WS-ROW-*(WS-SCRN-COUNTER). source: :1165-1171
-                    _rows[_wsScrnCounter - 1] = new Row
+                    _rows[_screenCounter - 1] = new Row
                     {
                         CardNum = CardNum,
                         AcctNo = Zoned(CardAcctId, 11),
                         Status = CardActiveStatus,
                     };
 
-                    if (_wsScrnCounter == 1) // IF WS-SCRN-COUNTER = 1. source: :1173
+                    if (_screenCounter == 1) // IF WS-SCRN-COUNTER = 1. source: :1173
                     {
-                        _wsCaFirstCardAcctId = CardAcctId; // MOVE CARD-ACCT-ID TO WS-CA-FIRST-CARD-ACCT-ID. source: :1174-1175
-                        _wsCaFirstCardNum = CardNum;       // MOVE CARD-NUM     TO WS-CA-FIRST-CARD-NUM. source: :1176
-                        if (_wsCaScreenNum == 0)           // IF WS-CA-SCREEN-NUM = 0. source: :1177
+                        _firstCardAcctId = CardAcctId; // MOVE CARD-ACCT-ID TO WS-CA-FIRST-CARD-ACCT-ID. source: :1174-1175
+                        _firstCardNum = CardNum;       // MOVE CARD-NUM     TO WS-CA-FIRST-CARD-NUM. source: :1176
+                        if (_screenNum == 0)           // IF WS-CA-SCREEN-NUM = 0. source: :1177
                             AddOneToScreenNum();           // ADD +1 TO WS-CA-SCREEN-NUM. source: :1178
                         // ELSE CONTINUE. source: :1179-1180
                     }
@@ -969,59 +969,59 @@ public sealed class CardListProgram : ITransactionHandler
                 // ELSE CONTINUE. source: :1185-1186
 
                 // IF WS-SCRN-COUNTER = WS-MAX-SCREEN-LINES — page full; look ahead one record. source: :1191-1232
-                if (_wsScrnCounter == WS_MAX_SCREEN_LINES)
+                if (_screenCounter == MaxScreenLines)
                 {
                     SetReadLoopExit(); // SET READ-LOOP-EXIT TO TRUE. source: :1192
 
-                    _wsCaLastCardAcctId = CardAcctId; // MOVE CARD-ACCT-ID TO WS-CA-LAST-CARD-ACCT-ID. source: :1194
-                    _wsCaLastCardNum = CardNum;       // MOVE CARD-NUM     TO WS-CA-LAST-CARD-NUM. source: :1195
+                    _lastCardAcctId = CardAcctId; // MOVE CARD-ACCT-ID TO WS-CA-LAST-CARD-ACCT-ID. source: :1194
+                    _lastCardNum = CardNum;       // MOVE CARD-NUM     TO WS-CA-LAST-CARD-NUM. source: :1195
 
                     // EXEC CICS READNEXT (look-ahead). source: :1197-1205
                     string fs2 = card.ReadNext(out _cardRecord);
                     SetResp(fs2);
 
-                    if (_wsRespCd == (int)Resp.Normal || _wsRespCd == (int)Resp.DupRec) // WHEN NORMAL/DUPREC. source: :1208-1209
+                    if (_responseCode == (int)Resp.Normal || _responseCode == (int)Resp.DupRec) // WHEN NORMAL/DUPREC. source: :1208-1209
                     {
                         SetCaNextPageExists();            // SET CA-NEXT-PAGE-EXISTS TO TRUE. source: :1210-1211
-                        _wsCaLastCardAcctId = CardAcctId; // MOVE CARD-ACCT-ID TO WS-CA-LAST-CARD-ACCT-ID. source: :1212-1213
-                        _wsCaLastCardNum = CardNum;       // MOVE CARD-NUM     TO WS-CA-LAST-CARD-NUM. source: :1214
+                        _lastCardAcctId = CardAcctId; // MOVE CARD-ACCT-ID TO WS-CA-LAST-CARD-ACCT-ID. source: :1212-1213
+                        _lastCardNum = CardNum;       // MOVE CARD-NUM     TO WS-CA-LAST-CARD-NUM. source: :1214
                     }
-                    else if (_wsRespCd == (int)Resp.EndFile) // WHEN ENDFILE. source: :1215
+                    else if (_responseCode == (int)Resp.EndFile) // WHEN ENDFILE. source: :1215
                     {
                         SetCaNextPageNotExists(); // SET CA-NEXT-PAGE-NOT-EXISTS TO TRUE. source: :1216
-                        if (WsErrorMsgOff)        // IF WS-ERROR-MSG-OFF. source: :1218
-                            _wsErrorMsg = "NO MORE RECORDS TO SHOW"; // source: :1219-1220
+                        if (ErrorMessageIsBlank)        // IF WS-ERROR-MSG-OFF. source: :1218
+                            _errorMessage = "NO MORE RECORDS TO SHOW"; // source: :1219-1220
                     }
                     else // WHEN OTHER — file error. source: :1222-1230
                     {
                         SetReadLoopExit();               // SET READ-LOOP-EXIT TO TRUE. source: :1225
                         _errorOpname = PadX("READ", 8);  // MOVE 'READ' TO ERROR-OPNAME. source: :1226
-                        _errorFile = PadX(LIT_CARD_FILE, 9); // MOVE LIT-CARD-FILE TO ERROR-FILE. source: :1227
-                        _errorResp = Alpha(_wsRespCd, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. source: :1228
-                        _errorResp2 = Alpha(_wsReasCd, 10);  // MOVE WS-REAS-CD TO ERROR-RESP2. source: :1229
-                        _wsErrorMsg = Truncate75(BuildFileErrorMessage()); // MOVE WS-FILE-ERROR-MESSAGE TO WS-ERROR-MSG. source: :1230
+                        _errorFile = PadX(CardFileName, 9); // MOVE LIT-CARD-FILE TO ERROR-FILE. source: :1227
+                        _errorResp = Alpha(_responseCode, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. source: :1228
+                        _errorResp2 = Alpha(_reasonCode, 10);  // MOVE WS-REAS-CD TO ERROR-RESP2. source: :1229
+                        _errorMessage = Truncate75(BuildFileErrorMessage()); // MOVE WS-FILE-ERROR-MESSAGE TO WS-ERROR-MSG. source: :1230
                     }
                 }
             }
-            else if (_wsRespCd == (int)Resp.EndFile) // WHEN ENDFILE (main). source: :1233-1245
+            else if (_responseCode == (int)Resp.EndFile) // WHEN ENDFILE (main). source: :1233-1245
             {
                 SetReadLoopExit();        // SET READ-LOOP-EXIT TO TRUE. source: :1234
                 SetCaNextPageNotExists(); // SET CA-NEXT-PAGE-NOT-EXISTS TO TRUE. source: :1235
-                _wsCaLastCardAcctId = CardAcctId; // MOVE CARD-ACCT-ID TO WS-CA-LAST-CARD-ACCT-ID. source: :1236
-                _wsCaLastCardNum = CardNum;       // MOVE CARD-NUM     TO WS-CA-LAST-CARD-NUM. source: :1237
-                if (WsErrorMsgOff)                // IF WS-ERROR-MSG-OFF. source: :1238
-                    _wsErrorMsg = "NO MORE RECORDS TO SHOW"; // source: :1239
-                if (_wsCaScreenNum == 1 && _wsScrnCounter == 0) // source: :1241-1242
-                    SetWsNoRecordsFound();                       // SET WS-NO-RECORDS-FOUND TO TRUE. source: :1244
+                _lastCardAcctId = CardAcctId; // MOVE CARD-ACCT-ID TO WS-CA-LAST-CARD-ACCT-ID. source: :1236
+                _lastCardNum = CardNum;       // MOVE CARD-NUM     TO WS-CA-LAST-CARD-NUM. source: :1237
+                if (ErrorMessageIsBlank)                // IF WS-ERROR-MSG-OFF. source: :1238
+                    _errorMessage = "NO MORE RECORDS TO SHOW"; // source: :1239
+                if (_screenNum == 1 && _screenCounter == 0) // source: :1241-1242
+                    SetIsNoRecordsFoundError();                       // SET WS-NO-RECORDS-FOUND TO TRUE. source: :1244
             }
             else // WHEN OTHER — file error. source: :1246-1254
             {
                 SetReadLoopExit();               // SET READ-LOOP-EXIT TO TRUE. source: :1249
                 _errorOpname = PadX("READ", 8);  // MOVE 'READ' TO ERROR-OPNAME. source: :1250
-                _errorFile = PadX(LIT_CARD_FILE, 9); // MOVE LIT-CARD-FILE TO ERROR-FILE. source: :1251
-                _errorResp = Alpha(_wsRespCd, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. source: :1252
-                _errorResp2 = Alpha(_wsReasCd, 10);  // MOVE WS-REAS-CD TO ERROR-RESP2. source: :1253
-                _wsErrorMsg = Truncate75(BuildFileErrorMessage()); // MOVE WS-FILE-ERROR-MESSAGE TO WS-ERROR-MSG. source: :1254
+                _errorFile = PadX(CardFileName, 9); // MOVE LIT-CARD-FILE TO ERROR-FILE. source: :1251
+                _errorResp = Alpha(_responseCode, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. source: :1252
+                _errorResp2 = Alpha(_reasonCode, 10);  // MOVE WS-REAS-CD TO ERROR-RESP2. source: :1253
+                _errorMessage = Truncate75(BuildFileErrorMessage()); // MOVE WS-FILE-ERROR-MESSAGE TO WS-ERROR-MSG. source: :1254
             }
         }
 
@@ -1032,39 +1032,39 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     //  9100-READ-BACKWARDS — source: COCRDLIC.cbl:1264-1380
     // =============================================================================================
-    private void Read9100Backwards()
+    private void ReadBackwards()  // COBOL paragraph: 9100-READ-BACKWARDS
     {
         MoveLowValuesToAllRows(); // MOVE LOW-VALUES TO WS-ALL-ROWS. source: :1266
 
         // MOVE WS-CA-FIRST-CARDKEY TO WS-CA-LAST-CARDKEY. source: :1268
-        _wsCaLastCardNum = _wsCaFirstCardNum;
-        _wsCaLastCardAcctId = _wsCaFirstCardAcctId;
+        _lastCardNum = _firstCardNum;
+        _lastCardAcctId = _firstCardAcctId;
 
         var card = new CardRepository(_db.Connection);
 
         // EXEC CICS STARTBR DATASET(CARDDAT) RIDFLD(WS-CARD-RID-CARDNUM) KEYLENGTH(16) GTEQ. source: :1273-1280
-        card.StartBrowse(string.IsNullOrEmpty(_wsCardRidCardnum) ? null : _wsCardRidCardnum);
+        card.StartBrowse(string.IsNullOrEmpty(_cardRidCardNum) ? null : _cardRidCardNum);
 
         // COMPUTE WS-SCRN-COUNTER = WS-MAX-SCREEN-LINES + 1 (= 8). source: :1284-1286
-        _wsScrnCounter = WS_MAX_SCREEN_LINES + 1;
+        _screenCounter = MaxScreenLines + 1;
         SetCaNextPageExists();  // SET CA-NEXT-PAGE-EXISTS  TO TRUE. source: :1287
         SetMoreRecordsToRead(); // SET MORE-RECORDS-TO-READ TO TRUE. source: :1288
 
         // Priming READPREV (skips the current first record). source: :1294-1318
         string fsPrime = card.ReadPrevious(out _cardRecord);
         SetResp(fsPrime);
-        if (_wsRespCd == (int)Resp.Normal || _wsRespCd == (int)Resp.DupRec) // WHEN NORMAL/DUPREC. source: :1305-1306
+        if (_responseCode == (int)Resp.Normal || _responseCode == (int)Resp.DupRec) // WHEN NORMAL/DUPREC. source: :1305-1306
         {
-            _wsScrnCounter--; // SUBTRACT 1 FROM WS-SCRN-COUNTER (-> 7). source: :1307
+            _screenCounter--; // SUBTRACT 1 FROM WS-SCRN-COUNTER (-> 7). source: :1307
         }
         else // WHEN OTHER — file error; ENDBR + exit. source: :1308-1317
         {
             SetReadLoopExit();               // SET READ-LOOP-EXIT TO TRUE. source: :1311
             _errorOpname = PadX("READ", 8);  // MOVE 'READ' TO ERROR-OPNAME. source: :1312
-            _errorFile = PadX(LIT_CARD_FILE, 9); // MOVE LIT-CARD-FILE TO ERROR-FILE. source: :1313
-            _errorResp = Alpha(_wsRespCd, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. source: :1314
-            _errorResp2 = Alpha(_wsReasCd, 10);  // MOVE WS-REAS-CD TO ERROR-RESP2. source: :1315
-            _wsErrorMsg = Truncate75(BuildFileErrorMessage()); // source: :1316
+            _errorFile = PadX(CardFileName, 9); // MOVE LIT-CARD-FILE TO ERROR-FILE. source: :1313
+            _errorResp = Alpha(_responseCode, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. source: :1314
+            _errorResp2 = Alpha(_reasonCode, 10);  // MOVE WS-REAS-CD TO ERROR-RESP2. source: :1315
+            _errorMessage = Truncate75(BuildFileErrorMessage()); // source: :1316
             card.EndBrowse();                // 9100-READ-BACKWARDS-EXIT ENDBR. source: :1375-1377
             return;                          // GO TO 9100-READ-BACKWARDS-EXIT. source: :1317
         }
@@ -1076,26 +1076,26 @@ public sealed class CardListProgram : ITransactionHandler
             string fs = card.ReadPrevious(out _cardRecord);
             SetResp(fs);
 
-            if (_wsRespCd == (int)Resp.Normal || _wsRespCd == (int)Resp.DupRec) // WHEN NORMAL/DUPREC. source: :1333-1334
+            if (_responseCode == (int)Resp.Normal || _responseCode == (int)Resp.DupRec) // WHEN NORMAL/DUPREC. source: :1333-1334
             {
-                Filter9500Records(); // PERFORM 9500-FILTER-RECORDS. source: :1335-1336
+                FilterRecords(); // PERFORM 9500-FILTER-RECORDS. source: :1335-1336
 
-                if (WsDonotExcludeThisRecord) // IF WS-DONOT-EXCLUDE-THIS-RECORD. source: :1337
+                if (IncludeThisRecord) // IF WS-DONOT-EXCLUDE-THIS-RECORD. source: :1337
                 {
                     // MOVE CARD-NUM/ACCT-ID/ACTIVE-STATUS TO WS-ROW-*(WS-SCRN-COUNTER). source: :1338-1344
-                    _rows[_wsScrnCounter - 1] = new Row
+                    _rows[_screenCounter - 1] = new Row
                     {
                         CardNum = CardNum,
                         AcctNo = Zoned(CardAcctId, 11),
                         Status = CardActiveStatus,
                     };
 
-                    _wsScrnCounter--; // SUBTRACT 1 FROM WS-SCRN-COUNTER. source: :1346
-                    if (_wsScrnCounter == 0) // IF WS-SCRN-COUNTER = 0. source: :1347
+                    _screenCounter--; // SUBTRACT 1 FROM WS-SCRN-COUNTER. source: :1346
+                    if (_screenCounter == 0) // IF WS-SCRN-COUNTER = 0. source: :1347
                     {
                         SetReadLoopExit();                 // SET READ-LOOP-EXIT TO TRUE. source: :1348
-                        _wsCaFirstCardAcctId = CardAcctId; // MOVE CARD-ACCT-ID TO WS-CA-FIRST-CARD-ACCT-ID. source: :1350-1351
-                        _wsCaFirstCardNum = CardNum;       // MOVE CARD-NUM     TO WS-CA-FIRST-CARD-NUM. source: :1352-1353
+                        _firstCardAcctId = CardAcctId; // MOVE CARD-ACCT-ID TO WS-CA-FIRST-CARD-ACCT-ID. source: :1350-1351
+                        _firstCardNum = CardNum;       // MOVE CARD-NUM     TO WS-CA-FIRST-CARD-NUM. source: :1352-1353
                     }
                     // ELSE CONTINUE. source: :1354-1355
                 }
@@ -1105,10 +1105,10 @@ public sealed class CardListProgram : ITransactionHandler
             {
                 SetReadLoopExit();               // SET READ-LOOP-EXIT TO TRUE. source: :1364
                 _errorOpname = PadX("READ", 8);  // MOVE 'READ' TO ERROR-OPNAME. source: :1365
-                _errorFile = PadX(LIT_CARD_FILE, 9); // MOVE LIT-CARD-FILE TO ERROR-FILE. source: :1366
-                _errorResp = Alpha(_wsRespCd, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. source: :1367
-                _errorResp2 = Alpha(_wsReasCd, 10);  // MOVE WS-REAS-CD TO ERROR-RESP2. source: :1368
-                _wsErrorMsg = Truncate75(BuildFileErrorMessage()); // source: :1369
+                _errorFile = PadX(CardFileName, 9); // MOVE LIT-CARD-FILE TO ERROR-FILE. source: :1366
+                _errorResp = Alpha(_responseCode, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. source: :1367
+                _errorResp2 = Alpha(_reasonCode, 10);  // MOVE WS-REAS-CD TO ERROR-RESP2. source: :1368
+                _errorMessage = Truncate75(BuildFileErrorMessage()); // source: :1369
             }
         }
 
@@ -1119,15 +1119,15 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     //  9500-FILTER-RECORDS — source: COCRDLIC.cbl:1382-1411
     // =============================================================================================
-    private void Filter9500Records()
+    private void FilterRecords()  // COBOL paragraph: 9500-FILTER-RECORDS
     {
-        SetWsDonotExcludeThisRecord(); // SET WS-DONOT-EXCLUDE-THIS-RECORD TO TRUE. source: :1383
+        SetIncludeThisRecord(); // SET WS-DONOT-EXCLUDE-THIS-RECORD TO TRUE. source: :1383
 
         // IF FLG-ACCTFILTER-ISVALID: IF CARD-ACCT-ID = CC-ACCT-ID continue else EXCLUDE. source: :1385-1394
         if (FlgAcctFilterIsValid)
         {
             // CARD-ACCT-ID 9(11) = CC-ACCT-ID X(11): compare as numeric value. source: :1386
-            if (CardAcctId == ParseLong(_ccAcctId))
+            if (CardAcctId == ParseLong(_filterAcctId))
             {
                 // CONTINUE
             }
@@ -1142,7 +1142,7 @@ public sealed class CardListProgram : ITransactionHandler
         if (FlgCardFilterIsValid)
         {
             // CARD-NUM X(16) = CC-CARD-NUM-N 9(16): compare as numeric value. source: :1397
-            if (ParseLong(CardNum) == ParseLong(_ccCardNum))
+            if (ParseLong(CardNum) == ParseLong(_filterCardNum))
             {
                 // CONTINUE
             }
@@ -1157,15 +1157,15 @@ public sealed class CardListProgram : ITransactionHandler
     // =============================================================================================
     //  YYYY-STORE-PFKEY (copybook CSSTRPFY) — source: CSSTRPFY.cpy:17-82; COCRDLIC.cbl:349-350
     // =============================================================================================
-    private void Yyyy_StorePfkey(CicsContext ctx) => _ccardAid = ctx.StorePfKey();
+    private void StorePfKeyAid(CicsContext ctx) => _aidKey = ctx.StorePfKey();  // COBOL paragraph: YYYY-STORE-PFKEY
 
     // =============================================================================================
     //  Arithmetic helpers — COBOL truncation semantics
     // =============================================================================================
     // ADD +1 TO WS-CA-SCREEN-NUM (PIC 9(1)) — B-9: single-digit silent truncation. source: :237,492,1178
-    private void AddOneToScreenNum() => _wsCaScreenNum = (_wsCaScreenNum + 1) % 10;
+    private void AddOneToScreenNum() => _screenNum = (_screenNum + 1) % 10;
     // SUBTRACT 1 FROM WS-CA-SCREEN-NUM (PIC 9(1)). source: :508
-    private void SubtractOneFromScreenNum() => _wsCaScreenNum = ((_wsCaScreenNum - 1) % 10 + 10) % 10;
+    private void SubtractOneFromScreenNum() => _screenNum = ((_screenNum - 1) % 10 + 10) % 10;
 
     // =============================================================================================
     //  WS-THIS-PROGCOMMAREA (de)serialize — the program-private trailer carried across turns.
@@ -1179,13 +1179,13 @@ public sealed class CardListProgram : ITransactionHandler
     private void InitializeProgCommarea()
     {
         // INITIALIZE WS-THIS-PROGCOMMAREA: alphanumeric -> SPACES, numeric -> 0, X(1) inds -> SPACE.
-        _wsCaLastCardNum = "";
-        _wsCaLastCardAcctId = 0;
-        _wsCaFirstCardNum = "";
-        _wsCaFirstCardAcctId = 0;
-        _wsCaScreenNum = 0;
-        _wsCaLastPageDisplayed = 0;
-        _wsCaNextPageInd = ' '; // INITIALIZE sets X(1) to SPACE (not LOW-VALUES). source: PORT NOTE INITIALIZE.
+        _lastCardNum = "";
+        _lastCardAcctId = 0;
+        _firstCardNum = "";
+        _firstCardAcctId = 0;
+        _screenNum = 0;
+        _lastPageDisplayed = 0;
+        _nextPageInd = ' '; // INITIALIZE sets X(1) to SPACE (not LOW-VALUES). source: PORT NOTE INITIALIZE.
     }
 
     // The trailer is serialized into the COMMAREA's CustFName/CustMName/CustLName text slots (75 spare
@@ -1198,13 +1198,13 @@ public sealed class CardListProgram : ITransactionHandler
         //   FIRST-CARD-NUM(16) | LAST-CARD-NUM(16) | SCREEN-NUM(1) | LAST-PAGE-DISPLAYED(1) | NEXT-IND(1) |
         //   FIRST-CARD-ACCT-ID(11) | LAST-CARD-ACCT-ID(11)  = 57 bytes.
         string packed =
-            PadX(_wsCaFirstCardNum, 16) +
-            PadX(_wsCaLastCardNum, 16) +
-            (char)('0' + (_wsCaScreenNum % 10)) +
-            (char)('0' + (_wsCaLastPageDisplayed % 10)) +
-            (_wsCaNextPageInd == '\0' ? ' ' : _wsCaNextPageInd) +
-            Zoned(_wsCaFirstCardAcctId, 11) +
-            Zoned(_wsCaLastCardAcctId, 11);
+            PadX(_firstCardNum, 16) +
+            PadX(_lastCardNum, 16) +
+            (char)('0' + (_screenNum % 10)) +
+            (char)('0' + (_lastPageDisplayed % 10)) +
+            (_nextPageInd == '\0' ? ' ' : _nextPageInd) +
+            Zoned(_firstCardAcctId, 11) +
+            Zoned(_lastCardAcctId, 11);
         // Spread the 57-byte image across CustFName(25)+CustMName(25)+CustLName(25); pad to the full 75.
         packed = PadX(packed, 75);
         _commArea.CustFName = packed.Substring(0, 25);
@@ -1220,16 +1220,16 @@ public sealed class CardListProgram : ITransactionHandler
         string packed = fname + mname + lname;
         if (packed.Length < 51) packed = PadX(packed, 73);
 
-        _wsCaFirstCardNum = packed.Substring(0, 16).TrimEnd();
-        _wsCaLastCardNum = packed.Substring(16, 16).TrimEnd();
+        _firstCardNum = packed.Substring(0, 16).TrimEnd();
+        _lastCardNum = packed.Substring(16, 16).TrimEnd();
         char sn = packed[32];
         char lpd = packed[33];
         char npi = packed[34];
-        _wsCaScreenNum = sn is >= '0' and <= '9' ? sn - '0' : 0;
-        _wsCaLastPageDisplayed = lpd is >= '0' and <= '9' ? lpd - '0' : 0;
-        _wsCaNextPageInd = npi == 'Y' ? 'Y' : (npi == ' ' ? ' ' : '\0');
-        _wsCaFirstCardAcctId = ParseLong(packed.Length >= 46 ? packed.Substring(35, 11) : "0");
-        _wsCaLastCardAcctId = ParseLong(packed.Length >= 57 ? packed.Substring(46, 11) : "0");
+        _screenNum = sn is >= '0' and <= '9' ? sn - '0' : 0;
+        _lastPageDisplayed = lpd is >= '0' and <= '9' ? lpd - '0' : 0;
+        _nextPageInd = npi == 'Y' ? 'Y' : (npi == ' ' ? ' ' : '\0');
+        _firstCardAcctId = ParseLong(packed.Length >= 46 ? packed.Substring(35, 11) : "0");
+        _lastCardAcctId = ParseLong(packed.Length >= 57 ? packed.Substring(46, 11) : "0");
     }
 
     // =============================================================================================
@@ -1247,7 +1247,7 @@ public sealed class CardListProgram : ITransactionHandler
     /// <summary>Maps a repository FileStatus to the CICS RESP/RESP2 the EVALUATE branches on.</summary>
     private void SetResp(string fileStatus)
     {
-        _wsRespCd = fileStatus switch
+        _responseCode = fileStatus switch
         {
             FileStatus.Ok => (int)Resp.Normal,              // '00' -> DFHRESP(NORMAL)
             FileStatus.EndOfFile => (int)Resp.EndFile,      // '10' -> DFHRESP(ENDFILE)
@@ -1255,7 +1255,7 @@ public sealed class CardListProgram : ITransactionHandler
             FileStatus.DuplicateKey => (int)Resp.DupRec,    // '02' -> DFHRESP(DUPREC)
             _ => (int)Resp.Error,                           // any other -> WHEN OTHER (file error)
         };
-        _wsReasCd = 0; // RESP2 unavailable from the relational repo; 0 for parity.
+        _reasonCode = 0; // RESP2 unavailable from the relational repo; 0 for parity.
     }
 
     /// <summary>
@@ -1351,10 +1351,10 @@ public sealed class CardListProgram : ITransactionHandler
     //  source: app/bms/COCRDLI.bms:25-340 / SCREEN_COCRDLI.md
     // =============================================================================================
     /// <summary>The DFHMDI map name. source: COCRDLI.bms:25.</summary>
-    public const string MapName = LIT_THISMAP;   // "CCRDLIA"
+    public const string MapName = ThisMap;   // "CCRDLIA"
 
     /// <summary>The DFHMSD mapset name. source: COCRDLI.bms:20.</summary>
-    public const string MapsetName = LIT_THISMAPSET; // "COCRDLI"
+    public const string MapsetName = ThisMapSet; // "COCRDLI"
 
     /// <summary>
     /// Constructs the <c>CCRDLIA</c> screen map: every <c>DFHMDF</c> as a <see cref="ScreenField"/> with its

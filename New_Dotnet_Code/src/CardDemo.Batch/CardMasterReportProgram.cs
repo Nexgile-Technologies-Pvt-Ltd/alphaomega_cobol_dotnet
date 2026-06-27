@@ -38,19 +38,19 @@ public sealed class CardMasterReportProgram
     // --- WORKING-STORAGE (CBACT02C lines 42-67) --------------------------------------------------
 
     /// <summary>CARDFILE-STATUS — the file-status of the CARD cursor (2 chars). // source: CBACT02C.cbl:46-48</summary>
-    private string _cardfileStatus = "00";
+    private string _cardFileStatus = "00"; // WS-CARDFILE-STATUS
 
     /// <summary>IO-STATUS — working copy of the status used by the display routine. // source: CBACT02C.cbl:50-52</summary>
-    private string _ioStatus = "00";
+    private string _ioStatus = "00"; // WS-IO-STATUS
 
     /// <summary>APPL-RESULT PIC S9(9) COMP. 0=ok(AOK), 16=EOF, 8=pre-op, 12=hard error. // source: CBACT02C.cbl:61-63</summary>
-    private int _applResult;
+    private int _applicationResult; // WS-APPL-RESULT
 
     /// <summary>END-OF-FILE PIC X(01) VALUE 'N' — main-loop sentinel. // source: CBACT02C.cbl:65</summary>
-    private bool _endOfFile;
+    private bool _endOfFile; // WS-END-OF-FILE
 
     /// <summary>CARD-RECORD — the record READ ... INTO populates (CVACT02Y, 150 bytes). // source: CBACT02C.cbl:45,93</summary>
-    private Card? _cardRecord;
+    private Card? _cardRecord; // CARD-RECORD
 
     /// <summary>The CARD master cursor (VSAM KSDS -&gt; relational CARD table). // source: CBACT02C.cbl:29-33</summary>
     private CardRepository _cardFile = null!;
@@ -61,10 +61,10 @@ public sealed class CardMasterReportProgram
     private readonly List<string> _sysout = [];
 
     /// <summary>88 APPL-AOK VALUE 0. // source: CBACT02C.cbl:62</summary>
-    private bool ApplAok => _applResult == 0;
+    private bool ApplAok => _applicationResult == 0;
 
     /// <summary>88 APPL-EOF VALUE 16. // source: CBACT02C.cbl:63</summary>
-    private bool ApplEof => _applResult == 16;
+    private bool ApplEof => _applicationResult == 16;
 
     /// <summary>The SYSOUT (DISPLAY) lines produced by the run, in order.</summary>
     public IReadOnlyList<string> Sysout => _sysout;
@@ -90,21 +90,21 @@ public sealed class CardMasterReportProgram
             // source: CBACT02C.cbl:71
             Display("START OF EXECUTION OF PROGRAM CBACT02C");
             // source: CBACT02C.cbl:72
-            CardfileOpen0000();
+            OpenCardFile();
 
             // PERFORM UNTIL END-OF-FILE = 'Y'  // source: CBACT02C.cbl:74-81
             while (!_endOfFile)
             {
                 if (!_endOfFile) // IF END-OF-FILE = 'N'  // source: CBACT02C.cbl:75
                 {
-                    CardfileGetNext1000(); // source: CBACT02C.cbl:76
+                    GetNextCard(); // source: CBACT02C.cbl:76
                     if (!_endOfFile)       // IF END-OF-FILE = 'N'  // source: CBACT02C.cbl:77
                         Display(FormatCardRecord(_cardRecord!)); // DISPLAY CARD-RECORD  // source: CBACT02C.cbl:78
                 }
             }
 
             // source: CBACT02C.cbl:83
-            CardfileClose9000();
+            CloseCardFile();
             // source: CBACT02C.cbl:85
             Display("END OF EXECUTION OF PROGRAM CBACT02C");
 
@@ -125,19 +125,19 @@ public sealed class CardMasterReportProgram
     /// <summary>
     /// 1000-CARDFILE-GET-NEXT — sequential READ of the next card row. // source: CBACT02C.cbl:92-116
     /// </summary>
-    private void CardfileGetNext1000()
+    private void GetNextCard() // COBOL paragraph: 1000-CARDFILE-GET-NEXT
     {
         // READ CARDFILE-FILE INTO CARD-RECORD  // source: CBACT02C.cbl:93
-        _cardfileStatus = _cardFile.ReadNext(out Card? card);
+        _cardFileStatus = _cardFile.ReadNext(out Card? card);
         if (card is not null)
             _cardRecord = card; // READ ... INTO CARD-RECORD (only populated on a successful read)
 
-        if (_cardfileStatus == FileStatus.Ok)        // CARDFILE-STATUS = '00'  // source: CBACT02C.cbl:94
-            _applResult = 0;                          // source: CBACT02C.cbl:95
-        else if (_cardfileStatus == FileStatus.EndOfFile) // '10'  // source: CBACT02C.cbl:98
-            _applResult = 16;                         // source: CBACT02C.cbl:99
+        if (_cardFileStatus == FileStatus.Ok)        // CARDFILE-STATUS = '00'  // source: CBACT02C.cbl:94
+            _applicationResult = 0;                          // source: CBACT02C.cbl:95
+        else if (_cardFileStatus == FileStatus.EndOfFile) // '10'  // source: CBACT02C.cbl:98
+            _applicationResult = 16;                         // source: CBACT02C.cbl:99
         else
-            _applResult = 12;                         // source: CBACT02C.cbl:101
+            _applicationResult = 12;                         // source: CBACT02C.cbl:101
 
         if (ApplAok)                                  // source: CBACT02C.cbl:104
         {
@@ -150,9 +150,9 @@ public sealed class CardMasterReportProgram
         else
         {
             Display("ERROR READING CARDFILE");        // source: CBACT02C.cbl:110
-            _ioStatus = _cardfileStatus;              // MOVE CARDFILE-STATUS TO IO-STATUS  // source: CBACT02C.cbl:111
-            DisplayIoStatus9910();                    // source: CBACT02C.cbl:112
-            AbendProgram9999();                       // source: CBACT02C.cbl:113
+            _ioStatus = _cardFileStatus;              // MOVE CARDFILE-STATUS TO IO-STATUS  // source: CBACT02C.cbl:111
+            DisplayIoStatus();                    // source: CBACT02C.cbl:112
+            AbendProgram();                       // source: CBACT02C.cbl:113
         }
         // EXIT  // source: CBACT02C.cbl:116
     }
@@ -162,19 +162,19 @@ public sealed class CardMasterReportProgram
     /// 0000-CARDFILE-OPEN — OPEN INPUT the card file (positions a forward, PK-ordered browse).
     /// // source: CBACT02C.cbl:118-134
     /// </summary>
-    private void CardfileOpen0000()
+    private void OpenCardFile() // COBOL paragraph: 0000-CARDFILE-OPEN
     {
-        _applResult = 8;                              // MOVE 8 TO APPL-RESULT  // source: CBACT02C.cbl:119
+        _applicationResult = 8;                              // MOVE 8 TO APPL-RESULT  // source: CBACT02C.cbl:119
 
         // OPEN INPUT CARDFILE-FILE — relational: position the read cursor at the first row in PK order.
         // The SQLite-backed table is always openable, so OPEN succeeds with status '00'.
         _cardFile.StartBrowse();                      // source: CBACT02C.cbl:120
-        _cardfileStatus = FileStatus.Ok;
+        _cardFileStatus = FileStatus.Ok;
 
-        if (_cardfileStatus == FileStatus.Ok)         // CARDFILE-STATUS = '00'  // source: CBACT02C.cbl:121
-            _applResult = 0;                          // source: CBACT02C.cbl:122
+        if (_cardFileStatus == FileStatus.Ok)         // CARDFILE-STATUS = '00'  // source: CBACT02C.cbl:121
+            _applicationResult = 0;                          // source: CBACT02C.cbl:122
         else
-            _applResult = 12;                         // source: CBACT02C.cbl:124 (faithful: '10' not handled)
+            _applicationResult = 12;                         // source: CBACT02C.cbl:124 (faithful: '10' not handled)
 
         if (ApplAok)                                  // source: CBACT02C.cbl:126
         {
@@ -183,9 +183,9 @@ public sealed class CardMasterReportProgram
         else
         {
             Display("ERROR OPENING CARDFILE");        // source: CBACT02C.cbl:129
-            _ioStatus = _cardfileStatus;              // source: CBACT02C.cbl:130
-            DisplayIoStatus9910();                    // source: CBACT02C.cbl:131
-            AbendProgram9999();                       // source: CBACT02C.cbl:132
+            _ioStatus = _cardFileStatus;              // source: CBACT02C.cbl:130
+            DisplayIoStatus();                    // source: CBACT02C.cbl:131
+            AbendProgram();                       // source: CBACT02C.cbl:132
         }
         // EXIT  // source: CBACT02C.cbl:134
     }
@@ -194,18 +194,18 @@ public sealed class CardMasterReportProgram
     /// <summary>
     /// 9000-CARDFILE-CLOSE — CLOSE the card file (ends the browse). // source: CBACT02C.cbl:136-152
     /// </summary>
-    private void CardfileClose9000()
+    private void CloseCardFile() // COBOL paragraph: 9000-CARDFILE-CLOSE
     {
-        _applResult = 8;                              // ADD 8 TO ZERO GIVING APPL-RESULT  // source: CBACT02C.cbl:137
+        _applicationResult = 8;                              // ADD 8 TO ZERO GIVING APPL-RESULT  // source: CBACT02C.cbl:137
 
         // CLOSE CARDFILE-FILE — relational: dispose the read cursor; always succeeds with '00'.
         _cardFile.EndBrowse();                        // source: CBACT02C.cbl:138
-        _cardfileStatus = FileStatus.Ok;
+        _cardFileStatus = FileStatus.Ok;
 
-        if (_cardfileStatus == FileStatus.Ok)         // CARDFILE-STATUS = '00'  // source: CBACT02C.cbl:139
-            _applResult = _applResult - _applResult;  // SUBTRACT APPL-RESULT FROM APPL-RESULT (-> 0)  // source: CBACT02C.cbl:140
+        if (_cardFileStatus == FileStatus.Ok)         // CARDFILE-STATUS = '00'  // source: CBACT02C.cbl:139
+            _applicationResult = _applicationResult - _applicationResult;  // SUBTRACT APPL-RESULT FROM APPL-RESULT (-> 0)  // source: CBACT02C.cbl:140
         else
-            _applResult = 12;                         // ADD 12 TO ZERO GIVING APPL-RESULT  // source: CBACT02C.cbl:142
+            _applicationResult = 12;                         // ADD 12 TO ZERO GIVING APPL-RESULT  // source: CBACT02C.cbl:142
 
         if (ApplAok)                                  // source: CBACT02C.cbl:144
         {
@@ -214,9 +214,9 @@ public sealed class CardMasterReportProgram
         else
         {
             Display("ERROR CLOSING CARDFILE");        // source: CBACT02C.cbl:147
-            _ioStatus = _cardfileStatus;              // source: CBACT02C.cbl:148
-            DisplayIoStatus9910();                    // source: CBACT02C.cbl:149
-            AbendProgram9999();                       // source: CBACT02C.cbl:150
+            _ioStatus = _cardFileStatus;              // source: CBACT02C.cbl:148
+            DisplayIoStatus();                    // source: CBACT02C.cbl:149
+            AbendProgram();                       // source: CBACT02C.cbl:150
         }
         // EXIT  // source: CBACT02C.cbl:152
     }
@@ -224,12 +224,12 @@ public sealed class CardMasterReportProgram
     /// <summary>
     /// 9999-ABEND-PROGRAM — CALL 'CEE3ABD' USING ABCODE(999), TIMING(0). // source: CBACT02C.cbl:154-158
     /// </summary>
-    private void AbendProgram9999()
+    private void AbendProgram() // COBOL paragraph: 9999-ABEND-PROGRAM
     {
         Display("ABENDING PROGRAM");                  // source: CBACT02C.cbl:155
         // MOVE 0 TO TIMING; MOVE 999 TO ABCODE; CALL 'CEE3ABD' USING ABCODE, TIMING.
         // source: CBACT02C.cbl:156-158
-        throw new AbendException("999", $"CBACT02C abend; FILE STATUS '{_cardfileStatus}'.");
+        throw new AbendException("999", $"CBACT02C abend; FILE STATUS '{_cardFileStatus}'.");
     }
 
     // *****************************************************************
@@ -237,7 +237,7 @@ public sealed class CardMasterReportProgram
     /// 9910-DISPLAY-IO-STATUS — formats the 2-byte file status into a 4-char "NNNN" string and DISPLAYs
     /// <c>'FILE STATUS IS: NNNN' IO-STATUS-04</c>. // source: CBACT02C.cbl:161-174
     /// </summary>
-    private void DisplayIoStatus9910()
+    private void DisplayIoStatus() // COBOL paragraph: 9910-DISPLAY-IO-STATUS
     {
         // IO-STATUS-04 = IO-STATUS-0401 PIC 9 + IO-STATUS-0403 PIC 999  // source: CBACT02C.cbl:57-59
         string ioStat1 = _ioStatus.Length > 0 ? _ioStatus[..1] : " ";
@@ -286,15 +286,15 @@ public sealed class CardMasterReportProgram
     /// CARD-EMBOSSED-NAME X50, CARD-EXPIRAION-DATE X10 [misspelled — FAITHFUL BUG #2],
     /// CARD-ACTIVE-STATUS X1, FILLER X59).
     /// </remarks>
-    private static string FormatCardRecord(Card c)
+    private static string FormatCardRecord(Card card)
     {
         var sb = new StringBuilder(150);
-        sb.Append(Alpha(c.CardNum, 16));            // CARD-NUM            PIC X(16)
-        sb.Append(Zoned(c.AcctId, 11));             // CARD-ACCT-ID        PIC 9(11)
-        sb.Append(Zoned(c.CvvCd, 3));               // CARD-CVV-CD         PIC 9(03)
-        sb.Append(Alpha(c.EmbossedName, 50));       // CARD-EMBOSSED-NAME  PIC X(50)
-        sb.Append(Alpha(c.ExpirationDate, 10));     // CARD-EXPIRAION-DATE PIC X(10) (misspelled in source)
-        sb.Append(Alpha(c.ActiveStatus, 1));        // CARD-ACTIVE-STATUS  PIC X(01)
+        sb.Append(Alpha(card.CardNum, 16));            // CARD-NUM            PIC X(16)
+        sb.Append(Zoned(card.AcctId, 11));             // CARD-ACCT-ID        PIC 9(11)
+        sb.Append(Zoned(card.CvvCd, 3));               // CARD-CVV-CD         PIC 9(03)
+        sb.Append(Alpha(card.EmbossedName, 50));       // CARD-EMBOSSED-NAME  PIC X(50)
+        sb.Append(Alpha(card.ExpirationDate, 10));     // CARD-EXPIRAION-DATE PIC X(10) (misspelled in source)
+        sb.Append(Alpha(card.ActiveStatus, 1));        // CARD-ACTIVE-STATUS  PIC X(01)
         sb.Append(new string(' ', 59));             // FILLER              PIC X(59)
         return sb.ToString();
     }

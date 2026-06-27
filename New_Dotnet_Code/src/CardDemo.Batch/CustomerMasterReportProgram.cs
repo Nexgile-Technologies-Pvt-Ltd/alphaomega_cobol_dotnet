@@ -45,13 +45,13 @@ public sealed class CustomerMasterReportProgram
     // --- WORKING-STORAGE (CBCUS01C lines 42-67) --------------------------------------------------
 
     /// <summary>CUSTFILE-STATUS — the file-status of the CUSTOMER cursor (2 chars). // source: CBCUS01C.cbl:46-48</summary>
-    private string _custfileStatus = "00";
+    private string _customerFileStatus = "00"; // CUSTFILE-STATUS
 
     /// <summary>IO-STATUS — working copy of the status used by the display routine. // source: CBCUS01C.cbl:50-52</summary>
     private string _ioStatus = "00";
 
     /// <summary>APPL-RESULT PIC S9(9) COMP. 0=ok(AOK), 16=EOF, 8=pre-op, 12=hard error. // source: CBCUS01C.cbl:61-63</summary>
-    private int _applResult;
+    private int _resultCode; // APPL-RESULT
 
     /// <summary>END-OF-FILE PIC X(01) VALUE 'N' — main-loop sentinel. // source: CBCUS01C.cbl:65</summary>
     private bool _endOfFile;
@@ -60,7 +60,7 @@ public sealed class CustomerMasterReportProgram
     private Customer? _customerRecord;
 
     /// <summary>The CUSTOMER master cursor (VSAM KSDS -&gt; relational CUSTOMER table). // source: CBCUS01C.cbl:29-33</summary>
-    private CustomerRepository _custFile = null!;
+    private CustomerRepository _customerRepository = null!; // CUSTFILE-FILE
 
     /// <summary>Optional flat report writer mirroring SYSOUT. // source: CBCUS01C.cbl:78,96,168,172</summary>
     private FixedFileWriter? _writer;
@@ -68,10 +68,10 @@ public sealed class CustomerMasterReportProgram
     private readonly List<string> _sysout = [];
 
     /// <summary>88 APPL-AOK VALUE 0. // source: CBCUS01C.cbl:62</summary>
-    private bool ApplAok => _applResult == 0;
+    private bool IsResultOk => _resultCode == 0; // APPL-AOK
 
     /// <summary>88 APPL-EOF VALUE 16. // source: CBCUS01C.cbl:63</summary>
-    private bool ApplEof => _applResult == 16;
+    private bool IsResultEof => _resultCode == 16; // APPL-EOF
 
     /// <summary>The SYSOUT (DISPLAY) lines produced by the run, in order.</summary>
     public IReadOnlyList<string> Sysout => _sysout;
@@ -95,28 +95,28 @@ public sealed class CustomerMasterReportProgram
     /// </summary>
     public int Run(CustomerRepository custFile, string? sysoutPath = null)
     {
-        _custFile = custFile;
+        _customerRepository = custFile;
         _writer = sysoutPath is null ? null : BatchSupport.OpenWriter(sysoutPath, HostKind.Ascii);
         try
         {
             // source: CBCUS01C.cbl:71
             Display("START OF EXECUTION OF PROGRAM CBCUS01C");
             // source: CBCUS01C.cbl:72
-            CustfileOpen0000();
+            OpenCustomerFile();
 
             // PERFORM UNTIL END-OF-FILE = 'Y'  // source: CBCUS01C.cbl:74-81
             while (!_endOfFile)
             {
                 if (!_endOfFile) // IF END-OF-FILE = 'N'  // source: CBCUS01C.cbl:75
                 {
-                    CustfileGetNext1000(); // source: CBCUS01C.cbl:76
+                    GetNextCustomer(); // source: CBCUS01C.cbl:76
                     if (!_endOfFile)       // IF END-OF-FILE = 'N'  // source: CBCUS01C.cbl:77
                         Display(FormatCustomerRecord(_customerRecord!)); // DISPLAY CUSTOMER-RECORD  // source: CBCUS01C.cbl:78
                 }
             }
 
             // source: CBCUS01C.cbl:83
-            CustfileClose9000();
+            CloseCustomerFile();
             // source: CBCUS01C.cbl:85
             Display("END OF EXECUTION OF PROGRAM CBCUS01C");
 
@@ -137,43 +137,43 @@ public sealed class CustomerMasterReportProgram
     /// <summary>
     /// 1000-CUSTFILE-GET-NEXT — sequential READ of the next customer row. // source: CBCUS01C.cbl:92-116
     /// </summary>
-    private void CustfileGetNext1000()
+    private void GetNextCustomer() // COBOL paragraph: 1000-CUSTFILE-GET-NEXT
     {
         // READ CUSTFILE-FILE INTO CUSTOMER-RECORD  // source: CBCUS01C.cbl:93
-        _custfileStatus = _custFile.ReadNext(out Customer? customer);
+        _customerFileStatus = _customerRepository.ReadNext(out Customer? customer);
         if (customer is not null)
             _customerRecord = customer; // READ ... INTO CUSTOMER-RECORD (only populated on a successful read)
 
-        if (_custfileStatus == FileStatus.Ok)        // CUSTFILE-STATUS = '00'  // source: CBCUS01C.cbl:94
+        if (_customerFileStatus == FileStatus.Ok)        // CUSTFILE-STATUS = '00'  // source: CBCUS01C.cbl:94
         {
-            _applResult = 0;                          // MOVE 0 TO APPL-RESULT  // source: CBCUS01C.cbl:95
+            _resultCode = 0;                          // MOVE 0 TO APPL-RESULT  // source: CBCUS01C.cbl:95
             // FAITHFUL BUG #1: DISPLAY CUSTOMER-RECORD here, in 1000-CUSTFILE-GET-NEXT, in addition to the
             // MAIN-loop DISPLAY at line 78 — so every record is printed twice. Reproduced, not fixed.
             Display(FormatCustomerRecord(_customerRecord!)); // DISPLAY CUSTOMER-RECORD  // source: CBCUS01C.cbl:96
         }
-        else if (_custfileStatus == FileStatus.EndOfFile) // '10'  // source: CBCUS01C.cbl:98
+        else if (_customerFileStatus == FileStatus.EndOfFile) // '10'  // source: CBCUS01C.cbl:98
         {
-            _applResult = 16;                         // MOVE 16 TO APPL-RESULT  // source: CBCUS01C.cbl:99
+            _resultCode = 16;                         // MOVE 16 TO APPL-RESULT  // source: CBCUS01C.cbl:99
         }
         else
         {
-            _applResult = 12;                         // MOVE 12 TO APPL-RESULT  // source: CBCUS01C.cbl:101
+            _resultCode = 12;                         // MOVE 12 TO APPL-RESULT  // source: CBCUS01C.cbl:101
         }
 
-        if (ApplAok)                                  // IF APPL-AOK  // source: CBCUS01C.cbl:104
+        if (IsResultOk)                               // IF APPL-AOK  // source: CBCUS01C.cbl:104
         {
             // CONTINUE  // source: CBCUS01C.cbl:105
         }
-        else if (ApplEof)                             // IF APPL-EOF  // source: CBCUS01C.cbl:107
+        else if (IsResultEof)                         // IF APPL-EOF  // source: CBCUS01C.cbl:107
         {
             _endOfFile = true;                        // MOVE 'Y' TO END-OF-FILE  // source: CBCUS01C.cbl:108
         }
         else
         {
             Display("ERROR READING CUSTOMER FILE");    // source: CBCUS01C.cbl:110
-            _ioStatus = _custfileStatus;              // MOVE CUSTFILE-STATUS TO IO-STATUS  // source: CBCUS01C.cbl:111
-            ZDisplayIoStatus();                       // source: CBCUS01C.cbl:112
-            ZAbendProgram();                          // source: CBCUS01C.cbl:113
+            _ioStatus = _customerFileStatus;          // MOVE CUSTFILE-STATUS TO IO-STATUS  // source: CBCUS01C.cbl:111
+            DisplayIoStatus();                        // source: CBCUS01C.cbl:112
+            AbendProgram();                           // source: CBCUS01C.cbl:113
         }
         // EXIT  // source: CBCUS01C.cbl:116
     }
@@ -183,30 +183,30 @@ public sealed class CustomerMasterReportProgram
     /// 0000-CUSTFILE-OPEN — OPEN INPUT the customer file (positions a forward, PK-ordered browse).
     /// // source: CBCUS01C.cbl:118-134
     /// </summary>
-    private void CustfileOpen0000()
+    private void OpenCustomerFile() // COBOL paragraph: 0000-CUSTFILE-OPEN
     {
-        _applResult = 8;                              // MOVE 8 TO APPL-RESULT  // source: CBCUS01C.cbl:119
+        _resultCode = 8;                              // MOVE 8 TO APPL-RESULT  // source: CBCUS01C.cbl:119
 
         // OPEN INPUT CUSTFILE-FILE — relational: position the read cursor at the first row in PK order.
         // The SQLite-backed table is always openable, so OPEN succeeds with status '00'.
-        _custFile.StartBrowse();                      // source: CBCUS01C.cbl:120
-        _custfileStatus = FileStatus.Ok;
+        _customerRepository.StartBrowse();            // source: CBCUS01C.cbl:120
+        _customerFileStatus = FileStatus.Ok;
 
-        if (_custfileStatus == FileStatus.Ok)         // CUSTFILE-STATUS = '00'  // source: CBCUS01C.cbl:121
-            _applResult = 0;                          // MOVE 0 TO APPL-RESULT  // source: CBCUS01C.cbl:122
+        if (_customerFileStatus == FileStatus.Ok)     // CUSTFILE-STATUS = '00'  // source: CBCUS01C.cbl:121
+            _resultCode = 0;                          // MOVE 0 TO APPL-RESULT  // source: CBCUS01C.cbl:122
         else
-            _applResult = 12;                         // MOVE 12 TO APPL-RESULT  // source: CBCUS01C.cbl:124
+            _resultCode = 12;                         // MOVE 12 TO APPL-RESULT  // source: CBCUS01C.cbl:124
 
-        if (ApplAok)                                  // IF APPL-AOK  // source: CBCUS01C.cbl:126
+        if (IsResultOk)                               // IF APPL-AOK  // source: CBCUS01C.cbl:126
         {
             // CONTINUE  // source: CBCUS01C.cbl:127
         }
         else
         {
             Display("ERROR OPENING CUSTFILE");        // source: CBCUS01C.cbl:129
-            _ioStatus = _custfileStatus;              // MOVE CUSTFILE-STATUS TO IO-STATUS  // source: CBCUS01C.cbl:130
-            ZDisplayIoStatus();                       // source: CBCUS01C.cbl:131
-            ZAbendProgram();                          // source: CBCUS01C.cbl:132
+            _ioStatus = _customerFileStatus;          // MOVE CUSTFILE-STATUS TO IO-STATUS  // source: CBCUS01C.cbl:130
+            DisplayIoStatus();                        // source: CBCUS01C.cbl:131
+            AbendProgram();                           // source: CBCUS01C.cbl:132
         }
         // EXIT  // source: CBCUS01C.cbl:134
     }
@@ -215,29 +215,29 @@ public sealed class CustomerMasterReportProgram
     /// <summary>
     /// 9000-CUSTFILE-CLOSE — CLOSE the customer file (ends the browse). // source: CBCUS01C.cbl:136-152
     /// </summary>
-    private void CustfileClose9000()
+    private void CloseCustomerFile() // COBOL paragraph: 9000-CUSTFILE-CLOSE
     {
-        _applResult = 8;                              // ADD 8 TO ZERO GIVING APPL-RESULT (-> 8)  // source: CBCUS01C.cbl:137
+        _resultCode = 8;                              // ADD 8 TO ZERO GIVING APPL-RESULT (-> 8)  // source: CBCUS01C.cbl:137
 
         // CLOSE CUSTFILE-FILE — relational: dispose the read cursor; always succeeds with '00'.
-        _custFile.EndBrowse();                        // source: CBCUS01C.cbl:138
-        _custfileStatus = FileStatus.Ok;
+        _customerRepository.EndBrowse();              // source: CBCUS01C.cbl:138
+        _customerFileStatus = FileStatus.Ok;
 
-        if (_custfileStatus == FileStatus.Ok)         // CUSTFILE-STATUS = '00'  // source: CBCUS01C.cbl:139
-            _applResult = _applResult - _applResult;  // SUBTRACT APPL-RESULT FROM APPL-RESULT (-> 0)  // source: CBCUS01C.cbl:140
+        if (_customerFileStatus == FileStatus.Ok)     // CUSTFILE-STATUS = '00'  // source: CBCUS01C.cbl:139
+            _resultCode = _resultCode - _resultCode;  // SUBTRACT APPL-RESULT FROM APPL-RESULT (-> 0)  // source: CBCUS01C.cbl:140
         else
-            _applResult = 12;                         // ADD 12 TO ZERO GIVING APPL-RESULT (-> 12)  // source: CBCUS01C.cbl:142
+            _resultCode = 12;                         // ADD 12 TO ZERO GIVING APPL-RESULT (-> 12)  // source: CBCUS01C.cbl:142
 
-        if (ApplAok)                                  // IF APPL-AOK  // source: CBCUS01C.cbl:144
+        if (IsResultOk)                               // IF APPL-AOK  // source: CBCUS01C.cbl:144
         {
             // CONTINUE  // source: CBCUS01C.cbl:145
         }
         else
         {
             Display("ERROR CLOSING CUSTOMER FILE");   // source: CBCUS01C.cbl:147
-            _ioStatus = _custfileStatus;              // MOVE CUSTFILE-STATUS TO IO-STATUS  // source: CBCUS01C.cbl:148
-            ZDisplayIoStatus();                       // source: CBCUS01C.cbl:149
-            ZAbendProgram();                          // source: CBCUS01C.cbl:150
+            _ioStatus = _customerFileStatus;          // MOVE CUSTFILE-STATUS TO IO-STATUS  // source: CBCUS01C.cbl:148
+            DisplayIoStatus();                        // source: CBCUS01C.cbl:149
+            AbendProgram();                           // source: CBCUS01C.cbl:150
         }
         // EXIT  // source: CBCUS01C.cbl:152
     }
@@ -245,12 +245,12 @@ public sealed class CustomerMasterReportProgram
     /// <summary>
     /// Z-ABEND-PROGRAM — CALL 'CEE3ABD' USING ABCODE(999), TIMING(0). // source: CBCUS01C.cbl:154-158
     /// </summary>
-    private void ZAbendProgram()
+    private void AbendProgram() // COBOL paragraph: Z-ABEND-PROGRAM
     {
         Display("ABENDING PROGRAM");                  // source: CBCUS01C.cbl:155
         // MOVE 0 TO TIMING; MOVE 999 TO ABCODE; CALL 'CEE3ABD' USING ABCODE, TIMING.
         // source: CBCUS01C.cbl:156-158
-        throw new AbendException("999", $"CBCUS01C abend; FILE STATUS '{_custfileStatus}'.");
+        throw new AbendException("999", $"CBCUS01C abend; FILE STATUS '{_customerFileStatus}'.");
     }
 
     // *****************************************************************
@@ -258,7 +258,7 @@ public sealed class CustomerMasterReportProgram
     /// Z-DISPLAY-IO-STATUS — formats the 2-byte file status into a 4-char "NNNN" string and DISPLAYs
     /// <c>'FILE STATUS IS: NNNN' IO-STATUS-04</c>. // source: CBCUS01C.cbl:160-174
     /// </summary>
-    private void ZDisplayIoStatus()
+    private void DisplayIoStatus() // COBOL paragraph: Z-DISPLAY-IO-STATUS
     {
         // IO-STATUS-04 = IO-STATUS-0401 PIC 9 + IO-STATUS-0403 PIC 999  // source: CBCUS01C.cbl:57-59
         string ioStat1 = _ioStatus.Length > 0 ? _ioStatus[..1] : " ";

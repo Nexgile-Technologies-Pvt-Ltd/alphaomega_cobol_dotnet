@@ -31,7 +31,7 @@ namespace CardDemo.Online.Programs;
 /// <c>READ ... UPDATE</c> (READ-USER-SEC-FILE) = <see cref="UserSecurityRepository.ReadByKey"/> which begins
 /// a tracked read of the row that the subsequent DELETE targets, and <c>DELETE</c> with <b>no RIDFLD</b>
 /// (DELETE-USER-SEC-FILE) = <see cref="UserSecurityRepository.Delete"/> of the <i>same</i> key the READ just
-/// resolved (<see cref="_secUsrId"/>) — the "delete the read-for-update record" idiom. The repository
+/// resolved (<see cref="_secUserId"/>) — the "delete the read-for-update record" idiom. The repository
 /// FileStatus maps to the CICS RESP the COBOL <c>EVALUATE WS-RESP-CD</c> branches on:
 /// Ok('00')→NORMAL(0), RecordNotFound('23')→NOTFND(13), anything else→the OTHER/"Unable to ..." branch.
 /// The READ and DELETE happen back-to-back in one handler invocation, so no held cross-turn lock is modelled.</para>
@@ -71,52 +71,52 @@ public sealed class UserDeleteProgram : ITransactionHandler
     // =============================================================================================
     //  WS-VARIABLES — source: COUSR03C.cbl:35-47
     // =============================================================================================
-    private const string WS_PGMNAME = "COUSR03C";     // 05 WS-PGMNAME PIC X(08) VALUE 'COUSR03C'. source: :36
-    private const string WS_TRANID = "CU03";          // 05 WS-TRANID  PIC X(04) VALUE 'CU03'.     source: :37
-    private const string WS_USRSEC_FILE = "USRSEC  "; // 05 WS-USRSEC-FILE PIC X(08) VALUE 'USRSEC  '. source: :39
+    private const string ProgramId = "COUSR03C";     // WS-PGMNAME PIC X(08) VALUE 'COUSR03C'. source: :36
+    private const string TranId = "CU03";            // WS-TRANID  PIC X(04) VALUE 'CU03'.     source: :37
+    private const string UserSecFileName = "USRSEC  "; // WS-USRSEC-FILE PIC X(08) VALUE 'USRSEC  '. source: :39
 
-    private string _wsMessage = "";                   // 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
+    private string _message = "";                     // WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
 
     // 05 WS-ERR-FLG PIC X(01) VALUE 'N'. 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. source: :40-42
-    private bool _errFlgOn;
-    private bool ErrFlgOn => _errFlgOn;   // 88 ERR-FLG-ON
+    private bool _errorFlagOn;                         // WS-ERR-FLG
+    private bool ErrorFlagOn => _errorFlagOn;   // 88 ERR-FLG-ON
 
     // 05 WS-RESP-CD / WS-REAS-CD PIC S9(09) COMP VALUE ZEROS. source: :43-44
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode;                         // WS-RESP-CD
+    private int _reasonCode;                           // WS-REAS-CD
 
     // 05 WS-USR-MODIFIED PIC X(01) VALUE 'N'. 88 USR-MODIFIED-YES='Y' / USR-MODIFIED-NO='N'.
     // FB-3: dead flag — set to NO in MAIN-PARA, never set YES, never tested. source: :45-47
-    private bool _usrModified;
-    private void SetUsrModifiedNo() => _usrModified = false;  // SET USR-MODIFIED-NO TO TRUE. source: :85
+    private bool _userModified;                        // WS-USR-MODIFIED
+    private void SetUserModifiedNo() => _userModified = false;  // SET USR-MODIFIED-NO TO TRUE. source: :85
 
     // CCDA-TITLE01/02 (COTTL01Y) + CCDA-MSG-INVALID-KEY (CSMSG01Y) — shared screen header / messages.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...         ";
+    private const string Title01 = "      AWS Mainframe Modernization       ";
+    private const string Title02 = "              CardDemo                  ";
+    private const string MsgInvalidKey = "Invalid key pressed. Please see below...         ";
 
     // =============================================================================================
     //  COCOM01Y trailer — CDEMO-CU03-INFO (the program-private selection state). source: :50-58
     // =============================================================================================
     // Only CDEMO-CU03-USR-SELECTED is read by this program (pre-selected user from the list screen).
     // 10 CDEMO-CU03-USRID-FIRST   PIC X(08). source: :51
-    private string _cu03UsridFirst = "";
+    private string _selectionUsridFirst = "";
     // 10 CDEMO-CU03-USRID-LAST    PIC X(08). source: :52
-    private string _cu03UsridLast = "";
+    private string _selectionUsridLast = "";
     // 10 CDEMO-CU03-PAGE-NUM      PIC 9(08). source: :53
-    private int _cu03PageNum;
+    private int _selectionPageNum;
     // 10 CDEMO-CU03-NEXT-PAGE-FLG PIC X(01) VALUE 'N'. source: :54-56
-    private char _cu03NextPageFlg = 'N';
+    private char _selectionNextPageFlag = 'N';
     // 10 CDEMO-CU03-USR-SEL-FLG   PIC X(01). source: :57
-    private string _cu03UsrSelFlg = "";
+    private string _selectionUsrSelFlag = "";
     // 10 CDEMO-CU03-USR-SELECTED  PIC X(08). source: :58
-    private string _cu03UsrSelected = "";
+    private string _selectedUserId = "";
 
     // =============================================================================================
     //  SEC-USER-DATA (CSUSR01Y) — the keyed record read for update. source: :271-274
     // =============================================================================================
     // SEC-USR-ID X(8) — the READ RID, and the key the no-RIDFLD DELETE targets (held read-for-update).
-    private string _secUsrId = "";
+    private string _secUserId = "";                   // SEC-USR-ID
     private UserSecurity? _secUserData;
 
     // =============================================================================================
@@ -138,10 +138,10 @@ public sealed class UserDeleteProgram : ITransactionHandler
     public UserDeleteProgram() => _db = null!;
 
     /// <inheritdoc/>
-    public string ProgramName => WS_PGMNAME; // PROGRAM-ID. COUSR03C. source: :23
+    public string ProgramName => ProgramId; // PROGRAM-ID. COUSR03C. source: :23
 
     /// <inheritdoc/>
-    public string TransId => WS_TRANID;      // CSD: CU03 -> COUSR03C. source: CSD_TRANSACTIONS.md:87; cbl:37
+    public string TransId => TranId;         // CSD: CU03 -> COUSR03C. source: CSD_TRANSACTIONS.md:87; cbl:37
 
     // =============================================================================================
     //  MAIN-PARA — source: COUSR03C.cbl:82-137
@@ -154,11 +154,11 @@ public sealed class UserDeleteProgram : ITransactionHandler
         if (_db is not null) _users = new UserSecurityRepository(_db.Connection);
 
         // SET ERR-FLG-OFF TO TRUE / SET USR-MODIFIED-NO TO TRUE. source: :84-85
-        _errFlgOn = false;
-        SetUsrModifiedNo();
+        _errorFlagOn = false;
+        SetUserModifiedNo();
 
         // MOVE SPACES TO WS-MESSAGE  ERRMSGO OF COUSR3AO. source: :87-88
-        _wsMessage = "";
+        _message = "";
         _map.Field("ERRMSG").SetValue("", setMdt: false);
 
         if (ctx.EibCalen == 0)
@@ -172,7 +172,7 @@ public sealed class UserDeleteProgram : ITransactionHandler
         {
             // MOVE DFHCOMMAREA(1:EIBCALEN) TO CARDDEMO-COMMAREA. source: :94
             _commArea = ctx.CommArea!;
-            RestoreCu03Info();
+            RestoreSelectionInfo();
 
             if (!_commArea.IsReenter)
             {
@@ -182,17 +182,17 @@ public sealed class UserDeleteProgram : ITransactionHandler
                 _map.Field("USRIDIN").CursorLength = -1; // MOVE -1 TO USRIDINL OF COUSR3AI. source: :98
 
                 // IF CDEMO-CU03-USR-SELECTED NOT = SPACES AND LOW-VALUES. source: :99-100
-                if (NotSpacesOrLow(_cu03UsrSelected))
+                if (NotSpacesOrLow(_selectedUserId))
                 {
                     // MOVE CDEMO-CU03-USR-SELECTED TO USRIDINI OF COUSR3AI. source: :101-102
-                    _map.Field("USRIDIN").SetValue(_cu03UsrSelected, setMdt: false);
+                    _map.Field("USRIDIN").SetValue(_selectedUserId, setMdt: false);
                     ProcessEnterKey(ctx);               // PERFORM PROCESS-ENTER-KEY. source: :103
                 }
-                SendUsrdelScreen(ctx);                  // PERFORM SEND-USRDEL-SCREEN. source: :105 (FB-9 extra SEND)
+                SendUserDeleteScreen(ctx);              // PERFORM SEND-USRDEL-SCREEN. source: :105 (FB-9 extra SEND)
             }
             else
             {
-                ReceiveUsrdelScreen(ctx);               // PERFORM RECEIVE-USRDEL-SCREEN. source: :107
+                ReceiveUserDeleteScreen(ctx);           // PERFORM RECEIVE-USRDEL-SCREEN. source: :107
                 // EVALUATE EIBAID. source: :108-130
                 switch (ctx.EibAid)
                 {
@@ -219,9 +219,9 @@ public sealed class UserDeleteProgram : ITransactionHandler
                         break;
                     default:
                         // WHEN OTHER. source: :126-129
-                        _errFlgOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :127
-                        _wsMessage = CCDA_MSG_INVALID_KEY;             // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. source: :128
-                        SendUsrdelScreen(ctx);                         // PERFORM SEND-USRDEL-SCREEN. source: :129
+                        _errorFlagOn = true;                           // MOVE 'Y' TO WS-ERR-FLG. source: :127
+                        _message = MsgInvalidKey;               // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. source: :128
+                        SendUserDeleteScreen(ctx);                     // PERFORM SEND-USRDEL-SCREEN. source: :129
                         break;
                 }
             }
@@ -230,8 +230,8 @@ public sealed class UserDeleteProgram : ITransactionHandler
         // EXEC CICS RETURN TRANSID(WS-TRANID) COMMAREA(CARDDEMO-COMMAREA). source: :134-137
         if (ctx.Outcome is null)
         {
-            SaveCu03Info();
-            ctx.ReturnTransId(WS_TRANID, _commArea);
+            SaveSelectionInfo();
+            ctx.ReturnTransId(TranId, _commArea);
         }
     }
 
@@ -244,10 +244,10 @@ public sealed class UserDeleteProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_map.Field("USRIDIN").Value))
         {
             // WHEN USRIDINI = SPACES OR LOW-VALUES. source: :145-150
-            _errFlgOn = true;                            // MOVE 'Y' TO WS-ERR-FLG. source: :146
-            _wsMessage = "User ID can NOT be empty...";  // source: :147-148
+            _errorFlagOn = true;                         // MOVE 'Y' TO WS-ERR-FLG. source: :146
+            _message = "User ID can NOT be empty...";    // source: :147-148
             _map.Field("USRIDIN").CursorLength = -1;      // MOVE -1 TO USRIDINL. source: :149
-            SendUsrdelScreen(ctx);                       // PERFORM SEND-USRDEL-SCREEN. source: :150
+            SendUserDeleteScreen(ctx);                   // PERFORM SEND-USRDEL-SCREEN. source: :150
         }
         else
         {
@@ -256,25 +256,25 @@ public sealed class UserDeleteProgram : ITransactionHandler
         }
 
         // IF NOT ERR-FLG-ON. source: :156-162
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
             // MOVE SPACES TO FNAMEI/LNAMEI/USRTYPEI OF COUSR3AI. source: :157-159
             _map.Field("FNAME").SetValue("", setMdt: false);
             _map.Field("LNAME").SetValue("", setMdt: false);
             _map.Field("USRTYPE").SetValue("", setMdt: false);
             // MOVE USRIDINI OF COUSR3AI TO SEC-USR-ID. source: :160
-            _secUsrId = PadX(_map.Field("USRIDIN").Value, 8);
+            _secUserId = PadX(_map.Field("USRIDIN").Value, 8);
             ReadUserSecFile(ctx);                        // PERFORM READ-USER-SEC-FILE. source: :161
         }
 
         // IF NOT ERR-FLG-ON. source: :164-169
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
             // MOVE SEC-USR-FNAME/LNAME/TYPE TO the corresponding screen display fields. source: :165-167
             _map.Field("FNAME").SetValue(SecUsrFname, setMdt: false);
             _map.Field("LNAME").SetValue(SecUsrLname, setMdt: false);
             _map.Field("USRTYPE").SetValue(SecUsrType, setMdt: false);
-            SendUsrdelScreen(ctx);                       // PERFORM SEND-USRDEL-SCREEN. source: :168 (FB-2 second SEND)
+            SendUserDeleteScreen(ctx);                   // PERFORM SEND-USRDEL-SCREEN. source: :168 (FB-2 second SEND)
         }
     }
 
@@ -287,10 +287,10 @@ public sealed class UserDeleteProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_map.Field("USRIDIN").Value))
         {
             // WHEN USRIDINI = SPACES OR LOW-VALUES. source: :177-182
-            _errFlgOn = true;                            // MOVE 'Y' TO WS-ERR-FLG. source: :178
-            _wsMessage = "User ID can NOT be empty...";  // source: :179-180
+            _errorFlagOn = true;                         // MOVE 'Y' TO WS-ERR-FLG. source: :178
+            _message = "User ID can NOT be empty...";    // source: :179-180
             _map.Field("USRIDIN").CursorLength = -1;      // MOVE -1 TO USRIDINL. source: :181
-            SendUsrdelScreen(ctx);                       // PERFORM SEND-USRDEL-SCREEN. source: :182
+            SendUserDeleteScreen(ctx);                   // PERFORM SEND-USRDEL-SCREEN. source: :182
         }
         else
         {
@@ -299,10 +299,10 @@ public sealed class UserDeleteProgram : ITransactionHandler
         }
 
         // IF NOT ERR-FLG-ON. source: :188-192
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
             // MOVE USRIDINI OF COUSR3AI TO SEC-USR-ID (FB-8: whatever is currently in USRIDIN). source: :189
-            _secUsrId = PadX(_map.Field("USRIDIN").Value, 8);
+            _secUserId = PadX(_map.Field("USRIDIN").Value, 8);
             ReadUserSecFile(ctx);                        // PERFORM READ-USER-SEC-FILE. source: :190
             // FB-1: DELETE runs unconditionally here, even if READ set ERR-FLG-ON (NOTFND). No guard. source: :191
             DeleteUserSecFile(ctx);                      // PERFORM DELETE-USER-SEC-FILE. source: :191
@@ -318,23 +318,23 @@ public sealed class UserDeleteProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_commArea.ToProgram))
             _commArea.ToProgram = "COSGN00C";
 
-        _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :202
-        _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :203
+        _commArea.FromTranId = TranId;      // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :202
+        _commArea.FromProgram = ProgramId;  // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :203
         _commArea.SetFirstEntry();          // MOVE ZEROS TO CDEMO-PGM-CONTEXT. source: :204
 
         // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :205-208
-        SaveCu03Info();
+        SaveSelectionInfo();
         ctx.Xctl(_commArea.ToProgram.TrimEnd(), _commArea);
     }
 
     // =============================================================================================
     //  SEND-USRDEL-SCREEN — source: COUSR03C.cbl:213-225
     // =============================================================================================
-    private void SendUsrdelScreen(CicsContext ctx)
+    private void SendUserDeleteScreen(CicsContext ctx)   // COBOL paragraph: SEND-USRDEL-SCREEN
     {
         PopulateHeaderInfo(ctx);                                    // PERFORM POPULATE-HEADER-INFO. source: :215
 
-        _map.Field("ERRMSG").SetValue(_wsMessage, setMdt: false);  // MOVE WS-MESSAGE TO ERRMSGO. source: :217 (FB-7 trunc 80->78)
+        _map.Field("ERRMSG").SetValue(_message, setMdt: false);    // MOVE WS-MESSAGE TO ERRMSGO. source: :217 (FB-7 trunc 80->78)
 
         // EXEC CICS SEND MAP('COUSR3A') MAPSET('COUSR03') FROM(COUSR3AO) ERASE CURSOR. source: :219-225
         ctx.SendMap("COUSR3A", "COUSR03", _map, new SendMapOptions
@@ -343,19 +343,19 @@ public sealed class UserDeleteProgram : ITransactionHandler
             FreeKb = true,
             Cursor = -1, // CURSOR — honour the MOVE -1 TO xxxL the handler set this turn.
         });
-        _wsRespCd = (int)Resp.Normal;
+        _responseCode = (int)Resp.Normal;
     }
 
     // =============================================================================================
     //  RECEIVE-USRDEL-SCREEN — source: COUSR03C.cbl:230-238
     // =============================================================================================
-    private void ReceiveUsrdelScreen(CicsContext ctx)
+    private void ReceiveUserDeleteScreen(CicsContext ctx)   // COBOL paragraph: RECEIVE-USRDEL-SCREEN
     {
         // EXEC CICS RECEIVE MAP('COUSR3A') MAPSET('COUSR03') INTO(COUSR3AI) RESP RESP2. source: :232-238
         // FB-4: RESP/RESP2 captured but never inspected (no MAPFAIL handling).
         ctx.ReceiveMap("COUSR3A", "COUSR03", _map);
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
     }
 
     // =============================================================================================
@@ -366,10 +366,10 @@ public sealed class UserDeleteProgram : ITransactionHandler
         // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: :245
         DateTime now = ctx.Clock.Now;
 
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :247
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :248
-        _map.Field("TRNNAME").SetValue(WS_TRANID, setMdt: false);    // MOVE WS-TRANID  TO TRNNAMEO. source: :249
-        _map.Field("PGMNAME").SetValue(WS_PGMNAME, setMdt: false);   // MOVE WS-PGMNAME TO PGMNAMEO. source: :250
+        _map.Field("TITLE01").SetValue(Title01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :247
+        _map.Field("TITLE02").SetValue(Title02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :248
+        _map.Field("TRNNAME").SetValue(TranId, setMdt: false);       // MOVE WS-TRANID  TO TRNNAMEO. source: :249
+        _map.Field("PGMNAME").SetValue(ProgramId, setMdt: false);    // MOVE WS-PGMNAME TO PGMNAMEO. source: :250
 
         // CURDATEO = mm/dd/yy (year last two digits). source: :252-256
         _map.Field("CURDATE").SetValue(
@@ -388,36 +388,36 @@ public sealed class UserDeleteProgram : ITransactionHandler
         // EXEC CICS READ DATASET(WS-USRSEC-FILE) INTO(SEC-USER-DATA) RIDFLD(SEC-USR-ID) KEYLENGTH UPDATE
         // RESP RESP2. The UPDATE intent (record lock) is not required cross-turn: in DELETE-USER-INFO the
         // DELETE immediately follows this READ in the same invocation, deleting the same key. source: :269-278
-        _ = WS_USRSEC_FILE; // dataset name (fixed) — repository is keyed by usr_id.
-        string fileStatus = _users.ReadByKey(_secUsrId, out _secUserData);
+        _ = UserSecFileName; // dataset name (fixed) — repository is keyed by usr_id.
+        string fileStatus = _users.ReadByKey(_secUserId, out _secUserData);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :280-300
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal:
                 // WHEN DFHRESP(NORMAL). The branch opens with a dead CONTINUE (no-op), then the MOVEs.
                 // FB-2: this SENDs "Press PF5 key to delete this user ..." (neutral) BEFORE control returns to
                 // the caller, which (on the ENTER path) re-SENDs with the fetched names. source: :281-286
                 // (CONTINUE — no-op. source: :282)
-                _wsMessage = "Press PF5 key to delete this user ...";    // source: :283-284
+                _message = "Press PF5 key to delete this user ...";      // source: :283-284
                 _map.Field("ERRMSG").ColorOverride = BmsColor.Neutral;   // MOVE DFHNEUTR TO ERRMSGC. source: :285
-                SendUsrdelScreen(ctx);                                   // PERFORM SEND-USRDEL-SCREEN. source: :286
+                SendUserDeleteScreen(ctx);                               // PERFORM SEND-USRDEL-SCREEN. source: :286
                 break;
             case Resp.NotFnd:
                 // WHEN DFHRESP(NOTFND). source: :287-292
-                _errFlgOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :288
-                _wsMessage = "User ID NOT found...";                     // source: :289-290
+                _errorFlagOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :288
+                _message = "User ID NOT found...";                       // source: :289-290
                 _map.Field("USRIDIN").CursorLength = -1;                  // MOVE -1 TO USRIDINL. source: :291
-                SendUsrdelScreen(ctx);                                   // PERFORM SEND-USRDEL-SCREEN. source: :292
+                SendUserDeleteScreen(ctx);                               // PERFORM SEND-USRDEL-SCREEN. source: :292
                 break;
             default:
                 // WHEN OTHER. DISPLAY 'RESP:'/'REAS:' -> region-log trace; no-op here. FB-6: -1 to FNAMEL
                 // (a protected field). source: :293-299
-                _errFlgOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :295
-                _wsMessage = "Unable to lookup User...";                 // source: :296-297
+                _errorFlagOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :295
+                _message = "Unable to lookup User...";                   // source: :296-297
                 _map.Field("FNAME").CursorLength = -1;                    // MOVE -1 TO FNAMEL. source: :298
-                SendUsrdelScreen(ctx);                                   // PERFORM SEND-USRDEL-SCREEN. source: :299
+                SendUserDeleteScreen(ctx);                               // PERFORM SEND-USRDEL-SCREEN. source: :299
                 break;
         }
     }
@@ -428,41 +428,41 @@ public sealed class UserDeleteProgram : ITransactionHandler
     private void DeleteUserSecFile(CicsContext ctx)
     {
         // EXEC CICS DELETE DATASET(WS-USRSEC-FILE) RESP RESP2 — NO RIDFLD; deletes the held READ-for-UPDATE
-        // record. Modelled as deleting the same key the immediately-preceding READ resolved (_secUsrId).
+        // record. Modelled as deleting the same key the immediately-preceding READ resolved (_secUserId).
         // Because FB-1 lets this run after a NOTFND READ, the repository DELETE itself detects "not found"
         // and returns the '23'/NOTFND branch. source: :307-311
-        string fileStatus = _users.Delete(_secUsrId);
+        string fileStatus = _users.Delete(_secUserId);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :313-336
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal:
                 // WHEN DFHRESP(NORMAL). source: :314-322
                 InitializeAllFields();                                   // PERFORM INITIALIZE-ALL-FIELDS. source: :315
-                _wsMessage = "";                                         // MOVE SPACES TO WS-MESSAGE. source: :316
+                _message = "";                                           // MOVE SPACES TO WS-MESSAGE. source: :316
                 _map.Field("ERRMSG").ColorOverride = BmsColor.Green;     // MOVE DFHGREEN TO ERRMSGC. source: :317
                 // STRING 'User ' (SIZE) + SEC-USR-ID (DELIMITED BY SPACE = up to FIRST space) + ' has been deleted
                 // ...' (SIZE) INTO WS-MESSAGE. INITIALIZE-ALL-FIELDS cleared the screen fields, but SEC-USR-ID lives
                 // in SEC-USER-DATA (not a screen field), so it survives. source: :318-321
-                string secUsrIdToFirstSpace = SecUsrId.Split(' ')[0];    // DELIMITED BY SPACE stops at first space
-                _wsMessage = $"User {secUsrIdToFirstSpace} has been deleted ...";
-                SendUsrdelScreen(ctx);                                   // PERFORM SEND-USRDEL-SCREEN. source: :322
+                string secUserIdToFirstSpace = SecUsrId.Split(' ')[0];   // DELIMITED BY SPACE stops at first space
+                _message = $"User {secUserIdToFirstSpace} has been deleted ...";
+                SendUserDeleteScreen(ctx);                               // PERFORM SEND-USRDEL-SCREEN. source: :322
                 break;
             case Resp.NotFnd:
                 // WHEN DFHRESP(NOTFND). source: :323-328
-                _errFlgOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :324
-                _wsMessage = "User ID NOT found...";                     // source: :325-326
+                _errorFlagOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :324
+                _message = "User ID NOT found...";                       // source: :325-326
                 _map.Field("USRIDIN").CursorLength = -1;                  // MOVE -1 TO USRIDINL. source: :327
-                SendUsrdelScreen(ctx);                                   // PERFORM SEND-USRDEL-SCREEN. source: :328
+                SendUserDeleteScreen(ctx);                               // PERFORM SEND-USRDEL-SCREEN. source: :328
                 break;
             default:
                 // WHEN OTHER. DISPLAY 'RESP:'/'REAS:' -> region-log trace; no-op here. FB-5: message says
                 // "Update", not "Delete" (copy-paste from COUSR02C). FB-6: -1 to FNAMEL (protected). source: :329-335
-                _errFlgOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :331
-                _wsMessage = "Unable to Update User...";                 // source: :332-333 (FB-5 verbatim)
+                _errorFlagOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :331
+                _message = "Unable to Update User...";                   // source: :332-333 (FB-5 verbatim)
                 _map.Field("FNAME").CursorLength = -1;                    // MOVE -1 TO FNAMEL. source: :334
-                SendUsrdelScreen(ctx);                                   // PERFORM SEND-USRDEL-SCREEN. source: :335
+                SendUserDeleteScreen(ctx);                               // PERFORM SEND-USRDEL-SCREEN. source: :335
                 break;
         }
     }
@@ -472,8 +472,8 @@ public sealed class UserDeleteProgram : ITransactionHandler
     // =============================================================================================
     private void ClearCurrentScreen(CicsContext ctx)
     {
-        InitializeAllFields();   // PERFORM INITIALIZE-ALL-FIELDS. source: :343
-        SendUsrdelScreen(ctx);   // PERFORM SEND-USRDEL-SCREEN. source: :344
+        InitializeAllFields();     // PERFORM INITIALIZE-ALL-FIELDS. source: :343
+        SendUserDeleteScreen(ctx); // PERFORM SEND-USRDEL-SCREEN. source: :344
     }
 
     // =============================================================================================
@@ -487,7 +487,7 @@ public sealed class UserDeleteProgram : ITransactionHandler
         _map.Field("FNAME").SetValue("", setMdt: false);    // FNAMEI
         _map.Field("LNAME").SetValue("", setMdt: false);    // LNAMEI
         _map.Field("USRTYPE").SetValue("", setMdt: false);  // USRTYPEI
-        _wsMessage = "";                                    // WS-MESSAGE
+        _message = "";                                      // WS-MESSAGE
     }
 
     // =============================================================================================
@@ -513,7 +513,7 @@ public sealed class UserDeleteProgram : ITransactionHandler
     // =============================================================================================
     private void SetResp(string fileStatus)
     {
-        _wsRespCd = fileStatus switch
+        _responseCode = fileStatus switch
         {
             FileStatus.Ok => (int)Resp.Normal,                  // '00' -> DFHRESP(NORMAL)
             FileStatus.RecordNotFound => (int)Resp.NotFnd,      // '23' -> DFHRESP(NOTFND)
@@ -521,7 +521,7 @@ public sealed class UserDeleteProgram : ITransactionHandler
             FileStatus.DuplicateKey => (int)Resp.DupRec,        // '02' -> DFHRESP(DUPREC)
             _ => (int)Resp.Error,                               // any other -> WHEN OTHER (file error)
         };
-        _wsReasCd = 0; // RESP2 unavailable from the relational repo; 0 for parity.
+        _reasonCode = 0; // RESP2 unavailable from the relational repo; 0 for parity.
     }
 
     // =============================================================================================
@@ -532,32 +532,32 @@ public sealed class UserDeleteProgram : ITransactionHandler
     // selection round-trips losslessly with COUSR00C (which produced it). Pack layout into
     // CustFName(25)+CustMName(25)+CustLName(25) = 75 bytes:
     //   USRID-FIRST X(8) | USRID-LAST X(8) | PAGE-NUM 9(8) | NEXT X(1) | USR-SEL-FLG X(1) | USR-SELECTED X(8).
-    private void SaveCu03Info()
+    private void SaveSelectionInfo()
     {
         string packed =
-            PadX(_cu03UsridFirst, 8) +
-            PadX(_cu03UsridLast, 8) +
-            Zoned(_cu03PageNum, 8) +
-            (_cu03NextPageFlg == '\0' ? "N" : _cu03NextPageFlg.ToString()) +
-            PadX(_cu03UsrSelFlg, 1) +
-            PadX(_cu03UsrSelected, 8);
+            PadX(_selectionUsridFirst, 8) +
+            PadX(_selectionUsridLast, 8) +
+            Zoned(_selectionPageNum, 8) +
+            (_selectionNextPageFlag == '\0' ? "N" : _selectionNextPageFlag.ToString()) +
+            PadX(_selectionUsrSelFlag, 1) +
+            PadX(_selectedUserId, 8);
         packed = PadX(packed, 75);
         _commArea.CustFName = packed.Substring(0, 25);
         _commArea.CustMName = packed.Substring(25, 25);
         _commArea.CustLName = packed.Substring(50, 25);
     }
 
-    private void RestoreCu03Info()
+    private void RestoreSelectionInfo()
     {
         string packed = PadX(_commArea.CustFName, 25) + PadX(_commArea.CustMName, 25) + PadX(_commArea.CustLName, 25);
         if (packed.Length < 75) packed = PadX(packed, 75);
-        _cu03UsridFirst = packed.Substring(0, 8).TrimEnd();
-        _cu03UsridLast = packed.Substring(8, 8).TrimEnd();
-        _cu03PageNum = (int)ParseLong(packed.Substring(16, 8));
+        _selectionUsridFirst = packed.Substring(0, 8).TrimEnd();
+        _selectionUsridLast = packed.Substring(8, 8).TrimEnd();
+        _selectionPageNum = (int)ParseLong(packed.Substring(16, 8));
         char nx = packed[24];
-        _cu03NextPageFlg = nx == 'Y' ? 'Y' : 'N';
-        _cu03UsrSelFlg = packed.Substring(25, 1).TrimEnd();
-        _cu03UsrSelected = packed.Substring(26, 8).TrimEnd();
+        _selectionNextPageFlag = nx == 'Y' ? 'Y' : 'N';
+        _selectionUsrSelFlag = packed.Substring(25, 1).TrimEnd();
+        _selectedUserId = packed.Substring(26, 8).TrimEnd();
     }
 
     // =============================================================================================

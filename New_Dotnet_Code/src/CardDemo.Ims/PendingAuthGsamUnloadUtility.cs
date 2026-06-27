@@ -53,17 +53,17 @@ public sealed class PendingAuthGsamUnloadUtility
     private int _currentYyddd;       // CURRENT-YYDDD  9(05) — ACCEPT FROM DAY
     // WS-AUTH-DATE/WS-EXPIRY-DAYS/WS-DAY-DIFF/IDX/WS-CURR-APP-ID — declared, unused.
 
-    private int _wsNoChkp;           // WS-NO-CHKP            9(8)  VALUE 0 (unused)
-    private int _wsAuthSmryProcCnt;  // WS-AUTH-SMRY-PROC-CNT 9(8)  VALUE 0
-    private int _wsNoSumryRead;      // WS-NO-SUMRY-READ      S9(8) COMP VALUE 0
-    private int _wsNoSumryDeleted;   // WS-NO-SUMRY-DELETED   S9(8) COMP VALUE 0 (unused)
-    private int _wsNoDtlRead;        // WS-NO-DTL-READ        S9(8) COMP VALUE 0 (unused — bug #1)
-    private int _wsNoDtlDeleted;     // WS-NO-DTL-DELETED     S9(8) COMP VALUE 0 (unused)
+    private int _noCheckpoint;             // WS-NO-CHKP            9(8)  VALUE 0 (unused)
+    private int _authSummaryProcessedCount; // WS-AUTH-SMRY-PROC-CNT 9(8)  VALUE 0
+    private int _summaryReadCount;         // WS-NO-SUMRY-READ      S9(8) COMP VALUE 0
+    private int _summaryDeletedCount;      // WS-NO-SUMRY-DELETED   S9(8) COMP VALUE 0 (unused)
+    private int _detailReadCount;          // WS-NO-DTL-READ        S9(8) COMP VALUE 0 (unused — bug #1)
+    private int _detailDeletedCount;       // WS-NO-DTL-DELETED     S9(8) COMP VALUE 0 (unused)
 
     private bool _endOfAuthDb;       // WS-END-OF-AUTHDB-FLAG (inert)
     private bool _moreAuths;         // WS-MORE-AUTHS-FLAG    (inert, bug #2)
-    private string _wsEndOfRootSeg = " ";   // WS-END-OF-ROOT-SEG  X(01) — root loop sentinel
-    private string _wsEndOfChildSeg = " ";  // WS-END-OF-CHILD-SEG X(01) — child loop sentinel
+    private string _endOfRootSeg = " ";    // WS-END-OF-ROOT-SEG  X(01) — root loop sentinel
+    private string _endOfChildSeg = " ";   // WS-END-OF-CHILD-SEG X(01) — child loop sentinel
 
     // ---- PCB statuses the program branches on --------------------------------------------------------
     private string _pautPcbStatus = "  ";   // PAUT-PCB-STATUS: '  ' ok / 'GB' end-of-db / 'GE' no-more
@@ -115,29 +115,29 @@ public sealed class PendingAuthGsamUnloadUtility
         HostKind host = HostKind.Ebcdic)
     {
         var program = new PendingAuthGsamUnloadUtility(summary, detail, clock ?? SystemClock.Instance, host);
-        program.MainPara(summaryGsamPath, detailGsamPath);
+        program.Main(summaryGsamPath, detailGsamPath);
         return new PendingAuthGsamUnloadUtilityResult(program.Sysout, program.ReturnCode);
     }
 
     // =================================================================================================
     // MAIN-PARA // source: DBUNLDGS.CBL:164-179
     // =================================================================================================
-    private void MainPara(string summaryGsamPath, string detailGsamPath)
+    private void Main(string summaryGsamPath, string detailGsamPath)  // COBOL paragraph: MAIN-PARA
     {
         try
         {
             // ENTRY 'DLITCBL' USING PAUTBPCB PASFLPCB PADFLPCB. // source: DBUNLDGS.CBL:165-167
 
-            Initialize1000(summaryGsamPath, detailGsamPath);          // source: DBUNLDGS.CBL:170
+            Initialize(summaryGsamPath, detailGsamPath);              // source: DBUNLDGS.CBL:170
 
             // PERFORM 2000-FIND-NEXT-AUTH-SUMMARY UNTIL WS-END-OF-ROOT-SEG = 'Y'. // source: DBUNLDGS.CBL:172-173
             _summary.StartBrowse();
-            while (_wsEndOfRootSeg != "Y")
+            while (_endOfRootSeg != "Y")
             {
-                FindNextAuthSummary2000();
+                FindNextAuthSummary();
             }
 
-            FileClose4000();                                          // source: DBUNLDGS.CBL:175
+            FileClose();                                              // source: DBUNLDGS.CBL:175
 
             // GOBACK. // source: DBUNLDGS.CBL:179
         }
@@ -158,7 +158,7 @@ public sealed class PendingAuthGsamUnloadUtility
     // (The OPEN OUTPUT statements for the QSAM OPFILE1/OPFILE2 are commented out in the source; the GSAM
     //  datasets are opened by the IMS region. Here we create the two GSAM output files.)
     // =================================================================================================
-    private void Initialize1000(string summaryGsamPath, string detailGsamPath)
+    private void Initialize(string summaryGsamPath, string detailGsamPath)  // COBOL paragraph: 1000-INITIALIZE
     {
         // ACCEPT CURRENT-DATE FROM DATE; ACCEPT CURRENT-YYDDD FROM DAY. // source: DBUNLDGS.CBL:185-186
         DateTime now = _clock.Now;
@@ -180,7 +180,7 @@ public sealed class PendingAuthGsamUnloadUtility
     // =================================================================================================
     // 2000-FIND-NEXT-AUTH-SUMMARY // source: DBUNLDGS.CBL:216-258
     // =================================================================================================
-    private void FindNextAuthSummary2000()
+    private void FindNextAuthSummary()  // COBOL paragraph: 2000-FIND-NEXT-AUTH-SUMMARY
     {
         // INITIALIZE PAUT-PCB-STATUS. // source: DBUNLDGS.CBL:221
         _pautPcbStatus = "  ";
@@ -193,8 +193,8 @@ public sealed class PendingAuthGsamUnloadUtility
         if (_pautPcbStatus == "  ")
         {
             _summaryRec = next;
-            _wsNoSumryRead++;                                         // ADD 1 TO WS-NO-SUMRY-READ // source: DBUNLDGS.CBL:234
-            _wsAuthSmryProcCnt++;                                     // ADD 1 TO WS-AUTH-SMRY-PROC-CNT // source: DBUNLDGS.CBL:235
+            _summaryReadCount++;                                     // ADD 1 TO WS-NO-SUMRY-READ // source: DBUNLDGS.CBL:234
+            _authSummaryProcessedCount++;                            // ADD 1 TO WS-AUTH-SMRY-PROC-CNT // source: DBUNLDGS.CBL:235
 
             // MOVE PENDING-AUTH-SUMMARY TO OPFIL1-REC. // source: DBUNLDGS.CBL:236
             // INITIALIZE ROOT-SEG-KEY; INITIALIZE CHILD-SEG-REC; MOVE PA-ACCT-ID TO ROOT-SEG-KEY.
@@ -206,18 +206,18 @@ public sealed class PendingAuthGsamUnloadUtility
             if (PautSegmentImages.IsNumericComp3(rootSegKey))
             {
                 // WRITE OPFIL1-REC is commented out; replaced by 3100-INSERT-PARENT-SEG-GSAM. // source: DBUNLDGS.CBL:242-243
-                InsertParentSegGsam3100();
+                InsertParentSegGsam();
 
                 // INITIALIZE WS-END-OF-CHILD-SEG. // source: DBUNLDGS.CBL:244
-                _wsEndOfChildSeg = " ";
+                _endOfChildSeg = " ";
 
                 // Establish parentage for the following GNPs (this root's children).
                 _detail.StartParentScan(_summaryRec.AcctId);
 
                 // PERFORM 3000-FIND-NEXT-AUTH-DTL UNTIL WS-END-OF-CHILD-SEG = 'Y'. // source: DBUNLDGS.CBL:245-246
-                while (_wsEndOfChildSeg != "Y")
+                while (_endOfChildSeg != "Y")
                 {
-                    FindNextAuthDtl3000();
+                    FindNextAuthDetail();
                 }
             }
         }
@@ -226,7 +226,7 @@ public sealed class PendingAuthGsamUnloadUtility
         if (_pautPcbStatus == "GB")
         {
             _endOfAuthDb = true;                                      // SET END-OF-AUTHDB TO TRUE // source: DBUNLDGS.CBL:250
-            _wsEndOfRootSeg = "Y";                                    // MOVE 'Y' TO WS-END-OF-ROOT-SEG // source: DBUNLDGS.CBL:251
+            _endOfRootSeg = "Y";                                     // MOVE 'Y' TO WS-END-OF-ROOT-SEG // source: DBUNLDGS.CBL:251
         }
 
         // IF PAUT-PCB-STATUS NOT EQUAL TO SPACES AND 'GB' ... // source: DBUNLDGS.CBL:253
@@ -234,14 +234,14 @@ public sealed class PendingAuthGsamUnloadUtility
         {
             _sysout.Add("AUTH SUM  GN FAILED  :" + _pautPcbStatus);   // source: DBUNLDGS.CBL:254
             _sysout.Add("KEY FEEDBACK AREA    :" + _pautKeyfb);       // source: DBUNLDGS.CBL:255
-            Abend9999();                                              // source: DBUNLDGS.CBL:256
+            Abend();                                              // source: DBUNLDGS.CBL:256
         }
     }
 
     // =================================================================================================
     // 3000-FIND-NEXT-AUTH-DTL // source: DBUNLDGS.CBL:263-297
     // =================================================================================================
-    private void FindNextAuthDtl3000()
+    private void FindNextAuthDetail()  // COBOL paragraph: 3000-FIND-NEXT-AUTH-DTL
     {
         // CALL 'CBLTDLI' USING FUNC-GNP PAUTBPCB PENDING-AUTH-DETAILS CHILD-UNQUAL-SSA. // source: DBUNLDGS.CBL:267-270
         string status = _detail.ReadNextInParent(out PautDetail? next);
@@ -254,19 +254,19 @@ public sealed class PendingAuthGsamUnloadUtility
             _detailRec = next;
 
             // FAITHFUL BUG #1: summary counters incremented per detail read. // source: DBUNLDGS.CBL:278-279
-            _wsNoSumryRead++;                                        // ADD 1 TO WS-NO-SUMRY-READ
-            _wsAuthSmryProcCnt++;                                    // ADD 1 TO WS-AUTH-SMRY-PROC-CNT
+            _summaryReadCount++;                                     // ADD 1 TO WS-NO-SUMRY-READ
+            _authSummaryProcessedCount++;                           // ADD 1 TO WS-AUTH-SMRY-PROC-CNT
 
             // MOVE PENDING-AUTH-DETAILS TO CHILD-SEG-REC (WRITE OPFIL2-REC is commented out). // source: DBUNLDGS.CBL:280-281
             // PERFORM 3200-INSERT-CHILD-SEG-GSAM. // source: DBUNLDGS.CBL:282
-            InsertChildSegGsam3200();
+            InsertChildSegGsam();
         }
 
         // IF PAUT-PCB-STATUS = 'GE' ... // source: DBUNLDGS.CBL:284
         if (_pautPcbStatus == "GE")
         {
-            _wsEndOfChildSeg = "Y";                                  // MOVE 'Y' TO WS-END-OF-CHILD-SEG // source: DBUNLDGS.CBL:286
-            _sysout.Add("CHILD SEG FLAG GE : " + _wsEndOfChildSeg);  // source: DBUNLDGS.CBL:287-288
+            _endOfChildSeg = "Y";                                   // MOVE 'Y' TO WS-END-OF-CHILD-SEG // source: DBUNLDGS.CBL:286
+            _sysout.Add("CHILD SEG FLAG GE : " + _endOfChildSeg);    // source: DBUNLDGS.CBL:287-288
         }
 
         // IF PAUT-PCB-STATUS NOT EQUAL TO SPACES AND 'GE' ... // source: DBUNLDGS.CBL:290
@@ -274,7 +274,7 @@ public sealed class PendingAuthGsamUnloadUtility
         {
             _sysout.Add("GNP CALL FAILED  :" + _pautPcbStatus);      // source: DBUNLDGS.CBL:291
             _sysout.Add("KFB AREA IN CHILD:" + _pautKeyfb);          // source: DBUNLDGS.CBL:292
-            Abend9999();                                             // source: DBUNLDGS.CBL:293
+            Abend();                                             // source: DBUNLDGS.CBL:293
         }
 
         // INITIALIZE PAUT-PCB-STATUS. // source: DBUNLDGS.CBL:295
@@ -284,7 +284,7 @@ public sealed class PendingAuthGsamUnloadUtility
     // =================================================================================================
     // 3100-INSERT-PARENT-SEG-GSAM // source: DBUNLDGS.CBL:300-317
     // =================================================================================================
-    private void InsertParentSegGsam3100()
+    private void InsertParentSegGsam()  // COBOL paragraph: 3100-INSERT-PARENT-SEG-GSAM
     {
         // CALL 'CBLTDLI' USING FUNC-ISRT PASFLPCB PENDING-AUTH-SUMMARY. // source: DBUNLDGS.CBL:302-304
         byte[] summaryImage = PautSegmentImages.EncodeSummary(_summaryRec!, _host);
@@ -296,14 +296,14 @@ public sealed class PendingAuthGsamUnloadUtility
         {
             _sysout.Add("GSAM PARENT FAIL :" + _pasflPcbStatus);     // source: DBUNLDGS.CBL:312
             _sysout.Add("KFB AREA IN GSAM:" + _pasflKeyfb);          // source: DBUNLDGS.CBL:313
-            Abend9999();                                             // source: DBUNLDGS.CBL:314
+            Abend();                                             // source: DBUNLDGS.CBL:314
         }
     }
 
     // =================================================================================================
     // 3200-INSERT-CHILD-SEG-GSAM // source: DBUNLDGS.CBL:319-336
     // =================================================================================================
-    private void InsertChildSegGsam3200()
+    private void InsertChildSegGsam()  // COBOL paragraph: 3200-INSERT-CHILD-SEG-GSAM
     {
         // CALL 'CBLTDLI' USING FUNC-ISRT PADFLPCB PENDING-AUTH-DETAILS. // source: DBUNLDGS.CBL:321-323
         byte[] detailImage = PautSegmentImages.EncodeDetail(_detailRec!, _host);
@@ -316,7 +316,7 @@ public sealed class PendingAuthGsamUnloadUtility
             // FAITHFUL BUG #3: mislabelled 'GSAM PARENT FAIL' for the child-segment insert. // source: DBUNLDGS.CBL:331
             _sysout.Add("GSAM PARENT FAIL :" + _padflPcbStatus);     // source: DBUNLDGS.CBL:331
             _sysout.Add("KFB AREA IN GSAM:" + _padflKeyfb);          // source: DBUNLDGS.CBL:332
-            Abend9999();                                             // source: DBUNLDGS.CBL:333
+            Abend();                                             // source: DBUNLDGS.CBL:333
         }
     }
 
@@ -325,7 +325,7 @@ public sealed class PendingAuthGsamUnloadUtility
     // (The QSAM CLOSE statements are commented out; only the DISPLAY remains. The GSAM datasets are closed
     //  by the region — flushed/disposed here.)
     // =================================================================================================
-    private void FileClose4000()
+    private void FileClose()  // COBOL paragraph: 4000-FILE-CLOSE
     {
         _sysout.Add("CLOSING THE FILE");                             // source: DBUNLDGS.CBL:339
         _pasflGsam?.Flush();
@@ -335,7 +335,7 @@ public sealed class PendingAuthGsamUnloadUtility
     // =================================================================================================
     // 9999-ABEND // source: DBUNLDGS.CBL:357-363
     // =================================================================================================
-    private void Abend9999()
+    private void Abend()  // COBOL paragraph: 9999-ABEND
     {
         _sysout.Add("DBUNLDGS ABENDING ...");                        // source: DBUNLDGS.CBL:360
         ReturnCode = 16;                                             // MOVE 16 TO RETURN-CODE // source: DBUNLDGS.CBL:362

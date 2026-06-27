@@ -51,25 +51,25 @@ public sealed class PendingAuthDbUnloadUtility
     // ---- WORKING-STORAGE: WS-VARIABLES (PAUDBUNL.CBL:53-90) -------------------------------------------
     // private const string WsPgmName = "IMSUNLOD";       // WS-PGMNAME (X08)
     private int _currentDate;        // CURRENT-DATE   9(06) — ACCEPT FROM DATE
-    private int _currentYyddd;       // CURRENT-YYDDD  9(05) — ACCEPT FROM DAY
+    private int _currentJulianDate;  // WS-CURRENT-YYDDD  9(05) — ACCEPT FROM DAY
     // WS-AUTH-DATE 9(05), WS-EXPIRY-DAYS/WS-DAY-DIFF/IDX S9(4) COMP, WS-CURR-APP-ID 9(11) — unused (bug #3).
 
-    private int _wsNoChkp;           // WS-NO-CHKP            9(8)  VALUE 0 (unused, bug #3)
-    private int _wsAuthSmryProcCnt;  // WS-AUTH-SMRY-PROC-CNT 9(8)  VALUE 0
-    private int _wsNoSumryRead;      // WS-NO-SUMRY-READ      S9(8) COMP VALUE 0
-    private int _wsNoSumryDeleted;   // WS-NO-SUMRY-DELETED   S9(8) COMP VALUE 0 (unused)
-    private int _wsNoDtlRead;        // WS-NO-DTL-READ        S9(8) COMP VALUE 0 (unused — bug #1)
-    private int _wsNoDtlDeleted;     // WS-NO-DTL-DELETED     S9(8) COMP VALUE 0 (unused)
+    private int _checkpointCount;        // WS-NO-CHKP            9(8)  VALUE 0 (unused, bug #3)
+    private int _authSummaryProcessedCount; // WS-AUTH-SMRY-PROC-CNT 9(8)  VALUE 0
+    private int _summaryReadCount;       // WS-NO-SUMRY-READ      S9(8) COMP VALUE 0
+    private int _summaryDeletedCount;    // WS-NO-SUMRY-DELETED   S9(8) COMP VALUE 0 (unused)
+    private int _detailReadCount;        // WS-NO-DTL-READ        S9(8) COMP VALUE 0 (unused — bug #1)
+    private int _detailDeletedCount;     // WS-NO-DTL-DELETED     S9(8) COMP VALUE 0 (unused)
 
     // Flags. END-OF-AUTHDB / MORE-AUTHS 88s are SET but the loops test WS-END-OF-ROOT-SEG /
     // WS-END-OF-CHILD-SEG instead (bug #2).
     private bool _endOfAuthDb;       // WS-END-OF-AUTHDB-FLAG: END-OF-AUTHDB = 'Y'? (inert)
     private bool _moreAuths;         // WS-MORE-AUTHS-FLAG:    MORE-AUTHS = 'Y'?    (inert)
-    private string _wsEndOfRootSeg = " ";   // WS-END-OF-ROOT-SEG  X(01) VALUE SPACES — root loop sentinel
-    private string _wsEndOfChildSeg = " ";  // WS-END-OF-CHILD-SEG X(01) VALUE SPACES — child loop sentinel
+    private string _endOfRootSeg = " ";     // WS-END-OF-ROOT-SEG  X(01) VALUE SPACES — root loop sentinel
+    private string _endOfChildSeg = " ";    // WS-END-OF-CHILD-SEG X(01) VALUE SPACES — child loop sentinel
 
-    private string _wsOutfl1Status = "  ";  // WS-OUTFL1-STATUS X(02) VALUE SPACES
-    private string _wsOutfl2Status = "  ";  // WS-OUTFL2-STATUS X(02) VALUE SPACES
+    private string _outfile1Status = "  ";  // WS-OUTFL1-STATUS X(02) VALUE SPACES
+    private string _outfile2Status = "  ";  // WS-OUTFL2-STATUS X(02) VALUE SPACES
 
     // ---- PCB status (PAUT-PCB-STATUS in the PAUTBPCB mask) — the byte the program branches on ---------
     private string _pautPcbStatus = "  ";   // '  ' ok, 'GB' end-of-db, 'GE' no-more-children
@@ -124,23 +124,23 @@ public sealed class PendingAuthDbUnloadUtility
     // =================================================================================================
     // MAIN-PARA // source: PAUDBUNL.CBL:157-170
     // =================================================================================================
-    private void MainPara(string outfil1Path, string outfil2Path)
+    private void MainPara(string outfil1Path, string outfil2Path)  // COBOL paragraph: MAIN-PARA
     {
         try
         {
             // ENTRY 'DLITCBL' USING PAUTBPCB. // source: PAUDBUNL.CBL:158
 
-            Initialize1000(outfil1Path, outfil2Path);                 // source: PAUDBUNL.CBL:161
+            Initialize(outfil1Path, outfil2Path);                 // source: PAUDBUNL.CBL:161
 
             // PERFORM 2000-FIND-NEXT-AUTH-SUMMARY UNTIL WS-END-OF-ROOT-SEG = 'Y'. // source: PAUDBUNL.CBL:163-164
             // Establish the forward root GN cursor before the first GN.
             _summary.StartBrowse();
-            while (_wsEndOfRootSeg != "Y")
+            while (_endOfRootSeg != "Y")
             {
-                FindNextAuthSummary2000();
+                FindNextAuthSummary();
             }
 
-            FileClose4000();                                          // source: PAUDBUNL.CBL:166
+            FileClose();                                          // source: PAUDBUNL.CBL:166
 
             // GOBACK. // source: PAUDBUNL.CBL:170
         }
@@ -161,12 +161,12 @@ public sealed class PendingAuthDbUnloadUtility
     // =================================================================================================
     // 1000-INITIALIZE // source: PAUDBUNL.CBL:173-204
     // =================================================================================================
-    private void Initialize1000(string outfil1Path, string outfil2Path)
+    private void Initialize(string outfil1Path, string outfil2Path)  // COBOL paragraph: 1000-INITIALIZE
     {
         // ACCEPT CURRENT-DATE FROM DATE; ACCEPT CURRENT-YYDDD FROM DAY. // source: PAUDBUNL.CBL:176-177
         DateTime now = _clock.Now;
         _currentDate = AcceptFromDate(now);
-        _currentYyddd = AcceptFromDay(now);
+        _currentJulianDate = AcceptFromDay(now);
 
         // ACCEPT PRM-INFO FROM SYSIN is commented out in the source. // source: PAUDBUNL.CBL:179
 
@@ -177,35 +177,35 @@ public sealed class PendingAuthDbUnloadUtility
 
         // OPEN OUTPUT OPFILE1. // source: PAUDBUNL.CBL:186
         _opfile1 = OpenOutput(outfil1Path);
-        _wsOutfl1Status = "00";
-        if (_wsOutfl1Status == "  " || _wsOutfl1Status == "00")       // source: PAUDBUNL.CBL:187-188
+        _outfile1Status = "00";
+        if (_outfile1Status == "  " || _outfile1Status == "00")       // source: PAUDBUNL.CBL:187-188
         {
             // CONTINUE
         }
         else                                                          // source: PAUDBUNL.CBL:189-192
         {
-            _sysout.Add("ERROR IN OPENING OPFILE1:" + _wsOutfl1Status);
-            Abend9999();
+            _sysout.Add("ERROR IN OPENING OPFILE1:" + _outfile1Status);
+            Abend();
         }
 
         // OPEN OUTPUT OPFILE2. // source: PAUDBUNL.CBL:194
         _opfile2 = OpenOutput(outfil2Path);
-        _wsOutfl2Status = "00";
-        if (_wsOutfl2Status == "  " || _wsOutfl2Status == "00")       // source: PAUDBUNL.CBL:195-196
+        _outfile2Status = "00";
+        if (_outfile2Status == "  " || _outfile2Status == "00")       // source: PAUDBUNL.CBL:195-196
         {
             // CONTINUE
         }
         else                                                          // source: PAUDBUNL.CBL:197-200
         {
-            _sysout.Add("ERROR IN OPENING OPFILE2:" + _wsOutfl2Status);
-            Abend9999();
+            _sysout.Add("ERROR IN OPENING OPFILE2:" + _outfile2Status);
+            Abend();
         }
     }
 
     // =================================================================================================
     // 2000-FIND-NEXT-AUTH-SUMMARY // source: PAUDBUNL.CBL:207-249
     // =================================================================================================
-    private void FindNextAuthSummary2000()
+    private void FindNextAuthSummary()  // COBOL paragraph: 2000-FIND-NEXT-AUTH-SUMMARY
     {
         // INITIALIZE PAUT-PCB-STATUS. // source: PAUDBUNL.CBL:212
         _pautPcbStatus = "  ";
@@ -218,8 +218,8 @@ public sealed class PendingAuthDbUnloadUtility
         if (_pautPcbStatus == "  ")
         {
             _summaryRec = next;
-            _wsNoSumryRead++;                                         // ADD 1 TO WS-NO-SUMRY-READ // source: PAUDBUNL.CBL:225
-            _wsAuthSmryProcCnt++;                                     // ADD 1 TO WS-AUTH-SMRY-PROC-CNT // source: PAUDBUNL.CBL:226
+            _summaryReadCount++;                                         // ADD 1 TO WS-NO-SUMRY-READ // source: PAUDBUNL.CBL:225
+            _authSummaryProcessedCount++;                                     // ADD 1 TO WS-AUTH-SMRY-PROC-CNT // source: PAUDBUNL.CBL:226
 
             // MOVE PENDING-AUTH-SUMMARY TO OPFIL1-REC. // source: PAUDBUNL.CBL:227
             byte[] opfil1Rec = PautSegmentImages.EncodeSummary(_summaryRec!, _host);
@@ -235,15 +235,15 @@ public sealed class PendingAuthDbUnloadUtility
                 WriteOpfil1(opfil1Rec);
 
                 // INITIALIZE WS-END-OF-CHILD-SEG. // source: PAUDBUNL.CBL:234
-                _wsEndOfChildSeg = " ";
+                _endOfChildSeg = " ";
 
                 // Establish parentage for the following GNPs (this root's children, twin-chain order).
                 _detail.StartParentScan(_summaryRec.AcctId);
 
                 // PERFORM 3000-FIND-NEXT-AUTH-DTL UNTIL WS-END-OF-CHILD-SEG = 'Y'. // source: PAUDBUNL.CBL:235-236
-                while (_wsEndOfChildSeg != "Y")
+                while (_endOfChildSeg != "Y")
                 {
-                    FindNextAuthDtl3000(rootSegKey);
+                    FindNextAuthDetail(rootSegKey);
                 }
             }
         }
@@ -252,7 +252,7 @@ public sealed class PendingAuthDbUnloadUtility
         if (_pautPcbStatus == "GB")
         {
             _endOfAuthDb = true;                                      // SET END-OF-AUTHDB TO TRUE // source: PAUDBUNL.CBL:240
-            _wsEndOfRootSeg = "Y";                                    // MOVE 'Y' TO WS-END-OF-ROOT-SEG // source: PAUDBUNL.CBL:241
+            _endOfRootSeg = "Y";                                    // MOVE 'Y' TO WS-END-OF-ROOT-SEG // source: PAUDBUNL.CBL:241
         }
 
         // IF PAUT-PCB-STATUS NOT EQUAL TO SPACES AND 'GB' ... // source: PAUDBUNL.CBL:243
@@ -260,14 +260,14 @@ public sealed class PendingAuthDbUnloadUtility
         {
             _sysout.Add("AUTH SUM  GN FAILED  :" + _pautPcbStatus);   // source: PAUDBUNL.CBL:244
             _sysout.Add("KEY FEEDBACK AREA    :" + _pautKeyfb);       // source: PAUDBUNL.CBL:245
-            Abend9999();                                              // source: PAUDBUNL.CBL:246
+            Abend();                                              // source: PAUDBUNL.CBL:246
         }
     }
 
     // =================================================================================================
     // 3000-FIND-NEXT-AUTH-DTL // source: PAUDBUNL.CBL:253-286
     // =================================================================================================
-    private void FindNextAuthDtl3000(byte[] rootSegKey)
+    private void FindNextAuthDetail(byte[] rootSegKey)  // COBOL paragraph: 3000-FIND-NEXT-AUTH-DTL
     {
         // CALL 'CBLTDLI' USING FUNC-GNP PAUTBPCB PENDING-AUTH-DETAILS CHILD-UNQUAL-SSA. // source: PAUDBUNL.CBL:257-260
         string status = _detail.ReadNextInParent(out PautDetail? next);
@@ -280,8 +280,8 @@ public sealed class PendingAuthDbUnloadUtility
             _detailRec = next;
 
             // FAITHFUL BUG #1: the summary counters are incremented per DETAIL read. // source: PAUDBUNL.CBL:268-269
-            _wsNoSumryRead++;                                        // ADD 1 TO WS-NO-SUMRY-READ
-            _wsAuthSmryProcCnt++;                                    // ADD 1 TO WS-AUTH-SMRY-PROC-CNT
+            _summaryReadCount++;                                        // ADD 1 TO WS-NO-SUMRY-READ
+            _authSummaryProcessedCount++;                                    // ADD 1 TO WS-AUTH-SMRY-PROC-CNT
 
             // MOVE PENDING-AUTH-DETAILS TO CHILD-SEG-REC; WRITE OPFIL2-REC. // source: PAUDBUNL.CBL:270-271
             // OPFIL2-REC = ROOT-SEG-KEY (6) + CHILD-SEG-REC (200).
@@ -292,8 +292,8 @@ public sealed class PendingAuthDbUnloadUtility
         // IF PAUT-PCB-STATUS = 'GE' ... // source: PAUDBUNL.CBL:273
         if (_pautPcbStatus == "GE")
         {
-            _wsEndOfChildSeg = "Y";                                  // MOVE 'Y' TO WS-END-OF-CHILD-SEG // source: PAUDBUNL.CBL:275
-            _sysout.Add("CHILD SEG FLAG GE : " + _wsEndOfChildSeg);  // source: PAUDBUNL.CBL:276-277
+            _endOfChildSeg = "Y";                                  // MOVE 'Y' TO WS-END-OF-CHILD-SEG // source: PAUDBUNL.CBL:275
+            _sysout.Add("CHILD SEG FLAG GE : " + _endOfChildSeg);  // source: PAUDBUNL.CBL:276-277
         }
 
         // IF PAUT-PCB-STATUS NOT EQUAL TO SPACES AND 'GE' ... // source: PAUDBUNL.CBL:279
@@ -301,7 +301,7 @@ public sealed class PendingAuthDbUnloadUtility
         {
             _sysout.Add("GNP CALL FAILED  :" + _pautPcbStatus);      // source: PAUDBUNL.CBL:280
             _sysout.Add("KFB AREA IN CHILD:" + _pautKeyfb);          // source: PAUDBUNL.CBL:281
-            Abend9999();                                             // source: PAUDBUNL.CBL:282
+            Abend();                                             // source: PAUDBUNL.CBL:282
         }
 
         // INITIALIZE PAUT-PCB-STATUS. // source: PAUDBUNL.CBL:284
@@ -311,41 +311,41 @@ public sealed class PendingAuthDbUnloadUtility
     // =================================================================================================
     // 4000-FILE-CLOSE // source: PAUDBUNL.CBL:289-306
     // =================================================================================================
-    private void FileClose4000()
+    private void FileClose()  // COBOL paragraph: 4000-FILE-CLOSE
     {
         _sysout.Add("CLOSING THE FILE");                             // source: PAUDBUNL.CBL:290
 
         // CLOSE OPFILE1. // source: PAUDBUNL.CBL:291
         _opfile1?.Dispose();
         _opfile1 = null;
-        _wsOutfl1Status = "00";
-        if (_wsOutfl1Status == "  " || _wsOutfl1Status == "00")      // source: PAUDBUNL.CBL:293-294
+        _outfile1Status = "00";
+        if (_outfile1Status == "  " || _outfile1Status == "00")      // source: PAUDBUNL.CBL:293-294
         {
             // CONTINUE
         }
         else                                                         // source: PAUDBUNL.CBL:295-297
         {
-            _sysout.Add("ERROR IN CLOSING 1ST FILE:" + _wsOutfl1Status);
+            _sysout.Add("ERROR IN CLOSING 1ST FILE:" + _outfile1Status);
         }
 
         // CLOSE OPFILE2. // source: PAUDBUNL.CBL:298
         _opfile2?.Dispose();
         _opfile2 = null;
-        _wsOutfl2Status = "00";
-        if (_wsOutfl2Status == "  " || _wsOutfl2Status == "00")      // source: PAUDBUNL.CBL:300-301
+        _outfile2Status = "00";
+        if (_outfile2Status == "  " || _outfile2Status == "00")      // source: PAUDBUNL.CBL:300-301
         {
             // CONTINUE
         }
         else                                                         // source: PAUDBUNL.CBL:302-304
         {
-            _sysout.Add("ERROR IN CLOSING 2ND FILE:" + _wsOutfl2Status);
+            _sysout.Add("ERROR IN CLOSING 2ND FILE:" + _outfile2Status);
         }
     }
 
     // =================================================================================================
     // 9999-ABEND // source: PAUDBUNL.CBL:308-314
     // =================================================================================================
-    private void Abend9999()
+    private void Abend()  // COBOL paragraph: 9999-ABEND
     {
         _sysout.Add("IMSUNLOD ABENDING ...");                        // source: PAUDBUNL.CBL:311
         ReturnCode = 16;                                             // MOVE 16 TO RETURN-CODE // source: PAUDBUNL.CBL:313

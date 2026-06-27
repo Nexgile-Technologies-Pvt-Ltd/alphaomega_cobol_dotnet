@@ -22,26 +22,26 @@ namespace CardDemo.Online.Programs;
 public sealed class SignOnProgram : ITransactionHandler
 {
     // === WORKING-STORAGE (WS-VARIABLES) — source: COSGN00C.cbl:35-46 ===
-    private const string WS_PGMNAME = "COSGN00C";   // 05 WS-PGMNAME    PIC X(08) VALUE 'COSGN00C'  // :36
-    private const string WS_TRANID = "CC00";        // 05 WS-TRANID     PIC X(04) VALUE 'CC00'      // :37
-    private const string WS_USRSEC_FILE = "USRSEC  "; // 05 WS-USRSEC-FILE PIC X(08) VALUE 'USRSEC  ' // :39
+    private const string ProgramId = "COSGN00C";    // WS-PGMNAME    PIC X(08) VALUE 'COSGN00C'  // :36
+    private const string TranId = "CC00";           // WS-TRANID     PIC X(04) VALUE 'CC00'      // :37
+    private const string UserSecFileName = "USRSEC  "; // WS-USRSEC-FILE PIC X(08) VALUE 'USRSEC  ' // :39
 
-    private string _wsMessage = "";                 // 05 WS-MESSAGE    PIC X(80) VALUE SPACES       // :38
-    private bool _errFlgOn;                          // 05 WS-ERR-FLG    PIC X(01) VALUE 'N' (88 ERR-FLG-ON='Y') // :40-42
-    private int _wsRespCd;                           // 05 WS-RESP-CD    PIC S9(09) COMP VALUE ZEROS  // :43
-    private int _wsReasCd;                           // 05 WS-REAS-CD    PIC S9(09) COMP VALUE ZEROS  // :44 (captured, never inspected)
-    private string _wsUserId = "";                  // 05 WS-USER-ID    PIC X(08)                    // :45
-    private string _wsUserPwd = "";                 // 05 WS-USER-PWD   PIC X(08)                    // :46
+    private string _message = "";                   // WS-MESSAGE    PIC X(80) VALUE SPACES       // :38
+    private bool _errorFlagOn;                       // WS-ERR-FLG    PIC X(01) VALUE 'N' (88 ERR-FLG-ON='Y') // :40-42
+    private int _responseCode;                       // WS-RESP-CD    PIC S9(09) COMP VALUE ZEROS  // :43
+    private int _reasonCode;                         // WS-REAS-CD    PIC S9(09) COMP VALUE ZEROS  // :44 (captured, never inspected)
+    private string _userId = "";                    // WS-USER-ID    PIC X(08)                    // :45
+    private string _userPassword = "";              // WS-USER-PWD   PIC X(08)                    // :46
 
     // === Common-message constants pulled in via CSMSG01Y / COTTL01Y copybooks ===
     // CCDA-MSG-THANK-YOU   PIC X(50)  // CSMSG01Y.cpy:18-19
-    private const string CCDA_MSG_THANK_YOU = "Thank you for using CardDemo application...      ";
+    private const string MsgThankYou = "Thank you for using CardDemo application...      ";
     // CCDA-MSG-INVALID-KEY PIC X(50)  // CSMSG01Y.cpy:20-21
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...         ";
+    private const string MsgInvalidKey = "Invalid key pressed. Please see below...         ";
     // CCDA-TITLE01 PIC X(40)          // COTTL01Y.cpy:18-19
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
+    private const string Title01 = "      AWS Mainframe Modernization       ";
     // CCDA-TITLE02 PIC X(40)          // COTTL01Y.cpy:20-22
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
+    private const string Title02 = "              CardDemo                  ";
 
     // === CICS ASSIGN shim values (no real CICS region) — COSGN00C.cbl:198-204 / port spec §8.10 ===
     private const string ApplId = "CICSAWS ";       // EXEC CICS ASSIGN APPLID(...)  fixed parity value
@@ -74,11 +74,11 @@ public sealed class SignOnProgram : ITransactionHandler
         _map = BuildMap();
 
         // SET ERR-FLG-OFF TO TRUE                                            // source: COSGN00C.cbl:75
-        _errFlgOn = false;
+        _errorFlagOn = false;
 
         // MOVE SPACES TO WS-MESSAGE
         //                ERRMSGO OF COSGN0AO                                  // source: COSGN00C.cbl:77-78
-        _wsMessage = "";
+        _message = "";
         _map.Field("ERRMSG").SetValue("", setMdt: false);
 
         if (ctx.EibCalen == 0)
@@ -104,7 +104,7 @@ public sealed class SignOnProgram : ITransactionHandler
                 case AidKey.Pf3:
                     // WHEN DFHPF3                                            // source: COSGN00C.cbl:88
                     //     MOVE CCDA-MSG-THANK-YOU TO WS-MESSAGE             // source: COSGN00C.cbl:89
-                    _wsMessage = CCDA_MSG_THANK_YOU;
+                    _message = MsgThankYou;
                     //     PERFORM SEND-PLAIN-TEXT                           // source: COSGN00C.cbl:90
                     SendPlainText(ctx);
                     break;
@@ -112,9 +112,9 @@ public sealed class SignOnProgram : ITransactionHandler
                 default:
                     // WHEN OTHER                                            // source: COSGN00C.cbl:91
                     //     MOVE 'Y' TO WS-ERR-FLG                            // source: COSGN00C.cbl:92
-                    _errFlgOn = true;
+                    _errorFlagOn = true;
                     //     MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE          // source: COSGN00C.cbl:93
-                    _wsMessage = CCDA_MSG_INVALID_KEY;
+                    _message = MsgInvalidKey;
                     //     PERFORM SEND-SIGNON-SCREEN                        // source: COSGN00C.cbl:94
                     SendSignonScreen(ctx);
                     break;
@@ -131,7 +131,7 @@ public sealed class SignOnProgram : ITransactionHandler
             //           COMMAREA (CARDDEMO-COMMAREA)
             //           LENGTH(LENGTH OF CARDDEMO-COMMAREA)                  // source: COSGN00C.cbl:98-102
             ctx.CommArea ??= new CardDemoCommArea();
-            ctx.ReturnTransId(WS_TRANID, ctx.CommArea);
+            ctx.ReturnTransId(TranId, ctx.CommArea);
         }
     }
 
@@ -143,32 +143,32 @@ public sealed class SignOnProgram : ITransactionHandler
         // EXEC CICS RECEIVE MAP('COSGN0A') MAPSET('COSGN00')
         //           RESP(WS-RESP-CD) RESP2(WS-REAS-CD)                       // source: COSGN00C.cbl:110-115
         ctx.ReceiveMap("COSGN0A", "COSGN00", _map);
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
 
-        string useridi = _map.Field("USERID").Value; // USERIDI OF COSGN0AI
-        string passwdi = _map.Field("PASSWD").Value; // PASSWDI OF COSGN0AI
+        string userIdInput = _map.Field("USERID").Value; // USERIDI OF COSGN0AI
+        string passwordInput = _map.Field("PASSWD").Value; // PASSWDI OF COSGN0AI
 
         // EVALUATE TRUE                                                      // source: COSGN00C.cbl:117
-        if (IsSpacesOrLowValues(useridi))
+        if (IsSpacesOrLowValues(userIdInput))
         {
             // WHEN USERIDI = SPACES OR LOW-VALUES                           // source: COSGN00C.cbl:118
             //     MOVE 'Y' TO WS-ERR-FLG                                    // source: COSGN00C.cbl:119
-            _errFlgOn = true;
+            _errorFlagOn = true;
             //     MOVE 'Please enter User ID ...' TO WS-MESSAGE             // source: COSGN00C.cbl:120
-            _wsMessage = "Please enter User ID ...";
+            _message = "Please enter User ID ...";
             //     MOVE -1 TO USERIDL OF COSGN0AI                            // source: COSGN00C.cbl:121
             _map.Field("USERID").CursorLength = -1;
             //     PERFORM SEND-SIGNON-SCREEN                                // source: COSGN00C.cbl:122
             SendSignonScreen(ctx);
         }
-        else if (IsSpacesOrLowValues(passwdi))
+        else if (IsSpacesOrLowValues(passwordInput))
         {
             // WHEN PASSWDI = SPACES OR LOW-VALUES                           // source: COSGN00C.cbl:123
             //     MOVE 'Y' TO WS-ERR-FLG                                    // source: COSGN00C.cbl:124
-            _errFlgOn = true;
+            _errorFlagOn = true;
             //     MOVE 'Please enter Password ...' TO WS-MESSAGE            // source: COSGN00C.cbl:125
-            _wsMessage = "Please enter Password ...";
+            _message = "Please enter Password ...";
             //     MOVE -1 TO PASSWDL OF COSGN0AI                            // source: COSGN00C.cbl:126
             _map.Field("PASSWD").CursorLength = -1;
             //     PERFORM SEND-SIGNON-SCREEN                                // source: COSGN00C.cbl:127
@@ -186,15 +186,15 @@ public sealed class SignOnProgram : ITransactionHandler
         // MOVE FUNCTION UPPER-CASE(USERIDI OF COSGN0AI) TO
         //                 WS-USER-ID
         //                 CDEMO-USER-ID                                      // source: COSGN00C.cbl:132-134
-        _wsUserId = UpperCase(useridi);
+        _userId = UpperCase(userIdInput);
         ctx.CommArea ??= new CardDemoCommArea();
-        ctx.CommArea.UserId = _wsUserId; // CDEMO-USER-ID set even on validation failure (FB-3)
+        ctx.CommArea.UserId = _userId; // CDEMO-USER-ID set even on validation failure (FB-3)
 
         // MOVE FUNCTION UPPER-CASE(PASSWDI OF COSGN0AI) TO WS-USER-PWD       // source: COSGN00C.cbl:135-136
-        _wsUserPwd = UpperCase(passwdi);
+        _userPassword = UpperCase(passwordInput);
 
         // IF NOT ERR-FLG-ON PERFORM READ-USER-SEC-FILE                       // source: COSGN00C.cbl:138-140
-        if (!_errFlgOn)
+        if (!_errorFlagOn)
         {
             ReadUserSecFile(ctx);
         }
@@ -210,7 +210,7 @@ public sealed class SignOnProgram : ITransactionHandler
 
         // MOVE WS-MESSAGE TO ERRMSGO OF COSGN0AO                            // source: COSGN00C.cbl:149
         // ERRMSGO is X(78); WS-MESSAGE is X(80) -> truncates to 78 (SetValue truncates to field length).
-        _map.Field("ERRMSG").SetValue(_wsMessage);
+        _map.Field("ERRMSG").SetValue(_message);
 
         // EXEC CICS SEND MAP('COSGN0A') MAPSET('COSGN00')
         //           FROM(COSGN0AO) ERASE CURSOR                             // source: COSGN00C.cbl:151-157
@@ -230,7 +230,7 @@ public sealed class SignOnProgram : ITransactionHandler
         // EXEC CICS SEND TEXT FROM(WS-MESSAGE) LENGTH(LENGTH OF WS-MESSAGE)
         //           ERASE FREEKB                                            // source: COSGN00C.cbl:164-169
         // WS-MESSAGE is X(80): right-pad the message to the full 80 chars for SEND TEXT.
-        ctx.SendText(PadToWidth(_wsMessage, 80), erase: true, freeKb: true);
+        ctx.SendText(PadToWidth(_message, 80), erase: true, freeKb: true);
 
         // EXEC CICS RETURN  (no TRANSID — ends the pseudo-conversation / logoff)   // source: COSGN00C.cbl:171-172
         ctx.ReturnTerminal();
@@ -245,13 +245,13 @@ public sealed class SignOnProgram : ITransactionHandler
         DateTime now = ctx.Clock.Now;
 
         // MOVE CCDA-TITLE01 TO TITLE01O OF COSGN0AO                          // source: COSGN00C.cbl:181
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01);
+        _map.Field("TITLE01").SetValue(Title01);
         // MOVE CCDA-TITLE02 TO TITLE02O OF COSGN0AO                          // source: COSGN00C.cbl:182
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02);
+        _map.Field("TITLE02").SetValue(Title02);
         // MOVE WS-TRANID    TO TRNNAMEO OF COSGN0AO                          // source: COSGN00C.cbl:183
-        _map.Field("TRNNAME").SetValue(WS_TRANID);
+        _map.Field("TRNNAME").SetValue(TranId);
         // MOVE WS-PGMNAME   TO PGMNAMEO OF COSGN0AO                          // source: COSGN00C.cbl:184
-        _map.Field("PGMNAME").SetValue(WS_PGMNAME);
+        _map.Field("PGMNAME").SetValue(ProgramId);
 
         // Build WS-CURDATE-MM-DD-YY = MM '/' DD '/' YY (YEAR(3:2) = last 2 digits)  // source: COSGN00C.cbl:186-188
         // MOVE WS-CURDATE-MM-DD-YY TO CURDATEO OF COSGN0AO                   // source: COSGN00C.cbl:190
@@ -285,17 +285,17 @@ public sealed class SignOnProgram : ITransactionHandler
         // VSAM keyed READ -> repository ReadByKey. The key is WS-USER-ID padded to X(8) (the lookup key
         // is the upper-cased input right-padded to 8 with spaces; usr_id is stored X(8)). Map the FileStatus
         // outcome to the CICS RESP code the COBOL EVALUATE branches on: Found('00')->0, NotFnd('23')->13,
-        // any other infrastructure failure -> the "other" branch. _ = WS_USRSEC_FILE (dataset name, fixed).
-        _ = WS_USRSEC_FILE;
+        // any other infrastructure failure -> the "other" branch. _ = UserSecFileName (dataset name, fixed).
+        _ = UserSecFileName;
         var repo = new UserSecurityRepository(_db.Connection);
-        string ridfld = PadToWidth(_wsUserId, 8);
+        string recordKey = PadToWidth(_userId, 8);
 
-        UserSecurity? secUser;
+        UserSecurity? storedUser;
         string fileStatus;
         try
         {
-            fileStatus = repo.ReadByKey(ridfld, out secUser);
-            _wsRespCd = fileStatus switch
+            fileStatus = repo.ReadByKey(recordKey, out storedUser);
+            _responseCode = fileStatus switch
             {
                 FileStatus.Ok => (int)Resp.Normal,            // 0  -> DFHRESP(NORMAL)
                 FileStatus.RecordNotFound => (int)Resp.NotFnd, // 13 -> DFHRESP(NOTFND)
@@ -305,29 +305,29 @@ public sealed class SignOnProgram : ITransactionHandler
         catch
         {
             // Infrastructure/exception -> "other" branch (WHEN OTHER), per port spec §2.
-            secUser = null;
-            _wsRespCd = (int)Resp.Error;
+            storedUser = null;
+            _responseCode = (int)Resp.Error;
         }
 
         // EVALUATE WS-RESP-CD                                                // source: COSGN00C.cbl:221
-        if (_wsRespCd == 0)
+        if (_responseCode == 0)
         {
             // WHEN 0                                                        // source: COSGN00C.cbl:222
-            string secUsrPwd = secUser?.Pwd ?? "";   // SEC-USR-PWD  X(8)
-            string secUsrType = secUser?.UsrType ?? ""; // SEC-USR-TYPE X(1)
+            string storedPassword = storedUser?.Pwd ?? "";   // SEC-USR-PWD  X(8)
+            string storedUserType = storedUser?.UsrType ?? ""; // SEC-USR-TYPE X(1)
 
             // IF SEC-USR-PWD = WS-USER-PWD  (byte-for-byte X(8) equality)   // source: COSGN00C.cbl:223
-            if (PadToWidth(secUsrPwd, 8) == PadToWidth(_wsUserPwd, 8))
+            if (PadToWidth(storedPassword, 8) == PadToWidth(_userPassword, 8))
             {
                 ctx.CommArea ??= new CardDemoCommArea();
                 // MOVE WS-TRANID    TO CDEMO-FROM-TRANID                     // source: COSGN00C.cbl:224
-                ctx.CommArea.FromTranId = WS_TRANID;
+                ctx.CommArea.FromTranId = TranId;
                 // MOVE WS-PGMNAME   TO CDEMO-FROM-PROGRAM                    // source: COSGN00C.cbl:225
-                ctx.CommArea.FromProgram = WS_PGMNAME;
+                ctx.CommArea.FromProgram = ProgramId;
                 // MOVE WS-USER-ID   TO CDEMO-USER-ID                         // source: COSGN00C.cbl:226
-                ctx.CommArea.UserId = _wsUserId;
+                ctx.CommArea.UserId = _userId;
                 // MOVE SEC-USR-TYPE TO CDEMO-USER-TYPE                       // source: COSGN00C.cbl:227
-                ctx.CommArea.UserType = secUsrType;
+                ctx.CommArea.UserType = storedUserType;
                 // MOVE ZEROS        TO CDEMO-PGM-CONTEXT                     // source: COSGN00C.cbl:228
                 ctx.CommArea.PgmContext = 0;
 
@@ -347,20 +347,20 @@ public sealed class SignOnProgram : ITransactionHandler
             {
                 // ELSE (password mismatch — note: NO WS-ERR-FLG set here)    // source: COSGN00C.cbl:241
                 // MOVE 'Wrong Password. Try again ...' TO WS-MESSAGE        // source: COSGN00C.cbl:242-243
-                _wsMessage = "Wrong Password. Try again ...";
+                _message = "Wrong Password. Try again ...";
                 // MOVE -1 TO PASSWDL OF COSGN0AI                            // source: COSGN00C.cbl:244
                 _map.Field("PASSWD").CursorLength = -1;
                 // PERFORM SEND-SIGNON-SCREEN                                // source: COSGN00C.cbl:245
                 SendSignonScreen(ctx);
             }
         }
-        else if (_wsRespCd == 13)
+        else if (_responseCode == 13)
         {
             // WHEN 13                                                       // source: COSGN00C.cbl:247
             // MOVE 'Y' TO WS-ERR-FLG                                        // source: COSGN00C.cbl:248
-            _errFlgOn = true;
+            _errorFlagOn = true;
             // MOVE 'User not found. Try again ...' TO WS-MESSAGE            // source: COSGN00C.cbl:249
-            _wsMessage = "User not found. Try again ...";
+            _message = "User not found. Try again ...";
             // MOVE -1 TO USERIDL OF COSGN0AI                               // source: COSGN00C.cbl:250
             _map.Field("USERID").CursorLength = -1;
             // PERFORM SEND-SIGNON-SCREEN                                    // source: COSGN00C.cbl:251
@@ -370,9 +370,9 @@ public sealed class SignOnProgram : ITransactionHandler
         {
             // WHEN OTHER                                                    // source: COSGN00C.cbl:252
             // MOVE 'Y' TO WS-ERR-FLG                                        // source: COSGN00C.cbl:253
-            _errFlgOn = true;
+            _errorFlagOn = true;
             // MOVE 'Unable to verify the User ...' TO WS-MESSAGE            // source: COSGN00C.cbl:254
-            _wsMessage = "Unable to verify the User ...";
+            _message = "Unable to verify the User ...";
             // MOVE -1 TO USERIDL OF COSGN0AI                               // source: COSGN00C.cbl:255
             _map.Field("USERID").CursorLength = -1;
             // PERFORM SEND-SIGNON-SCREEN                                    // source: COSGN00C.cbl:256

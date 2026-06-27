@@ -68,112 +68,112 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  Literals and Constants — source: COTRTLIC.cbl:42-60
     // =============================================================================================
-    private const string LIT_THISPGM = "COTRTLIC";       // 05 LIT-THISPGM      X(8) 'COTRTLIC'. source: :43
-    private const string LIT_THISTRANID = "CTLI";        // 05 LIT-THISTRANID   X(4) 'CTLI'.     source: :44
-    private const string LIT_THISMAPSET = "COTRTLI";     // 05 LIT-THISMAPSET   X(7) 'COTRTLI'.  source: :45
-    private const string LIT_THISMAP = "CTRTLIA";        // 05 LIT-THISMAP      X(7) 'CTRTLIA'.  source: :46
-    private const string LIT_ADMINPGM = "COADM01C";      // 05 LIT-ADMINPGM     X(8) 'COADM01C'. source: :47
-    private const string LIT_ADMINTRANID = "CA00";       // 05 LIT-ADMINTRANID  X(4) 'CA00'.     source: :48
-    private const string LIT_ADMINMAPSET = "COADM01";    // 05 LIT-ADMINMAPSET  X(7) 'COADM01'.  source: :49
-    private const string LIT_ADDTPGM = "COTRTUPC";       // 05 LIT-ADDTPGM      X(8) 'COTRTUPC'. source: :50
-    private const string LIT_ADDTTRANID = "CTTU";        // 05 LIT-ADDTTRANID   X(4) 'CTTU'.     source: :51
-    private const string LIT_ADDTMAPSET = "COTRTUP";     // 05 LIT-ADDTMAPSET   X(7) 'COTRTUP'.  source: :52
-    private const string LIT_ADDTMAP = "CTRTUPA";        // 05 LIT-ADDTMAP      X(7) 'CTRTUPA'.  source: :53
-    private const string LIT_ASTERISK = "*";             // 05 LIT-ASTERISK     X(7) '*'.        source: :55
-    private const string LIT_DELETE_FLAG = "D";          // 05 LIT-DELETE-FLAG  X(1) 'D'.        source: :58
-    private const string LIT_UPDATE_FLAG = "U";          // 05 LIT-UPDATE-FLAG  X(1) 'U'.        source: :59
-    private const int WS_MAX_SCREEN_LINES = 7;           // 05 WS-MAX-SCREEN-LINES S9(4) COMP 7. source: :60
+    private const string ThisProgramId = "COTRTLIC";       // 05 LIT-THISPGM      X(8) 'COTRTLIC'. source: :43
+    private const string ThisTranId = "CTLI";        // 05 LIT-THISTRANID   X(4) 'CTLI'.     source: :44
+    private const string ThisMapSet = "COTRTLI";     // 05 LIT-THISMAPSET   X(7) 'COTRTLI'.  source: :45
+    private const string ThisMapId = "CTRTLIA";        // 05 LIT-THISMAP      X(7) 'CTRTLIA'.  source: :46
+    private const string AdminProgramId = "COADM01C";      // 05 LIT-ADMINPGM     X(8) 'COADM01C'. source: :47
+    private const string AdminTranId = "CA00";       // 05 LIT-ADMINTRANID  X(4) 'CA00'.     source: :48
+    private const string AdminMapSet = "COADM01";    // 05 LIT-ADMINMAPSET  X(7) 'COADM01'.  source: :49
+    private const string AddTypeProgramId = "COTRTUPC";       // 05 LIT-ADDTPGM      X(8) 'COTRTUPC'. source: :50
+    private const string AddTypeTranId = "CTTU";        // 05 LIT-ADDTTRANID   X(4) 'CTTU'.     source: :51
+    private const string AddTypeMapSet = "COTRTUP";     // 05 LIT-ADDTMAPSET   X(7) 'COTRTUP'.  source: :52
+    private const string AddTypeMapId = "CTRTUPA";        // 05 LIT-ADDTMAP      X(7) 'CTRTUPA'.  source: :53
+    private const string AsteriskLit = "*";             // 05 LIT-ASTERISK     X(7) '*'.        source: :55
+    private const string DeleteFlagLit = "D";          // 05 LIT-DELETE-FLAG  X(1) 'D'.        source: :58
+    private const string UpdateFlagLit = "U";          // 05 LIT-UPDATE-FLAG  X(1) 'U'.        source: :59
+    private const int MaxScreenLines = 7;           // 05 WS-MAX-SCREEN-LINES S9(4) COMP 7. source: :60
 
     // CCDA-TITLE01/02 (COTTL01Y) — shared screen header titles.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
+    private const string ScreenTitle01 = "      AWS Mainframe Modernization       ";
+    private const string ScreenTitle02 = "              CardDemo                  ";
 
     // =============================================================================================
     //  Input edits flags — source: COTRTLIC.cbl:98-140
     // =============================================================================================
     // 05 WS-INPUT-FLAG X(1). 88 INPUT-OK={'0',' ',LOW-VALUES} / INPUT-ERROR='1'. source: :98-102
-    private char _wsInputFlag = '\0';
-    private bool InputOk => _wsInputFlag is '0' or ' ' or '\0';     // 88 INPUT-OK
-    private bool InputError => _wsInputFlag == '1';                 // 88 INPUT-ERROR
-    private void SetInputError() => _wsInputFlag = '1';             // SET INPUT-ERROR TO TRUE
-    private void SetInputOk() => _wsInputFlag = '0';                // SET INPUT-OK TO TRUE
+    private char _inputFlag = '\0';
+    private bool InputOk => _inputFlag is '0' or ' ' or '\0';     // 88 INPUT-OK
+    private bool InputError => _inputFlag == '1';                 // 88 INPUT-ERROR
+    private void SetInputError() => _inputFlag = '1';             // SET INPUT-ERROR TO TRUE
+    private void SetInputOk() => _inputFlag = '0';                // SET INPUT-OK TO TRUE
 
     // 05 WS-EDIT-TYPE-FLAG X(1). 88 NOT-OK='0' / ISVALID='1' / BLANK=' '. source: :103-106
-    private char _wsEditTypeFlag = '\0';
-    private bool FlgTypeFilterNotOk => _wsEditTypeFlag == '0';
-    private bool FlgTypeFilterIsValid => _wsEditTypeFlag == '1';
-    private void SetTypeFilterNotOk() => _wsEditTypeFlag = '0';
-    private void SetTypeFilterIsValid() => _wsEditTypeFlag = '1';
-    private void SetTypeFilterBlank() => _wsEditTypeFlag = ' ';
+    private char _editTypeFlag = '\0';
+    private bool FlgTypeFilterNotOk => _editTypeFlag == '0';
+    private bool FlgTypeFilterIsValid => _editTypeFlag == '1';
+    private void SetTypeFilterNotOk() => _editTypeFlag = '0';
+    private void SetTypeFilterIsValid() => _editTypeFlag = '1';
+    private void SetTypeFilterBlank() => _editTypeFlag = ' ';
 
     // 05 WS-EDIT-DESC-FLAG X(1). 88 NOT-OK='0' / ISVALID='1' / BLANK=' '. source: :107-110
-    private char _wsEditDescFlag = '\0';
-    private bool FlgDescFilterNotOk => _wsEditDescFlag == '0';
-    private bool FlgDescFilterIsValid => _wsEditDescFlag == '1';
-    private void SetDescFilterNotOk() => _wsEditDescFlag = '0';
-    private void SetDescFilterIsValid() => _wsEditDescFlag = '1';
-    private void SetDescFilterBlank() => _wsEditDescFlag = ' ';
+    private char _editDescFlag = '\0';
+    private bool FlgDescFilterNotOk => _editDescFlag == '0';
+    private bool FlgDescFilterIsValid => _editDescFlag == '1';
+    private void SetDescFilterNotOk() => _editDescFlag = '0';
+    private void SetDescFilterIsValid() => _editDescFlag = '1';
+    private void SetDescFilterBlank() => _editDescFlag = ' ';
 
     // 05 WS-TYPEFILTER-CHANGED X(1). 88 NO=LOW-VALUES / YES='Y'. source: :111-113
-    private char _wsTypeFilterChanged = '\0';
-    private bool FlgTypeFilterChangedNo => _wsTypeFilterChanged == '\0';
-    private void SetTypeFilterChangedNo() => _wsTypeFilterChanged = '\0';
-    private void SetTypeFilterChangedYes() => _wsTypeFilterChanged = 'Y';
+    private char _typeFilterChanged = '\0';
+    private bool FlgTypeFilterChangedNo => _typeFilterChanged == '\0';
+    private void SetTypeFilterChangedNo() => _typeFilterChanged = '\0';
+    private void SetTypeFilterChangedYes() => _typeFilterChanged = 'Y';
 
     // 05 WS-DESCFILTER-CHANGED X(1). 88 NO=LOW-VALUES / YES='Y'. source: :114-116
-    private char _wsDescFilterChanged = '\0';
-    private bool FlgDescFilterChangedNo => _wsDescFilterChanged == '\0';
-    private void SetDescFilterChangedNo() => _wsDescFilterChanged = '\0';
-    private void SetDescFilterChangedYes() => _wsDescFilterChanged = 'Y';
+    private char _descFilterChanged = '\0';
+    private bool FlgDescFilterChangedNo => _descFilterChanged == '\0';
+    private void SetDescFilterChangedNo() => _descFilterChanged = '\0';
+    private void SetDescFilterChangedYes() => _descFilterChanged = 'Y';
 
     // 05 WS-DELETE-STATUS X(1). 88 FLG-DELETED-NO=LOW-VALUES / FLG-DELETED-YES='Y'. source: :121-123
-    private char _wsDeleteStatus = '\0';
-    private bool FlgDeletedYes => _wsDeleteStatus == 'Y';
-    private void SetDeletedYes() => _wsDeleteStatus = 'Y';
-    private void SetDeletedNo() => _wsDeleteStatus = '\0';
+    private char _deleteStatus = '\0';
+    private bool FlgDeletedYes => _deleteStatus == 'Y';
+    private void SetDeletedYes() => _deleteStatus = 'Y';
+    private void SetDeletedNo() => _deleteStatus = '\0';
 
     // 05 WS-UPDATE-STATUS X(1). 88 FLG-UPDATED-NO=LOW-VALUES / FLG-UPDATE-COMPLETED='Y'. source: :124-126
-    private char _wsUpdateStatus = '\0';
-    private bool FlgUpdateCompleted => _wsUpdateStatus == 'Y';
-    private void SetUpdateCompleted() => _wsUpdateStatus = 'Y';
+    private char _updateStatus = '\0';
+    private bool FlgUpdateCompleted => _updateStatus == 'Y';
+    private void SetUpdateCompleted() => _updateStatus = 'Y';
 
     // 05 WS-ROW-SELECTION-CHANGED X(1). 88 NO=LOW-VALUES / YES='Y'. source: :127-129
-    private char _wsRowSelectionChanged = '\0';
-    private bool FlgRowSelectionChangedNo => _wsRowSelectionChanged == '\0';
-    private void SetRowSelectionChangedNo() => _wsRowSelectionChanged = '\0';
-    private void SetRowSelectionChangedYes() => _wsRowSelectionChanged = 'Y';
+    private char _rowSelectionChanged = '\0';
+    private bool FlgRowSelectionChangedNo => _rowSelectionChanged == '\0';
+    private void SetRowSelectionChangedNo() => _rowSelectionChanged = '\0';
+    private void SetRowSelectionChangedYes() => _rowSelectionChanged = 'Y';
 
     // 05 WS-BAD-SELECTION-ACTION X(1). 88 NO=LOW-VALUES / YES='Y'. source: :130-132
-    private char _wsBadSelectionAction = '\0';
-    private bool FlgBadActionsSelectedNo => _wsBadSelectionAction == '\0';
-    private void SetBadActionsSelectedNo() => _wsBadSelectionAction = '\0';
-    private void SetBadActionsSelectedYes() => _wsBadSelectionAction = 'Y';
+    private char _badSelectionAction = '\0';
+    private bool FlgBadActionsSelectedNo => _badSelectionAction == '\0';
+    private void SetBadActionsSelectedNo() => _badSelectionAction = '\0';
+    private void SetBadActionsSelectedYes() => _badSelectionAction = 'Y';
 
     // 05 WS-ARRAY-DESCRIPTION-FLGS X(1). 88 ISVALID={LOW-VALUES,SPACES} / NOT-OK='0' / BLANK='B'. source: :133-137
-    private char _wsArrayDescriptionFlgs = '\0';
-    private bool FlgRowDescriptionIsValid => _wsArrayDescriptionFlgs is '\0' or ' ';
-    private bool FlgRowDescriptionBlank => _wsArrayDescriptionFlgs == 'B';
-    private void SetRowDescriptionNotOk() => _wsArrayDescriptionFlgs = '0';
+    private char _arrayDescriptionFlags = '\0';
+    private bool FlgRowDescriptionIsValid => _arrayDescriptionFlags is '\0' or ' ';
+    private bool FlgRowDescriptionBlank => _arrayDescriptionFlags == 'B';
+    private void SetRowDescriptionNotOk() => _arrayDescriptionFlags = '0';
 
     // 05 WS-DATACHANGED-FLAG X(1). 88 NO-CHANGES-FOUND='0' / CHANGES-HAVE-OCCURRED='1'. source: :138-140
-    private char _wsDataChangedFlag = '\0';
-    private bool ChangesHaveOccurred => _wsDataChangedFlag == '1';
-    private void SetNoChangesFound() => _wsDataChangedFlag = '0';
-    private void SetChangesHaveOccurred() => _wsDataChangedFlag = '1';
+    private char _dataChangedFlag = '\0';
+    private bool ChangesHaveOccurred => _dataChangedFlag == '1';
+    private void SetNoChangesFound() => _dataChangedFlag = '0';
+    private void SetChangesHaveOccurred() => _dataChangedFlag = '1';
 
     // =============================================================================================
     //  Generic edit work area — source: COTRTLIC.cbl:143-152
     // =============================================================================================
-    private string _wsEditVariableName = "";     // 10 WS-EDIT-VARIABLE-NAME X(25). source: :144
-    private string _wsEditAlphanumOnly = "";      // 10 WS-EDIT-ALPHANUM-ONLY X(256). source: :146
-    private int _wsEditAlphanumLength;            // 10 WS-EDIT-ALPHANUM-LENGTH S9(4) COMP-3. source: :147
+    private string _editVariableName = "";     // 10 WS-EDIT-VARIABLE-NAME X(25). source: :144
+    private string _editAlphanumOnly = "";      // 10 WS-EDIT-ALPHANUM-ONLY X(256). source: :146
+    private int _editAlphanumLength;            // 10 WS-EDIT-ALPHANUM-LENGTH S9(4) COMP-3. source: :147
     // 10 WS-EDIT-ALPHANUM-ONLY-FLAGS X(1). 88 ISVALID=LOW-VALUES / NOT-OK='0' / BLANK='B'. source: :149-152
-    private char _wsEditAlphanumFlags = '\0';
-    private void SetAlphanumNotOk() => _wsEditAlphanumFlags = '0';
-    private void SetAlphanumBlank() => _wsEditAlphanumFlags = 'B';
-    private void SetAlphanumIsValid() => _wsEditAlphanumFlags = '\0';
+    private char _editAlphanumFlags = '\0';
+    private void SetAlphanumNotOk() => _editAlphanumFlags = '0';
+    private void SetAlphanumBlank() => _editAlphanumFlags = 'B';
+    private void SetAlphanumIsValid() => _editAlphanumFlags = '\0';
 
-    private int _wsRecordsCount;                  // 10 WS-RECORDS-COUNT S9(4) COMP-3. source: :155
+    private int _recordsCount;                  // 10 WS-RECORDS-COUNT S9(4) COMP-3. source: :155
 
     // =============================================================================================
     //  Inbound page buffer (WS-SCREEN-DATA-IN) — source: COTRTLIC.cbl:165-172
@@ -200,14 +200,14 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     private int _iSelected;
 
     // 05 WS-ACTIONS-SELECTED (all S9(4) COMP-3). source: :202-220
-    private int _wsActionsRequested;  // 88 WS-ONLY-1-ACTION=1 / WS-MORETHAN1ACTION=2..7
-    private int _wsDeletesRequested;
-    private int _wsUpdatesRequested;
-    private int _wsNoActionsSelected;
-    private int _wsValidActionsSelected; // 88 WS-ONLY-1-VALID-ACTION=1
-    private bool WsOnly1Action => _wsActionsRequested == 1;
-    private bool WsMoreThan1Action => _wsActionsRequested is >= 2 and <= 7;
-    private bool WsOnly1ValidAction => _wsValidActionsSelected == 1;
+    private int _actionsRequested;  // 88 WS-ONLY-1-ACTION=1 / WS-MORETHAN1ACTION=2..7
+    private int _deletesRequested;
+    private int _updatesRequested;
+    private int _noActionsSelected;
+    private int _validActionsSelected; // 88 WS-ONLY-1-VALID-ACTION=1
+    private bool HasExactlyOneAction => _actionsRequested == 1;
+    private bool HasMoreThanOneAction => _actionsRequested is >= 2 and <= 7;
+    private bool HasExactlyOneValidAction => _validActionsSelected == 1;
 
     // =============================================================================================
     //  Output edits — source: COTRTLIC.cbl:225-231
@@ -222,73 +222,73 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     //  Output message construction — source: COTRTLIC.cbl:235-265
     // =============================================================================================
     // 05 WS-INFO-MSG X(45). 88 literals below. WS-NO-INFO-MESSAGE = {SPACES, LOW-VALUES}. source: :236-248
-    private string _wsInfoMsg = "";
-    private const string INFO_REC_ACTIONS = "Type U to update, D to delete any record";        // :239-240
-    private const string INFO_DELETE = "Delete HIGHLIGHTED row ? Press F10 to confirm";          // :241-242
-    private const string INFO_UPDATE = "Update HIGHLIGHTED row. Press F10 to save";              // :243-244
-    private const string INFO_DELETE_SUCCESS = "HIGHLIGHTED row deleted.Hit Enter to continue";  // :245-246 (no space after '.')
-    private const string INFO_UPDATE_SUCCESS = "HIGHLIGHTED row was updated";                    // :247-248
-    private bool WsNoInfoMessage => string.IsNullOrEmpty(_wsInfoMsg) || _wsInfoMsg.All(c => c is ' ' or '\0'); // 88 WS-NO-INFO-MESSAGE
-    private void SetNoInfoMessage() => _wsInfoMsg = "";
+    private string _infoMessage = "";
+    private const string InfoRecActions = "Type U to update, D to delete any record";        // :239-240
+    private const string InfoDelete = "Delete HIGHLIGHTED row ? Press F10 to confirm";          // :241-242
+    private const string InfoUpdate = "Update HIGHLIGHTED row. Press F10 to save";              // :243-244
+    private const string InfoDeleteSuccess = "HIGHLIGHTED row deleted.Hit Enter to continue";  // :245-246 (no space after '.')
+    private const string InfoUpdateSuccess = "HIGHLIGHTED row was updated";                    // :247-248
+    private bool HasNoInfoMessage => string.IsNullOrEmpty(_infoMessage) || _infoMessage.All(c => c is ' ' or '\0'); // 88 WS-NO-INFO-MESSAGE
+    private void SetNoInfoMessage() => _infoMessage = "";
 
     // 05 WS-RETURN-MSG X(75). 88 literals below. WS-RETURN-MSG-OFF = SPACES. source: :249-262
-    private string _wsReturnMsg = "";
-    private const string MESG_NO_RECORDS_FOUND = "No records found for this search condition.";  // :253-254
-    private const string MESG_NO_MORE_RECORDS = "No more pages for these search conditions";      // :255-256
-    private const string MESG_MORE_THAN_1_ACTION = "Please select only 1 action";                // :257-258
-    private const string MESG_INVALID_ACTION_CODE = "Action code selected is invalid";           // :259-260
-    private const string MESG_NO_CHANGES_DETECTED = "No change detected with respect to database values."; // :261-262
-    private const string EXIT_MESSAGE = "PF03 pressed. Exiting";                                  // :251-252
-    private bool WsReturnMsgOff => string.IsNullOrEmpty(_wsReturnMsg) || _wsReturnMsg.All(c => c == ' ');
-    private void SetReturnMsgOff() => _wsReturnMsg = "";
+    private string _returnMessage = "";
+    private const string MesgNoRecordsFound = "No records found for this search condition.";  // :253-254
+    private const string MesgNoMoreRecords = "No more pages for these search conditions";      // :255-256
+    private const string MesgMoreThan1Action = "Please select only 1 action";                // :257-258
+    private const string MesgInvalidActionCode = "Action code selected is invalid";           // :259-260
+    private const string MesgNoChangesDetected = "No change detected with respect to database values."; // :261-262
+    private const string ExitMessage = "PF03 pressed. Exiting";                                  // :251-252
+    private bool ReturnMessageIsBlank => string.IsNullOrEmpty(_returnMessage) || _returnMessage.All(c => c == ' ');
+    private void SetReturnMsgOff() => _returnMessage = "";
     // Convenience 88-comparisons used by 2500-SETUP-MESSAGE.
-    private bool WsMesgNoRecordsFound => _wsReturnMsg == MESG_NO_RECORDS_FOUND;
+    private bool IsNoRecordsFoundMessage => _returnMessage == MesgNoRecordsFound;
 
     // 05 WS-PFK-FLAG X(1). 88 PFK-VALID='0' / PFK-INVALID='1'. source: :263-265
-    private char _wsPfkFlag = '0';
-    private bool PfkInvalid => _wsPfkFlag == '1';
-    private void SetPfkValid() => _wsPfkFlag = '0';
-    private void SetPfkInvalid() => _wsPfkFlag = '1';
+    private char _pfkFlag = '0';
+    private bool PfkInvalid => _pfkFlag == '1';
+    private void SetPfkValid() => _pfkFlag = '0';
+    private void SetPfkInvalid() => _pfkFlag = '1';
 
     // 05 WS-STRING-FORMAT-VARS — message centering. source: :266-269
-    private int _wsStringMid;
-    private int _wsStringLen;
-    private string _wsStringOut = "";
+    private int _stringMid;
+    private int _stringLen;
+    private string _stringOut = "";
 
     // =============================================================================================
     //  Data handling — WS-DATA-FILTERS. source: COTRTLIC.cbl:274-301
     // =============================================================================================
-    private string _wsStartKey = "";       // 10 WS-START-KEY X(2). source: :275 ("" = LOW-VALUES/spaces -> first row)
-    private string _wsTypeCdFilter = "";   // 10 WS-TYPE-CD-FILTER X(2) VALUE SPACES. source: :276
-    private string _wsTypeDescFilter = ""; // 10 WS-TYPE-DESC-FILTER X(52). source: :278
+    private string _startKey = "";       // 10 WS-START-KEY X(2). source: :275 ("" = LOW-VALUES/spaces -> first row)
+    private string _typeCdFilter = "";   // 10 WS-TYPE-CD-FILTER X(2) VALUE SPACES. source: :276
+    private string _typeDescFilter = ""; // 10 WS-TYPE-DESC-FILTER X(52). source: :278
 
     // =============================================================================================
     //  Screen edit vars — WS-SCREEN-EDIT-VARS. source: COTRTLIC.cbl:309-313
     // =============================================================================================
-    private string _wsInTypeCd = "";       // 10 WS-IN-TYPE-CD X(2) VALUE SPACES. source: :310
-    private string _wsInTypeDesc = "";     // 10 WS-IN-TYPE-DESC X(50). source: :313
+    private string _inTypeCd = "";       // 10 WS-IN-TYPE-CD X(2) VALUE SPACES. source: :310
+    private string _inTypeDesc = "";     // 10 WS-IN-TYPE-DESC X(50). source: :313
 
     // =============================================================================================
     //  Screen array vars. source: COTRTLIC.cbl:318-322
     // =============================================================================================
-    private int _wsRowNumber;              // 05 WS-ROW-NUMBER S9(4) COMP. source: :318
+    private int _rowNumber;              // 05 WS-ROW-NUMBER S9(4) COMP. source: :318
     // 05 WS-RECORDS-TO-PROCESS-FLAG X(1). 88 READ-LOOP-EXIT='0' / MORE-RECORDS-TO-READ='1'. source: :320-322
-    private char _wsRecordsToProcessFlag = '\0';
-    private bool ReadLoopExit => _wsRecordsToProcessFlag == '0';
-    private void SetReadLoopExit() => _wsRecordsToProcessFlag = '0';
-    private void SetMoreRecordsToRead() => _wsRecordsToProcessFlag = '1';
+    private char _recordsToProcessFlag = '\0';
+    private bool ReadLoopExit => _recordsToProcessFlag == '0';
+    private void SetReadLoopExit() => _recordsToProcessFlag = '0';
+    private void SetMoreRecordsToRead() => _recordsToProcessFlag = '1';
 
     // =============================================================================================
     //  Db2 common WS (CSDB2RWY). source: COTRTLIC.cbl/CSDB2RWY
     // =============================================================================================
     private int _sqlcode;                  // SQLCODE
-    private string _wsDispSqlcode = "";    // WS-DISP-SQLCODE PIC ----9 (edited)
-    private string _wsDb2CurrentAction = ""; // WS-DB2-CURRENT-ACTION X(72)
-    private string _wsLongMsg = "";        // WS-LONG-MSG X(800)
+    private string _dispSqlcode = "";    // WS-DISP-SQLCODE PIC ----9 (edited)
+    private string _db2CurrentAction = ""; // WS-DB2-CURRENT-ACTION X(72)
+    private string _longMessage = "";        // WS-LONG-MSG X(800)
     // WS-DB2-PROCESSING-FLAG. 88 WS-DB2-OK='0' / WS-DB2-ERROR='1'.
-    private char _wsDb2ProcessingFlag = '0';
-    private bool WsDb2Error => _wsDb2ProcessingFlag == '1';
-    private void SetWsDb2Error() => _wsDb2ProcessingFlag = '1';
+    private char _db2ProcessingFlag = '0';
+    private bool HasDb2Error => _db2ProcessingFlag == '1';
+    private void SetHasDb2Error() => _db2ProcessingFlag = '1';
 
     // =============================================================================================
     //  DCLTRANSACTION-TYPE host variables (DCLTRTYP.dcl). source: COTRTLIC.cbl:333
@@ -376,10 +376,10 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     public TransactionTypeListProgram() => _db = null!;
 
     /// <inheritdoc/>
-    public string ProgramName => LIT_THISPGM; // PROGRAM-ID. COTRTLIC. source: :26
+    public string ProgramName => ThisProgramId; // PROGRAM-ID. COTRTLIC. source: :26
 
     /// <inheritdoc/>
-    public string TransId => LIT_THISTRANID;  // CSD: CTLI -> COTRTLIC. source: :44
+    public string TransId => ThisTranId;  // CSD: CTLI -> COTRTLIC. source: :44
 
     // =============================================================================================
     //  0000-MAIN — entry / dispatcher. source: COTRTLIC.cbl:498-915
@@ -402,12 +402,12 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
             // IF EIBCALEN = 0 -> INITIALIZE both commareas; set self/admin/enter/first-page. source: :515-525
             _commArea = ctx.CommArea ?? new CardDemoCommArea();
             InitThisProgCommarea();
-            _commArea.FromTranId = LIT_THISTRANID;   // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :518
-            _commArea.FromProgram = LIT_THISPGM;     // MOVE LIT-THISPGM TO CDEMO-FROM-PROGRAM. source: :519
+            _commArea.FromTranId = ThisTranId;   // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :518
+            _commArea.FromProgram = ThisProgramId;     // MOVE LIT-THISPGM TO CDEMO-FROM-PROGRAM. source: :519
             _commArea.SetAdmin();                    // SET CDEMO-USRTYP-ADMIN TO TRUE. source: :520
             _commArea.SetFirstEntry();               // SET CDEMO-PGM-ENTER TO TRUE. source: :521
-            _commArea.LastMap = LIT_THISMAP;         // MOVE LIT-THISMAP TO CDEMO-LAST-MAP. source: :522
-            _commArea.LastMapSet = LIT_THISMAPSET;   // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :523
+            _commArea.LastMap = ThisMapId;         // MOVE LIT-THISMAP TO CDEMO-LAST-MAP. source: :522
+            _commArea.LastMapSet = ThisMapSet;   // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :523
             SetCaFirstPage();                        // SET CA-FIRST-PAGE TO TRUE. source: :524
             SetCaLastPageNotShown();                 // SET CA-LAST-PAGE-NOT-SHOWN TO TRUE. source: :525
         }
@@ -422,21 +422,21 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         _ccardAid = CssTrpfy.StorePfKey(ctx.EibAid);
 
         // Fresh-start guard: coming from menu OR PF3 from the add screen -> start afresh. source: :544-554
-        if ((_commArea.IsFirstEntry && _commArea.FromProgram.TrimEnd() != LIT_THISPGM)
-            || (CcardAidPfk03 && _commArea.FromTranId.TrimEnd() == LIT_ADDTTRANID))
+        if ((_commArea.IsFirstEntry && _commArea.FromProgram.TrimEnd() != ThisProgramId)
+            || (CcardAidPfk03 && _commArea.FromTranId.TrimEnd() == AddTypeTranId))
         {
             InitThisProgCommarea();          // INITIALIZE WS-THIS-PROGCOMMAREA. source: :548
             _commArea.SetFirstEntry();       // SET CDEMO-PGM-ENTER TO TRUE. source: :549
             SetCcardAidEnter();              // SET CCARD-AID-ENTER TO TRUE. source: :550
-            _commArea.LastMap = LIT_THISMAP; // MOVE LIT-THISMAP TO CDEMO-LAST-MAP. source: :551
+            _commArea.LastMap = ThisMapId; // MOVE LIT-THISMAP TO CDEMO-LAST-MAP. source: :551
             SetCaFirstPage();                // SET CA-FIRST-PAGE TO TRUE. source: :552
             SetCaLastPageNotShown();         // SET CA-LAST-PAGE-NOT-SHOWN TO TRUE. source: :553
         }
 
         // Re-entry receive: commarea present AND from-program = self -> receive + edit. source: :561-566
-        if (ctx.EibCalen > 0 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM)
+        if (ctx.EibCalen > 0 && _commArea.FromProgram.TrimEnd() == ThisProgramId)
         {
-            ReceiveMap1000(ctx); // PERFORM 1000-RECEIVE-MAP. source: :563
+            ReceiveMap(ctx); // PERFORM 1000-RECEIVE-MAP. source: :563
         }
 
         // PFKey validity gate. source: :574-587
@@ -453,23 +453,23 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         if (CcardAidPfk03)
         {
             // CDEMO-TO-TRANID. source: :592-598
-            if (IsBlankTranId(_commArea.FromTranId) || _commArea.FromTranId.TrimEnd() == LIT_THISTRANID)
-                _commArea.ToTranId = LIT_ADMINTRANID;
+            if (IsBlankTranId(_commArea.FromTranId) || _commArea.FromTranId.TrimEnd() == ThisTranId)
+                _commArea.ToTranId = AdminTranId;
             else
                 _commArea.ToTranId = _commArea.FromTranId;
 
             // CDEMO-TO-PROGRAM. source: :600-606
-            if (IsBlankProgram(_commArea.FromProgram) || _commArea.FromProgram.TrimEnd() == LIT_THISPGM)
-                _commArea.ToProgram = LIT_ADMINPGM;
+            if (IsBlankProgram(_commArea.FromProgram) || _commArea.FromProgram.TrimEnd() == ThisProgramId)
+                _commArea.ToProgram = AdminProgramId;
             else
                 _commArea.ToProgram = _commArea.FromProgram;
 
-            _commArea.FromTranId = LIT_THISTRANID;   // source: :608
-            _commArea.FromProgram = LIT_THISPGM;     // source: :609
+            _commArea.FromTranId = ThisTranId;   // source: :608
+            _commArea.FromProgram = ThisProgramId;     // source: :609
             _commArea.SetAdmin();                    // source: :611
             _commArea.SetFirstEntry();               // source: :612
-            _commArea.LastMapSet = LIT_THISMAPSET;   // source: :613
-            _commArea.LastMap = LIT_THISMAP;         // source: :614
+            _commArea.LastMapSet = ThisMapSet;   // source: :613
+            _commArea.LastMap = ThisMapId;         // source: :614
 
             Syncpoint();                             // EXEC CICS SYNCPOINT. source: :616-618
             SaveThisProgCommarea();
@@ -478,21 +478,21 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         }
 
         // PF2 Add -> XCTL to COTRTUPC. source: :630-652
-        if (CcardAidPfk02 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM)
+        if (CcardAidPfk02 && _commArea.FromProgram.TrimEnd() == ThisProgramId)
         {
-            _commArea.FromTranId = LIT_THISTRANID;   // source: :632
-            _commArea.FromProgram = LIT_THISPGM;     // source: :633
+            _commArea.FromTranId = ThisTranId;   // source: :632
+            _commArea.FromProgram = ThisProgramId;     // source: :633
             _commArea.SetUser();                     // SET CDEMO-USRTYP-USER. source: :634
             _commArea.SetFirstEntry();               // SET CDEMO-PGM-ENTER. source: :635
-            _commArea.LastMapSet = LIT_THISMAPSET;   // source: :636
-            _commArea.LastMap = LIT_THISMAP;         // source: :637
-            _commArea.ToProgram = LIT_ADDTPGM;       // MOVE LIT-ADDTPGM TO CDEMO-TO-PROGRAM. source: :638
-            _ccardNextMapset = LIT_ADDTMAPSET;       // source: :640
-            _ccardNextMap = LIT_ADDTMAP;             // source: :641
-            _wsReturnMsg = EXIT_MESSAGE;             // SET WS-EXIT-MESSAGE TO TRUE. source: :642
+            _commArea.LastMapSet = ThisMapSet;   // source: :636
+            _commArea.LastMap = ThisMapId;         // source: :637
+            _commArea.ToProgram = AddTypeProgramId;       // MOVE LIT-ADDTPGM TO CDEMO-TO-PROGRAM. source: :638
+            _ccardNextMapset = AddTypeMapSet;       // source: :640
+            _ccardNextMap = AddTypeMapId;             // source: :641
+            _returnMessage = ExitMessage;             // SET WS-EXIT-MESSAGE TO TRUE. source: :642
             _commArea.SetFirstEntry();               // SET CDEMO-PGM-ENTER. source: :646
             SaveThisProgCommarea();
-            ctx.Xctl(LIT_ADDTPGM, _commArea);        // EXEC CICS XCTL PROGRAM(LIT-ADDTPGM). source: :648-651
+            ctx.Xctl(AddTypeProgramId, _commArea);        // EXEC CICS XCTL PROGRAM(LIT-ADDTPGM). source: :648-651
             return;
         }
 
@@ -521,8 +521,8 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         }
 
         // 9998-PRIMING-QUERY — Db2 connectivity probe. source: :684-691
-        PrimingQuery9998();
-        if (WsDb2Error)
+        PrimingQuery();
+        if (HasDb2Error)
         {
             SendLongText(ctx);  // PERFORM SEND-LONG-TEXT. source: :688
             CommonReturn(ctx);  // GO TO COMMON-RETURN. source: :690
@@ -533,91 +533,91 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         if (InputError)
         {
             // WHEN INPUT-ERROR. source: :699-720
-            _ccardErrorMsg = _wsReturnMsg;            // MOVE WS-RETURN-MSG TO CCARD-ERROR-MSG. source: :703
-            _commArea.FromProgram = LIT_THISPGM;      // source: :704
-            _commArea.LastMapSet = LIT_THISMAPSET;    // source: :705
-            _commArea.LastMap = LIT_THISMAP;          // source: :706
-            _ccardNextProg = LIT_THISPGM;             // source: :708
-            _ccardNextMapset = LIT_THISMAPSET;        // source: :709
-            _ccardNextMap = LIT_THISMAP;              // source: :710
-            _wsStartKey = _caFirstTrCode;             // MOVE WS-CA-FIRST-TR-CODE TO WS-START-KEY. source: :711
+            _ccardErrorMsg = _returnMessage;            // MOVE WS-RETURN-MSG TO CCARD-ERROR-MSG. source: :703
+            _commArea.FromProgram = ThisProgramId;      // source: :704
+            _commArea.LastMapSet = ThisMapSet;    // source: :705
+            _commArea.LastMap = ThisMapId;          // source: :706
+            _ccardNextProg = ThisProgramId;             // source: :708
+            _ccardNextMapset = ThisMapSet;        // source: :709
+            _ccardNextMap = ThisMapId;              // source: :710
+            _startKey = _caFirstTrCode;             // MOVE WS-CA-FIRST-TR-CODE TO WS-START-KEY. source: :711
             if (!FlgTypeFilterNotOk && !FlgDescFilterNotOk)
-                ReadForward8000();                    // PERFORM 8000-READ-FORWARD. source: :715
-            SendMap2000(ctx);                         // PERFORM 2000-SEND-MAP. source: :718
+                ReadForward();                    // PERFORM 8000-READ-FORWARD. source: :715
+            SendMap(ctx);                         // PERFORM 2000-SEND-MAP. source: :718
             CommonReturn(ctx);                        // GO TO COMMON-RETURN. source: :720
             return;
         }
         if (CcardAidPfk07 && CaFirstPage)
         {
             // B-2: two identical WHEN PFK07 AND CA-FIRST-PAGE; first is bodyless, falls into second. source: :721-734
-            _wsStartKey = _caFirstTrCode;             // MOVE WS-CA-FIRST-TR-CODE TO WS-START-KEY. source: :728
-            ReadForward8000();                        // PERFORM 8000-READ-FORWARD. source: :730
-            SendMap2000(ctx);                         // PERFORM 2000-SEND-MAP. source: :732
+            _startKey = _caFirstTrCode;             // MOVE WS-CA-FIRST-TR-CODE TO WS-START-KEY. source: :728
+            ReadForward();                        // PERFORM 8000-READ-FORWARD. source: :730
+            SendMap(ctx);                         // PERFORM 2000-SEND-MAP. source: :732
             CommonReturn(ctx);                        // GO TO COMMON-RETURN. source: :734
             return;
         }
         if (CcardAidPfk03
-            || (_commArea.IsReenter && _commArea.FromProgram.TrimEnd() != LIT_THISPGM))
+            || (_commArea.IsReenter && _commArea.FromProgram.TrimEnd() != ThisProgramId))
         {
             // WHEN CCARD-AID-PFK03 (dead) / WHEN CDEMO-PGM-REENTER AND from-program <> self. source: :738-762
             InitCarddemoCommareaFully();
             InitThisProgCommarea();
             InitWsMiscStorage();                      // INITIALIZE WS-MISC-STORAGE. source: :744
-            _commArea.FromTranId = LIT_THISTRANID;    // source: :746
-            _commArea.FromProgram = LIT_THISPGM;      // source: :747
-            _commArea.LastMap = LIT_THISMAP;          // source: :748
-            _commArea.LastMapSet = LIT_THISMAPSET;    // source: :749
+            _commArea.FromTranId = ThisTranId;    // source: :746
+            _commArea.FromProgram = ThisProgramId;      // source: :747
+            _commArea.LastMap = ThisMapId;          // source: :748
+            _commArea.LastMapSet = ThisMapSet;    // source: :749
             _commArea.SetAdmin();                     // source: :751
             _commArea.SetFirstEntry();                // source: :752
             SetCaFirstPage();                         // source: :753
             SetCaLastPageNotShown();                  // source: :754
-            _wsStartKey = _caFirstTrCode;             // MOVE WS-CA-FIRST-TR-CODE TO WS-START-KEY. source: :756
-            ReadForward8000();                        // PERFORM 8000-READ-FORWARD. source: :758
-            SendMap2000(ctx);                         // PERFORM 2000-SEND-MAP. source: :760
+            _startKey = _caFirstTrCode;             // MOVE WS-CA-FIRST-TR-CODE TO WS-START-KEY. source: :756
+            ReadForward();                        // PERFORM 8000-READ-FORWARD. source: :758
+            SendMap(ctx);                         // PERFORM 2000-SEND-MAP. source: :760
             CommonReturn(ctx);                        // GO TO COMMON-RETURN. source: :762
             return;
         }
         if (CcardAidPfk08 && CaNextPageExists)
         {
             // WHEN CCARD-AID-PFK08 AND CA-NEXT-PAGE-EXISTS (page down). source: :766-776
-            _wsStartKey = _caLastTrCode;              // MOVE WS-CA-LAST-TR-CODE TO WS-START-KEY. source: :768
+            _startKey = _caLastTrCode;              // MOVE WS-CA-LAST-TR-CODE TO WS-START-KEY. source: :768
             _caScreenNum += 1;                        // ADD +1 TO WS-CA-SCREEN-NUM. source: :770
-            ReadForward8000();                        // PERFORM 8000-READ-FORWARD. source: :771
+            ReadForward();                        // PERFORM 8000-READ-FORWARD. source: :771
             InitEditSelectFlags();                    // INITIALIZE WS-EDIT-SELECT-FLAGS. source: :773
-            SendMap2000(ctx);                         // PERFORM 2000-SEND-MAP. source: :774
+            SendMap(ctx);                         // PERFORM 2000-SEND-MAP. source: :774
             CommonReturn(ctx);                        // GO TO COMMON-RETURN. source: :776
             return;
         }
         if (CcardAidPfk07 && !CaFirstPage)
         {
             // WHEN CCARD-AID-PFK07 AND NOT CA-FIRST-PAGE (page up). source: :780-790
-            _wsStartKey = _caFirstTrCode;             // MOVE WS-CA-FIRST-TR-CODE TO WS-START-KEY. source: :782
+            _startKey = _caFirstTrCode;             // MOVE WS-CA-FIRST-TR-CODE TO WS-START-KEY. source: :782
             _caScreenNum -= 1;                        // SUBTRACT 1 FROM WS-CA-SCREEN-NUM. source: :784
-            ReadBackwards8100();                      // PERFORM 8100-READ-BACKWARDS. source: :785
+            ReadBackwards();                      // PERFORM 8100-READ-BACKWARDS. source: :785
             InitEditSelectFlags();                    // INITIALIZE WS-EDIT-SELECT-FLAGS. source: :787
-            SendMap2000(ctx);                         // PERFORM 2000-SEND-MAP. source: :788
+            SendMap(ctx);                         // PERFORM 2000-SEND-MAP. source: :788
             CommonReturn(ctx);                        // GO TO COMMON-RETURN. source: :790
             return;
         }
-        if (CcardAidEnter && _wsDeletesRequested > 0 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM)
+        if (CcardAidEnter && _deletesRequested > 0 && _commArea.FromProgram.TrimEnd() == ThisProgramId)
         {
             // WHEN ENTER AND WS-DELETES-REQUESTED > 0 AND from-program = self (arm delete confirm). source: :794-806
-            _wsStartKey = _caFirstTrCode;             // source: :797
+            _startKey = _caFirstTrCode;             // source: :797
             if (!FlgTypeFilterNotOk && !FlgDescFilterNotOk)
-                ReadForward8000();                    // PERFORM 8000-READ-FORWARD. source: :801
-            SendMap2000(ctx);                         // PERFORM 2000-SEND-MAP. source: :804
+                ReadForward();                    // PERFORM 8000-READ-FORWARD. source: :801
+            SendMap(ctx);                         // PERFORM 2000-SEND-MAP. source: :804
             CommonReturn(ctx);                        // GO TO COMMON-RETURN. source: :806
             return;
         }
-        if (CcardAidPfk10 && _wsDeletesRequested > 0 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM)
+        if (CcardAidPfk10 && _deletesRequested > 0 && _commArea.FromProgram.TrimEnd() == ThisProgramId)
         {
             // WHEN PFK10 AND WS-DELETES-REQUESTED > 0 AND from-program = self (confirm delete). source: :810-834
-            DeleteRecord9300();                       // PERFORM 9300-DELETE-RECORD. source: :814
+            DeleteRecord();                       // PERFORM 9300-DELETE-RECORD. source: :814
             if (CaDeleteSucceeded)
                 SetDeletedYes();                      // SET FLG-DELETED-YES. source: :818
             else
                 SetDeletedNo();                       // SET FLG-DELETED-NO. source: :820
-            SendMap2000(ctx);                         // PERFORM 2000-SEND-MAP. source: :823
+            SendMap(ctx);                         // PERFORM 2000-SEND-MAP. source: :823
             if (FlgDeletedYes)
             {
                 InitCarddemoCommareaFully();          // source: :827
@@ -630,33 +630,33 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
             CommonReturn(ctx);                        // GO TO COMMON-RETURN. source: :834
             return;
         }
-        if (CcardAidEnter && _wsUpdatesRequested > 0 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM)
+        if (CcardAidEnter && _updatesRequested > 0 && _commArea.FromProgram.TrimEnd() == ThisProgramId)
         {
             // WHEN ENTER AND WS-UPDATES-REQUESTED > 0 AND from-program = self (arm update confirm). source: :838-850
-            _wsStartKey = _caFirstTrCode;             // source: :841
+            _startKey = _caFirstTrCode;             // source: :841
             if (!FlgTypeFilterNotOk && !FlgDescFilterNotOk)
-                ReadForward8000();                    // PERFORM 8000-READ-FORWARD. source: :845
-            SendMap2000(ctx);                         // PERFORM 2000-SEND-MAP. source: :848
+                ReadForward();                    // PERFORM 8000-READ-FORWARD. source: :845
+            SendMap(ctx);                         // PERFORM 2000-SEND-MAP. source: :848
             CommonReturn(ctx);                        // GO TO COMMON-RETURN. source: :850
             return;
         }
-        if (CcardAidPfk10 && _wsUpdatesRequested > 0 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM)
+        if (CcardAidPfk10 && _updatesRequested > 0 && _commArea.FromProgram.TrimEnd() == ThisProgramId)
         {
             // WHEN PFK10 AND WS-UPDATES-REQUESTED > 0 AND from-program = self (confirm update). source: :854-868
-            UpdateRecord9200();                       // PERFORM 9200-UPDATE-RECORD. source: :858
+            UpdateRecord();                       // PERFORM 9200-UPDATE-RECORD. source: :858
             if (CaUpdateSucceeded)
                 SetUpdateCompleted();                 // SET FLG-UPDATE-COMPLETED. source: :861
-            _wsStartKey = _caFirstTrCode;             // source: :863
-            ReadForward8000();                        // PERFORM 8000-READ-FORWARD. source: :865
-            SendMap2000(ctx);                         // PERFORM 2000-SEND-MAP. source: :867
+            _startKey = _caFirstTrCode;             // source: :863
+            ReadForward();                        // PERFORM 8000-READ-FORWARD. source: :865
+            SendMap(ctx);                         // PERFORM 2000-SEND-MAP. source: :867
             // NOTE: NO GO TO COMMON-RETURN here — falls through to the post-EVALUATE block. source: :868
         }
         else if (!IsAnyMainWhenMatched())
         {
             // WHEN OTHER. source: :870-878
-            _wsStartKey = _caFirstTrCode;             // source: :872
-            ReadForward8000();                        // PERFORM 8000-READ-FORWARD. source: :874
-            SendMap2000(ctx);                         // PERFORM 2000-SEND-MAP. source: :876
+            _startKey = _caFirstTrCode;             // source: :872
+            ReadForward();                        // PERFORM 8000-READ-FORWARD. source: :874
+            SendMap(ctx);                         // PERFORM 2000-SEND-MAP. source: :876
             CommonReturn(ctx);                        // GO TO COMMON-RETURN. source: :878
             return;
         }
@@ -664,17 +664,17 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         // Post-EVALUATE fall-through (reached only via the PFK10-update WHEN, or no WHEN match). source: :882-896
         if (InputError)
         {
-            _ccardErrorMsg = _wsReturnMsg;            // source: :883
-            _commArea.FromProgram = LIT_THISPGM;      // source: :884
-            _commArea.LastMapSet = LIT_THISMAPSET;    // source: :885
-            _commArea.LastMap = LIT_THISMAP;          // source: :886
-            _ccardNextProg = LIT_THISPGM;             // source: :888
-            _ccardNextMapset = LIT_THISMAPSET;        // source: :889
-            _ccardNextMap = LIT_THISMAP;              // source: :890
+            _ccardErrorMsg = _returnMessage;            // source: :883
+            _commArea.FromProgram = ThisProgramId;      // source: :884
+            _commArea.LastMapSet = ThisMapSet;    // source: :885
+            _commArea.LastMap = ThisMapId;          // source: :886
+            _ccardNextProg = ThisProgramId;             // source: :888
+            _ccardNextMapset = ThisMapSet;        // source: :889
+            _ccardNextMap = ThisMapId;              // source: :890
             CommonReturn(ctx);                        // GO TO COMMON-RETURN. source: :892
             return;
         }
-        _ccardNextProg = LIT_THISPGM;                 // MOVE LIT-THISPGM TO CCARD-NEXT-PROG. source: :895
+        _ccardNextProg = ThisProgramId;                 // MOVE LIT-THISPGM TO CCARD-NEXT-PROG. source: :895
         CommonReturn(ctx);                            // GO TO COMMON-RETURN. source: :896
     }
 
@@ -685,14 +685,14 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     {
         if (ctx.Outcome is not null) return; // an XCTL already terminated the task.
 
-        _commArea.FromTranId = LIT_THISTRANID;   // source: :900
-        _commArea.FromProgram = LIT_THISPGM;     // source: :901
-        _commArea.LastMapSet = LIT_THISMAPSET;   // source: :902
-        _commArea.LastMap = LIT_THISMAP;         // source: :903
+        _commArea.FromTranId = ThisTranId;   // source: :900
+        _commArea.FromProgram = ThisProgramId;     // source: :901
+        _commArea.LastMapSet = ThisMapSet;   // source: :902
+        _commArea.LastMap = ThisMapId;         // source: :903
         // Reassemble WS-COMMAREA = CARDDEMO-COMMAREA prefix + WS-THIS-PROGCOMMAREA tail. source: :904-907
         SaveThisProgCommarea();
         // EXEC CICS RETURN TRANSID('CTLI') COMMAREA(WS-COMMAREA). source: :910-914
-        ctx.ReturnTransId(LIT_THISTRANID, _commArea);
+        ctx.ReturnTransId(ThisTranId, _commArea);
     }
 
     /// <summary>
@@ -704,45 +704,45 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     {
         if (InputError) return true;
         if (CcardAidPfk07 && CaFirstPage) return true;
-        if (CcardAidPfk03 || (_commArea.IsReenter && _commArea.FromProgram.TrimEnd() != LIT_THISPGM)) return true;
+        if (CcardAidPfk03 || (_commArea.IsReenter && _commArea.FromProgram.TrimEnd() != ThisProgramId)) return true;
         if (CcardAidPfk08 && CaNextPageExists) return true;
         if (CcardAidPfk07 && !CaFirstPage) return true;
-        if (CcardAidEnter && _wsDeletesRequested > 0 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM) return true;
-        if (CcardAidPfk10 && _wsDeletesRequested > 0 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM) return true;
-        if (CcardAidEnter && _wsUpdatesRequested > 0 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM) return true;
-        if (CcardAidPfk10 && _wsUpdatesRequested > 0 && _commArea.FromProgram.TrimEnd() == LIT_THISPGM) return true;
+        if (CcardAidEnter && _deletesRequested > 0 && _commArea.FromProgram.TrimEnd() == ThisProgramId) return true;
+        if (CcardAidPfk10 && _deletesRequested > 0 && _commArea.FromProgram.TrimEnd() == ThisProgramId) return true;
+        if (CcardAidEnter && _updatesRequested > 0 && _commArea.FromProgram.TrimEnd() == ThisProgramId) return true;
+        if (CcardAidPfk10 && _updatesRequested > 0 && _commArea.FromProgram.TrimEnd() == ThisProgramId) return true;
         return false;
     }
 
     // =============================================================================================
     //  1000-RECEIVE-MAP. source: COTRTLIC.cbl:919-928
     // =============================================================================================
-    private void ReceiveMap1000(CicsContext ctx)
+    private void ReceiveMap(CicsContext ctx)  // COBOL paragraph: 1000-RECEIVE-MAP
     {
-        ReceiveScreen1100(ctx); // PERFORM 1100-RECEIVE-SCREEN. source: :920
-        EditInputs1200();       // PERFORM 1200-EDIT-INPUTS. source: :923
+        ReceiveScreen(ctx); // PERFORM 1100-RECEIVE-SCREEN. source: :920
+        EditInputs();       // PERFORM 1200-EDIT-INPUTS. source: :923
     }
 
     // =============================================================================================
     //  1100-RECEIVE-SCREEN. source: COTRTLIC.cbl:930-958
     // =============================================================================================
-    private void ReceiveScreen1100(CicsContext ctx)
+    private void ReceiveScreen(CicsContext ctx)  // COBOL paragraph: 1100-RECEIVE-SCREEN
     {
         // EXEC CICS RECEIVE MAP('CTRTLIA') MAPSET('COTRTLI') INTO(CTRTLIAI). source: :931-935
-        ctx.ReceiveMap(LIT_THISMAP, LIT_THISMAPSET, _map);
+        ctx.ReceiveMap(ThisMapId, ThisMapSet, _map);
 
-        _wsInTypeCd = _map.Field("TRTYPE").Value;   // MOVE TRTYPEI TO WS-IN-TYPE-CD. source: :937
-        _wsInTypeDesc = _map.Field("TRDESC").Value; // MOVE TRDESCI TO WS-IN-TYPE-DESC. source: :938
+        _inTypeCd = _map.Field("TRTYPE").Value;   // MOVE TRTYPEI TO WS-IN-TYPE-CD. source: :937
+        _inTypeDesc = _map.Field("TRDESC").Value; // MOVE TRDESCI TO WS-IN-TYPE-DESC. source: :938
 
         // PERFORM VARYING I 1..7. source: :940-953
-        for (int i = 1; i <= WS_MAX_SCREEN_LINES; i++)
+        for (int i = 1; i <= MaxScreenLines; i++)
         {
             _editSelect[i - 1] = FirstChar(_map.Field($"TRTSEL{i}").Value);  // MOVE TRTSELI(I) TO WS-EDIT-SELECT(I). source: :941
             _rowTrCodeIn[i - 1] = _map.Field($"TRTTYP{i}").Value;            // MOVE TRTTYPI(I) TO WS-ROW-TR-CODE-IN(I). source: :942
 
             _rowTrDescIn[i - 1] = ""; // MOVE LOW-VALUES TO WS-ROW-TR-DESC-IN(I). source: :944
             string trtypdi = _map.Field($"TRTYPD{i}").Value;
-            if (trtypdi.TrimEnd() == LIT_ASTERISK || IsAllSpacesOrEmpty(trtypdi))
+            if (trtypdi.TrimEnd() == AsteriskLit || IsAllSpacesOrEmpty(trtypdi))
             {
                 // CONTINUE (leave low-values). source: :945-947
             }
@@ -756,29 +756,29 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  1200-EDIT-INPUTS. source: COTRTLIC.cbl:960-980
     // =============================================================================================
-    private void EditInputs1200()
+    private void EditInputs()  // COBOL paragraph: 1200-EDIT-INPUTS
     {
         SetInputOk();                  // SET INPUT-OK. source: :962
         SetProtectSelectRowsNo();      // SET FLG-PROTECT-SELECT-ROWS-NO. source: :963
 
         // B-4: 1210 runs first (it reads the CHANGED flags which 1220/1230 only set later). source: :965-975
-        EditArray1210();   // PERFORM 1210-EDIT-ARRAY. source: :965
-        EditDesc1230();    // PERFORM 1230-EDIT-DESC. source: :968 (desc before typecd)
-        EditTypeCd1220();  // PERFORM 1220-EDIT-TYPECD. source: :971
-        CrossEdits1290();  // PERFORM 1290-CROSS-EDITS. source: :974
+        EditArray();   // PERFORM 1210-EDIT-ARRAY. source: :965
+        EditDesc();    // PERFORM 1230-EDIT-DESC. source: :968 (desc before typecd)
+        EditTypeCd();  // PERFORM 1220-EDIT-TYPECD. source: :971
+        CrossEdits();  // PERFORM 1290-CROSS-EDITS. source: :974
     }
 
     // =============================================================================================
     //  1210-EDIT-ARRAY. source: COTRTLIC.cbl:982-1057
     // =============================================================================================
-    private void EditArray1210()
+    private void EditArray()  // COBOL paragraph: 1210-EDIT-ARRAY
     {
         // MOVE ZERO TO the action counters. source: :984-988
-        _wsActionsRequested = 0;
-        _wsNoActionsSelected = 0;
-        _wsDeletesRequested = 0;
-        _wsUpdatesRequested = 0;
-        _wsValidActionsSelected = 0;
+        _actionsRequested = 0;
+        _noActionsSelected = 0;
+        _deletesRequested = 0;
+        _updatesRequested = 0;
+        _validActionsSelected = 0;
 
         // B-4: keys off stale FLG-*FILTER-CHANGED flags (1220/1230 set them AFTER this paragraph). source: :991-994
         if (!FlgTypeFilterChangedNo || !FlgDescFilterChangedNo)
@@ -790,33 +790,33 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         // INSPECT WS-EDIT-SELECT-FLAGS TALLYING. source: :997-1001
         foreach (char c in _editSelect)
         {
-            if (c is ' ' or '\0') _wsNoActionsSelected++;       // FOR ALL SPACES LOW-VALUES
-            if (c == 'D') _wsDeletesRequested++;                // FOR ALL LIT-DELETE-FLAG
-            if (c == 'U') _wsUpdatesRequested++;                // FOR ALL LIT-UPDATE-FLAG
+            if (c is ' ' or '\0') _noActionsSelected++;       // FOR ALL SPACES LOW-VALUES
+            if (c == 'D') _deletesRequested++;                // FOR ALL LIT-DELETE-FLAG
+            if (c == 'U') _updatesRequested++;                // FOR ALL LIT-UPDATE-FLAG
         }
 
         // COMPUTE WS-ACTIONS-REQUESTED = 7 - WS-NO-ACTIONS-SELECTED. source: :1003-1006
-        _wsActionsRequested = WS_MAX_SCREEN_LINES - _wsNoActionsSelected;
+        _actionsRequested = MaxScreenLines - _noActionsSelected;
 
         // COMPUTE WS-VALID-ACTIONS-SELECTED = WS-DELETES-REQUESTED + WS-UPDATES-REQUESTED. source: :1009-1012
-        _wsValidActionsSelected = _wsDeletesRequested + _wsUpdatesRequested;
+        _validActionsSelected = _deletesRequested + _updatesRequested;
 
         _iSelected = 0;                  // MOVE ZERO TO I-SELECTED. source: :1014
         SetBadActionsSelectedNo();       // SET FLG-BAD-ACTIONS-SELECTED-NO. source: :1015
 
         // PERFORM VARYING I FROM 7 BY -1 UNTIL I = 0. source: :1017-1040
-        for (int i = WS_MAX_SCREEN_LINES; i > 0; i--)
+        for (int i = MaxScreenLines; i > 0; i--)
         {
             if (SelectOk(i))
             {
                 _iSelected = i;                          // MOVE I TO I-SELECTED. source: :1023
-                if (WsMoreThan1Action)
+                if (HasMoreThanOneAction)
                 {
                     SetRowSelectError(i);                // MOVE '1' TO WS-ROW-TRTSELECT-ERROR(I). source: :1025
                     SetBadActionsSelectedYes();          // SET FLG-BAD-ACTIONS-SELECTED-YES. source: :1026
                 }
                 if (UpdateRequestedOn(i))
-                    EditArrayDesc1211(i);                // PERFORM 1211-EDIT-ARRAY-DESC. source: :1029
+                    EditArrayDesc(i);                // PERFORM 1211-EDIT-ARRAY-DESC. source: :1029
             }
             else if (SelectBlank(i))
             {
@@ -827,7 +827,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
                 SetInputError();                         // SET INPUT-ERROR. source: :1035
                 SetRowSelectError(i);                    // MOVE '1' TO WS-ROW-TRTSELECT-ERROR(I). source: :1036
                 SetBadActionsSelectedYes();              // SET FLG-BAD-ACTIONS-SELECTED-YES. source: :1037
-                _wsReturnMsg = MESG_INVALID_ACTION_CODE; // SET WS-MESG-INVALID-ACTION-CODE. source: :1038
+                _returnMessage = MesgInvalidActionCode; // SET WS-MESG-INVALID-ACTION-CODE. source: :1038
             }
         }
 
@@ -843,17 +843,17 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         }
 
         // IF WS-MORETHAN1ACTION -> INPUT-ERROR + message. source: :1049-1052
-        if (WsMoreThan1Action)
+        if (HasMoreThanOneAction)
         {
             SetInputError();
-            _wsReturnMsg = MESG_MORE_THAN_1_ACTION;
+            _returnMessage = MesgMoreThan1Action;
         }
     }
 
     // =============================================================================================
     //  1211-EDIT-ARRAY-DESC. source: COTRTLIC.cbl:1060-1094
     // =============================================================================================
-    private void EditArrayDesc1211(int i)
+    private void EditArrayDesc(int i)  // COBOL paragraph: 1211-EDIT-ARRAY-DESC
     {
         SetNoChangesFound(); // SET NO-CHANGES-FOUND. source: :1062
 
@@ -862,7 +862,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         string outTrim = (_caRowTrDescOut[i - 1] ?? "").Trim();
         if (inTrim.ToUpperInvariant() == outTrim.ToUpperInvariant() && inTrim.Length == outTrim.Length)
         {
-            _wsReturnMsg = MESG_NO_CHANGES_DETECTED; // SET WS-MESG-NO-CHANGES-DETECTED. source: :1072
+            _returnMessage = MesgNoChangesDetected; // SET WS-MESG-NO-CHANGES-DETECTED. source: :1072
             return;                                  // GO TO 1211-EDIT-ARRAY-DESC-EXIT. source: :1073
         }
         SetChangesHaveOccurred(); // SET CHANGES-HAVE-OCCURRED. source: :1075
@@ -870,57 +870,57 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         SetRowDescriptionNotOk(); // SET FLG-ROW-DESCRIPTION-NOT-OK. source: :1078
 
         // Edit Description (50 chars). source: :1083-1089
-        _wsEditVariableName = "Transaction Desc";   // source: :1083
-        _wsEditAlphanumOnly = _rowTrDescIn[i - 1] ?? ""; // source: :1084
-        _wsEditAlphanumLength = 50;                 // source: :1085
-        EditAlphanumReqd1240();                     // PERFORM 1240-EDIT-ALPHANUM-REQD. source: :1086
-        _wsArrayDescriptionFlgs = _wsEditAlphanumFlags; // MOVE WS-EDIT-ALPHANUM-ONLY-FLAGS TO WS-ARRAY-DESCRIPTION-FLGS. source: :1088
+        _editVariableName = "Transaction Desc";   // source: :1083
+        _editAlphanumOnly = _rowTrDescIn[i - 1] ?? ""; // source: :1084
+        _editAlphanumLength = 50;                 // source: :1085
+        EditAlphanumReqd();                     // PERFORM 1240-EDIT-ALPHANUM-REQD. source: :1086
+        _arrayDescriptionFlags = _editAlphanumFlags; // MOVE WS-EDIT-ALPHANUM-ONLY-FLAGS TO WS-ARRAY-DESCRIPTION-FLGS. source: :1088
     }
 
     // =============================================================================================
     //  1220-EDIT-TYPECD (+ 1220-EDIT-TYPECD-EXIT carries change-detection). source: COTRTLIC.cbl:1096-1140
     // =============================================================================================
-    private void EditTypeCd1220()
+    private void EditTypeCd()  // COBOL paragraph: 1220-EDIT-TYPECD
     {
         SetTypeFilterBlank(); // SET FLG-TYPEFILTER-BLANK. source: :1098
 
         // Not supplied: low-values / spaces / zeros. source: :1101-1107
-        if (IsAllSpacesOrEmpty(_wsInTypeCd) || _wsInTypeCd.TrimEnd() == "" || IsAllZeros(_wsInTypeCd))
+        if (IsAllSpacesOrEmpty(_inTypeCd) || _inTypeCd.TrimEnd() == "" || IsAllZeros(_inTypeCd))
         {
             SetTypeFilterBlank();     // source: :1104
-            _wsTypeCdFilter = "00";   // MOVE ZEROES TO WS-TYPE-CD-FILTER. source: :1105
-            EditTypeCdExit1220();     // GO TO 1220-EDIT-TYPECD-EXIT (carries change-detection). source: :1106
+            _typeCdFilter = "00";   // MOVE ZEROES TO WS-TYPE-CD-FILTER. source: :1105
+            EditTypeCdExit();     // GO TO 1220-EDIT-TYPECD-EXIT (carries change-detection). source: :1106
             return;
         }
 
         // Not numeric. source: :1111-1122
-        if (!IsNumericX(_wsInTypeCd, 2))
+        if (!IsNumericX(_inTypeCd, 2))
         {
             SetInputError();             // source: :1112
             SetTypeFilterNotOk();        // source: :1113
             SetProtectSelectRowsYes();   // source: :1114
-            _wsReturnMsg = "TYPE CODE FILTER,IF SUPPLIED MUST BE A 2 DIGIT NUMBER"; // source: :1115-1116
-            EditTypeCdExit1220();        // GO TO 1220-EDIT-TYPECD-EXIT. source: :1118
+            _returnMessage = "TYPE CODE FILTER,IF SUPPLIED MUST BE A 2 DIGIT NUMBER"; // source: :1115-1116
+            EditTypeCdExit();        // GO TO 1220-EDIT-TYPECD-EXIT. source: :1118
             return;
         }
-        _wsTypeCdFilter = PadX(_wsInTypeCd, 2); // MOVE WS-IN-TYPE-CD TO WS-TYPE-CD-FILTER. source: :1120
+        _typeCdFilter = PadX(_inTypeCd, 2); // MOVE WS-IN-TYPE-CD TO WS-TYPE-CD-FILTER. source: :1120
         SetTypeFilterIsValid();                  // SET FLG-TYPEFILTER-ISVALID. source: :1121
-        EditTypeCdExit1220();
+        EditTypeCdExit();
     }
 
     /// <summary>1220-EDIT-TYPECD-EXIT — carries change-detection logic, not a pure no-op. source: :1125-1140</summary>
-    private void EditTypeCdExit1220()
+    private void EditTypeCdExit()  // COBOL paragraph: 1220-EDIT-TYPECD-EXIT
     {
         // IF WS-IN-TYPE-CD = WS-CA-TYPE-CD OR (BLANK AND WS-CA-TYPE-CD in {ZEROES,LOW-VALUES,SPACES}). source: :1127-1131
         bool caBlank = IsAllZeros(_caTypeCd) || IsAllSpacesOrEmpty(_caTypeCd);
-        if (PadX(_wsInTypeCd, 2) == PadX(_caTypeCd, 2) || (_wsEditTypeFlag == ' ' && caBlank))
+        if (PadX(_inTypeCd, 2) == PadX(_caTypeCd, 2) || (_editTypeFlag == ' ' && caBlank))
         {
             SetTypeFilterChangedNo(); // source: :1132
         }
         else
         {
             InitCaPagingVariables();         // INITIALIZE WS-CA-PAGING-VARIABLES. source: :1134
-            _caTypeCd = PadX(_wsInTypeCd, 2);// MOVE WS-IN-TYPE-CD TO WS-CA-TYPE-CD. source: :1135
+            _caTypeCd = PadX(_inTypeCd, 2);// MOVE WS-IN-TYPE-CD TO WS-CA-TYPE-CD. source: :1135
             SetTypeFilterChangedYes();       // source: :1136
         }
     }
@@ -928,39 +928,39 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  1230-EDIT-DESC (+ 1230-EDIT-DESC-EXIT carries change-detection). source: COTRTLIC.cbl:1142-1178
     // =============================================================================================
-    private void EditDesc1230()
+    private void EditDesc()  // COBOL paragraph: 1230-EDIT-DESC
     {
         SetDescFilterBlank(); // SET FLG-DESCFILTER-BLANK. source: :1144
 
         // Not supplied: low-values / spaces. source: :1147-1153
-        if (IsAllSpacesOrEmpty(_wsInTypeDesc))
+        if (IsAllSpacesOrEmpty(_inTypeDesc))
         {
             SetDescFilterBlank();  // source: :1149
-            EditDescExit1230();    // GO TO 1230-EDIT-DESC-EXIT. source: :1150
+            EditDescExit();    // GO TO 1230-EDIT-DESC-EXIT. source: :1150
             return;
         }
         SetDescFilterIsValid(); // source: :1152
 
         // Build the LIKE pattern: '%' TRIM(value) '%'. source: :1155-1163
         if (FlgDescFilterIsValid)
-            _wsTypeDescFilter = "%" + _wsInTypeDesc.Trim() + "%";
+            _typeDescFilter = "%" + _inTypeDesc.Trim() + "%";
 
-        EditDescExit1230();
+        EditDescExit();
     }
 
     /// <summary>1230-EDIT-DESC-EXIT — carries change-detection. source: :1166-1178</summary>
-    private void EditDescExit1230()
+    private void EditDescExit()  // COBOL paragraph: 1230-EDIT-DESC-EXIT
     {
         // IF WS-IN-TYPE-DESC = WS-CA-TYPE-DESC OR (BLANK AND WS-CA-TYPE-DESC in {LOW-VALUES,SPACES}). source: :1166-1169
         bool caBlank = IsAllSpacesOrEmpty(_caTypeDesc);
-        if (PadX(_wsInTypeDesc, 50) == PadX(_caTypeDesc, 50) || (_wsEditDescFlag == ' ' && caBlank))
+        if (PadX(_inTypeDesc, 50) == PadX(_caTypeDesc, 50) || (_editDescFlag == ' ' && caBlank))
         {
             SetDescFilterChangedNo(); // source: :1170
         }
         else
         {
             InitCaPagingVariables();           // INITIALIZE WS-CA-PAGING-VARIABLES. source: :1172
-            _caTypeDesc = PadX(_wsInTypeDesc, 50); // MOVE WS-IN-TYPE-DESC TO WS-CA-TYPE-DESC. source: :1173
+            _caTypeDesc = PadX(_inTypeDesc, 50); // MOVE WS-IN-TYPE-DESC TO WS-CA-TYPE-DESC. source: :1173
             SetDescFilterChangedYes();         // source: :1174
         }
     }
@@ -968,20 +968,20 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  1240-EDIT-ALPHANUM-REQD. source: COTRTLIC.cbl:1181-1237
     // =============================================================================================
-    private void EditAlphanumReqd1240()
+    private void EditAlphanumReqd()  // COBOL paragraph: 1240-EDIT-ALPHANUM-REQD
     {
         SetAlphanumNotOk(); // SET FLG-ALPHNANUM-NOT-OK. source: :1183
 
         // The field slice (1:length) = the 50-char description here.
-        string field = SliceX(_wsEditAlphanumOnly, _wsEditAlphanumLength);
+        string field = SliceX(_editAlphanumOnly, _editAlphanumLength);
 
         // Not supplied: LOW-VALUES / SPACES / LEN(TRIM())=0. source: :1186-1205
         if (IsAllSpacesOrEmpty(field) || field.Trim().Length == 0)
         {
             SetInputError();    // source: :1193
             SetAlphanumBlank(); // source: :1194
-            if (WsReturnMsgOff)
-                _wsReturnMsg = _wsEditVariableName.Trim() + " must be supplied."; // source: :1196-1200
+            if (ReturnMessageIsBlank)
+                _returnMessage = _editVariableName.Trim() + " must be supplied."; // source: :1196-1200
             return;             // GO TO 1240-EDIT-ALPHANUM-REQD-EXIT. source: :1204
         }
 
@@ -995,8 +995,8 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         {
             SetInputError();   // source: :1220
             SetAlphanumNotOk();// source: :1221
-            if (WsReturnMsgOff)
-                _wsReturnMsg = _wsEditVariableName.Trim() + " can have numbers or alphabets only."; // source: :1224-1225
+            if (ReturnMessageIsBlank)
+                _returnMessage = _editVariableName.Trim() + " can have numbers or alphabets only."; // source: :1224-1225
             return;            // GO TO 1240-EDIT-ALPHANUM-REQD-EXIT. source: :1230
         }
 
@@ -1006,7 +1006,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  1290-CROSS-EDITS. source: COTRTLIC.cbl:1239-1271
     // =============================================================================================
-    private void CrossEdits1290()
+    private void CrossEdits()  // COBOL paragraph: 1290-CROSS-EDITS
     {
         // No filter valid -> nothing to cross-check. source: :1241-1246
         if (FlgTypeFilterIsValid || FlgDescFilterIsValid)
@@ -1018,9 +1018,9 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
             return; // GO TO 1290-CROSS-EDITS-EXIT. source: :1245
         }
 
-        CheckFilters9100(); // PERFORM 9100-CHECK-FILTERS. source: :1248
+        CheckFilters(); // PERFORM 9100-CHECK-FILTERS. source: :1248
 
-        if (_wsRecordsCount == 0)
+        if (_recordsCount == 0)
         {
             SetInputError();                    // source: :1252
             if (FlgTypeFilterIsValid)
@@ -1028,7 +1028,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
             if (FlgDescFilterIsValid)
                 SetDescFilterNotOk();           // source: :1258
             SetProtectSelectRowsYes();          // source: :1262
-            _wsReturnMsg = "No Records found for these filter conditions"; // source: :1263-1264 (B-8: distinct text)
+            _returnMessage = "No Records found for these filter conditions"; // source: :1263-1264 (B-8: distinct text)
             // GO TO 1290-CROSS-EDITS-EXIT. source: :1266
         }
     }
@@ -1036,30 +1036,30 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  2000-SEND-MAP. source: COTRTLIC.cbl:1274-1292
     // =============================================================================================
-    private void SendMap2000(CicsContext ctx)
+    private void SendMap(CicsContext ctx)  // COBOL paragraph: 2000-SEND-MAP
     {
-        ScreenInit2100(ctx);          // PERFORM 2100-SCREEN-INIT. source: :1276
-        SetupArrayAttribs2200();      // PERFORM 2200-SETUP-ARRAY-ATTRIBS. source: :1278
-        ScreenArrayInit2300();        // PERFORM 2300-SCREEN-ARRAY-INIT. source: :1280
-        SetupScreenAttrs2400(ctx);    // PERFORM 2400-SETUP-SCREEN-ATTRS. source: :1282
-        SetupMessage2500();           // PERFORM 2500-SETUP-MESSAGE. source: :1284
-        SendScreen2600(ctx);          // PERFORM 2600-SEND-SCREEN. source: :1286
+        ScreenInit(ctx);          // PERFORM 2100-SCREEN-INIT. source: :1276
+        SetupArrayAttribs();      // PERFORM 2200-SETUP-ARRAY-ATTRIBS. source: :1278
+        ScreenArrayInit();        // PERFORM 2300-SCREEN-ARRAY-INIT. source: :1280
+        SetupScreenAttrs(ctx);    // PERFORM 2400-SETUP-SCREEN-ATTRS. source: :1282
+        SetupMessage();           // PERFORM 2500-SETUP-MESSAGE. source: :1284
+        SendScreen(ctx);          // PERFORM 2600-SEND-SCREEN. source: :1286
     }
 
     // =============================================================================================
     //  2100-SCREEN-INIT. source: COTRTLIC.cbl:1293-1327
     // =============================================================================================
-    private void ScreenInit2100(CicsContext ctx)
+    private void ScreenInit(CicsContext ctx)  // COBOL paragraph: 2100-SCREEN-INIT
     {
         // MOVE LOW-VALUES TO CTRTLIAO — blank every named field + clear per-turn overrides. source: :1294
         MoveLowValuesToMapOut();
 
         DateTime now = ctx.Clock.Now; // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: :1296,1303
 
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :1298
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :1299
-        _map.Field("TRNNAME").SetValue(LIT_THISTRANID, setMdt: false);// MOVE LIT-THISTRANID TO TRNNAMEO. source: :1300
-        _map.Field("PGMNAME").SetValue(LIT_THISPGM, setMdt: false);   // MOVE LIT-THISPGM TO PGMNAMEO. source: :1301
+        _map.Field("TITLE01").SetValue(ScreenTitle01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :1298
+        _map.Field("TITLE02").SetValue(ScreenTitle02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :1299
+        _map.Field("TRNNAME").SetValue(ThisTranId, setMdt: false);// MOVE LIT-THISTRANID TO TRNNAMEO. source: :1300
+        _map.Field("PGMNAME").SetValue(ThisProgramId, setMdt: false);   // MOVE LIT-THISPGM TO PGMNAMEO. source: :1301
 
         // CURDATEO = mm/dd/yy. source: :1305-1309
         _map.Field("CURDATE").SetValue($"{Two(now.Month)}/{Two(now.Day)}/{Four(now.Year).Substring(2, 2)}", setMdt: false);
@@ -1070,7 +1070,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         _map.Field("PAGENO").SetValue(_caScreenNum.ToString(), setMdt: false);
 
         SetNoInfoMessage();                                          // SET WS-NO-INFO-MESSAGE. source: :1320
-        _map.Field("INFOMSG").SetValue(_wsInfoMsg, setMdt: false);   // MOVE WS-INFO-MSG TO INFOMSGO. source: :1321
+        _map.Field("INFOMSG").SetValue(_infoMessage, setMdt: false);   // MOVE WS-INFO-MSG TO INFOMSGO. source: :1321
         // MOVE DFHBMDAR TO INFOMSGC — info line dark (model via attribute override). source: :1322
         _map.Field("INFOMSG").AttributeOverride = BmsAttribute.Dark | BmsAttribute.Protected;
     }
@@ -1078,10 +1078,10 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  2200-SETUP-ARRAY-ATTRIBS. source: COTRTLIC.cbl:1329-1379
     // =============================================================================================
-    private void SetupArrayAttribs2200()
+    private void SetupArrayAttribs()  // COBOL paragraph: 2200-SETUP-ARRAY-ATTRIBS
     {
         // PERFORM VARYING I FROM 7 BY -1 UNTIL I = 0. source: :1333-1336
-        for (int i = WS_MAX_SCREEN_LINES; i > 0; i--)
+        for (int i = MaxScreenLines; i > 0; i--)
         {
             // MOVE DFHBMPRF TO TRTYPDA(I) — desc protected by default. source: :1337
             SetRowDescAttr(i, BmsAttribute.Protected | BmsAttribute.Fset | BmsAttribute.Normal);
@@ -1099,14 +1099,14 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
                     SetRowSelCursor(i);                       // MOVE -1 TO TRTSELL(I). source: :1345
                 }
 
-                if (DeleteRequestedOn(i) && WsOnly1ValidAction && FlgBadActionsSelectedNo)
+                if (DeleteRequestedOn(i) && HasExactlyOneValidAction && FlgBadActionsSelectedNo)
                 {
                     SetRowTypeColor(i, BmsColor.Neutral);     // MOVE DFHNEUTR TO TRTTYPC(I). source: :1351
                     SetRowDescColor(i, BmsColor.Neutral);     // MOVE DFHNEUTR TO TRTYPDC(I). source: :1352
                     SetRowSelCursor(i);                       // MOVE -1 TO TRTSELL(I). source: :1353
                 }
 
-                if (UpdateRequestedOn(i) && WsOnly1ValidAction && FlgBadActionsSelectedNo)
+                if (UpdateRequestedOn(i) && HasExactlyOneValidAction && FlgBadActionsSelectedNo)
                 {
                     SetRowTypeColor(i, BmsColor.Neutral);     // MOVE DFHNEUTR TO TRTTYPC(I). source: :1359
                     if (FlgUpdateCompleted)
@@ -1132,10 +1132,10 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  2300-SCREEN-ARRAY-INIT. source: COTRTLIC.cbl:1383-1435
     // =============================================================================================
-    private void ScreenArrayInit2300()
+    private void ScreenArrayInit()  // COBOL paragraph: 2300-SCREEN-ARRAY-INIT
     {
         // PERFORM VARYING I FROM 1 BY 1 UNTIL I > 7. source: :1386
-        for (int i = 1; i <= WS_MAX_SCREEN_LINES; i++)
+        for (int i = 1; i <= MaxScreenLines; i++)
         {
             if (RowSlotIsLowValues(i))
             {
@@ -1143,7 +1143,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
                 continue;
             }
 
-            if (DeleteRequestedOn(i) && WsOnly1ValidAction && FlgBadActionsSelectedNo)
+            if (DeleteRequestedOn(i) && HasExactlyOneValidAction && FlgBadActionsSelectedNo)
             {
                 if (FlgDeletedYes)
                     SetSelectBlank(i);          // SET SELECT-BLANK(I) — clear after delete. source: :1395
@@ -1155,7 +1155,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
             _map.Field($"TRTTYP{i}").SetValue(_caRowTrCodeOut[i - 1] ?? "", setMdt: false);
 
             // Description. source: :1404-1425
-            if (UpdateRequestedOn(i) && WsOnly1ValidAction && FlgBadActionsSelectedNo)
+            if (UpdateRequestedOn(i) && HasExactlyOneValidAction && FlgBadActionsSelectedNo)
             {
                 if (FlgUpdateCompleted)
                     SetSelectBlank(i);          // SET SELECT-BLANK(I). source: :1408
@@ -1165,7 +1165,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
                 if (ChangesHaveOccurred)
                 {
                     if (FlgRowDescriptionBlank)
-                        _map.Field($"TRTYPD{i}").SetValue(LIT_ASTERISK, setMdt: false); // MOVE LIT-ASTERISK. source: :1415
+                        _map.Field($"TRTYPD{i}").SetValue(AsteriskLit, setMdt: false); // MOVE LIT-ASTERISK. source: :1415
                     else
                         _map.Field($"TRTYPD{i}").SetValue(_rowTrDescIn[i - 1] ?? "", setMdt: false); // MOVE WS-ROW-TR-DESC-IN(I). source: :1417
                 }
@@ -1189,28 +1189,28 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     //  B-6: several MOVEs target the INPUT map (CTRTLIAI); since CTRTLIAO REDEFINES CTRTLIAI the bytes
     //  overlap so the attribute outcome is achieved on the single symbolic field model.
     // =============================================================================================
-    private void SetupScreenAttrs2400(CicsContext ctx)
+    private void SetupScreenAttrs(CicsContext ctx)  // COBOL paragraph: 2400-SETUP-SCREEN-ATTRS
     {
         // Initialize search criteria (leave filters blank on fresh menu entry). source: :1440-1443
-        if (ctx.EibCalen == 0 || (_commArea.IsFirstEntry && _commArea.FromProgram.TrimEnd() == LIT_ADMINPGM))
+        if (ctx.EibCalen == 0 || (_commArea.IsFirstEntry && _commArea.FromProgram.TrimEnd() == AdminProgramId))
         {
             // CONTINUE. source: :1443
         }
         else
         {
             // Type filter echo. source: :1445-1459
-            if (_wsActionsRequested > 0)
+            if (_actionsRequested > 0)
             {
-                _map.Field("TRTYPE").SetValue(_wsInTypeCd, setMdt: false);                // source: :1447
+                _map.Field("TRTYPE").SetValue(_inTypeCd, setMdt: false);                // source: :1447
                 _map.Field("TRTYPE").AttributeOverride = BmsAttribute.AutoSkip | BmsAttribute.Fset; // DFHBMASF. source: :1448
                 _map.Field("TRTYPE").ColorOverride = BmsColor.Blue;                       // DFHBLUE. source: :1449
             }
             else if (FlgTypeFilterIsValid || FlgTypeFilterNotOk)
             {
-                _map.Field("TRTYPE").SetValue(_wsInTypeCd, setMdt: false);                // source: :1452
+                _map.Field("TRTYPE").SetValue(_inTypeCd, setMdt: false);                // source: :1452
                 _map.Field("TRTYPE").AttributeOverride = BmsAttribute.Unprotected | BmsAttribute.Fset | BmsAttribute.Normal; // DFHBMFSE. source: :1453
             }
-            else if (IsAllZeros(_wsInTypeCd))
+            else if (IsAllZeros(_inTypeCd))
             {
                 _map.Field("TRTYPE").SetValue("", setMdt: false);                         // MOVE LOW-VALUES. source: :1455
             }
@@ -1221,15 +1221,15 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
             }
 
             // Description filter echo. source: :1461-1472
-            if (_wsActionsRequested > 0)
+            if (_actionsRequested > 0)
             {
-                _map.Field("TRDESC").SetValue(_wsInTypeDesc, setMdt: false);              // source: :1463
+                _map.Field("TRDESC").SetValue(_inTypeDesc, setMdt: false);              // source: :1463
                 _map.Field("TRDESC").AttributeOverride = BmsAttribute.AutoSkip | BmsAttribute.Fset; // DFHBMASF. source: :1464
                 _map.Field("TRDESC").ColorOverride = BmsColor.Blue;                       // DFHBLUE. source: :1465
             }
             else if (FlgDescFilterIsValid || FlgDescFilterNotOk)
             {
-                _map.Field("TRDESC").SetValue(_wsInTypeDesc, setMdt: false);              // source: :1468
+                _map.Field("TRDESC").SetValue(_inTypeDesc, setMdt: false);              // source: :1468
                 _map.Field("TRDESC").AttributeOverride = BmsAttribute.Unprotected | BmsAttribute.Fset | BmsAttribute.Normal; // DFHBMFSE. source: :1469
             }
             else
@@ -1253,7 +1253,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         // If no errors, position cursor. source: :1489-1497
         if (InputOk)
         {
-            if (_wsActionsRequested > 0 && !CcardAidPfk07 && !CcardAidPfk08)
+            if (_actionsRequested > 0 && !CcardAidPfk07 && !CcardAidPfk08)
             {
                 // CONTINUE — cursor already on a row. source: :1493
             }
@@ -1267,69 +1267,69 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  2500-SETUP-MESSAGE. source: COTRTLIC.cbl:1504-1584
     // =============================================================================================
-    private void SetupMessage2500()
+    private void SetupMessage()  // COBOL paragraph: 2500-SETUP-MESSAGE
     {
         // EVALUATE TRUE — first match selects the info/return message. source: :1506-1555
         if (FlgDeletedYes)
         {
-            _wsInfoMsg = INFO_DELETE_SUCCESS; // SET WS-INFORM-DELETE-SUCCESS. source: :1508
+            _infoMessage = InfoDeleteSuccess; // SET WS-INFORM-DELETE-SUCCESS. source: :1508
         }
         else if (FlgUpdateCompleted)
         {
-            _wsInfoMsg = INFO_UPDATE_SUCCESS; // SET WS-INFORM-UPDATE-SUCCESS. source: :1510
+            _infoMessage = InfoUpdateSuccess; // SET WS-INFORM-UPDATE-SUCCESS. source: :1510
         }
         else if (FlgTypeFilterNotOk || FlgDescFilterNotOk)
         {
             // CONTINUE — keep the NOT-OK return message already set. source: :1511-1513
         }
-        else if (CcardAidEnter && _wsDeletesRequested > 0 && WsOnly1Action && WsOnly1ValidAction)
+        else if (CcardAidEnter && _deletesRequested > 0 && HasExactlyOneAction && HasExactlyOneValidAction)
         {
             // source: :1514-1522
-            if (WsNoInfoMessage && FlgTypeFilterChangedNo && FlgDescFilterChangedNo)
-                _wsInfoMsg = INFO_DELETE; // SET WS-INFORM-DELETE. source: :1521
+            if (HasNoInfoMessage && FlgTypeFilterChangedNo && FlgDescFilterChangedNo)
+                _infoMessage = InfoDelete; // SET WS-INFORM-DELETE. source: :1521
         }
-        else if (CcardAidEnter && _wsUpdatesRequested > 0 && WsOnly1Action && WsOnly1ValidAction)
+        else if (CcardAidEnter && _updatesRequested > 0 && HasExactlyOneAction && HasExactlyOneValidAction)
         {
             // source: :1523-1531
-            if (WsNoInfoMessage && FlgTypeFilterChangedNo && FlgDescFilterChangedNo)
-                _wsInfoMsg = INFO_UPDATE; // SET WS-INFORM-UPDATE. source: :1530
+            if (HasNoInfoMessage && FlgTypeFilterChangedNo && FlgDescFilterChangedNo)
+                _infoMessage = InfoUpdate; // SET WS-INFORM-UPDATE. source: :1530
         }
         else if (CcardAidPfk07 && CaFirstPage)
         {
-            _wsReturnMsg = "No previous pages to display"; // source: :1534-1535
+            _returnMessage = "No previous pages to display"; // source: :1534-1535
         }
         else if (CcardAidPfk08 && CaNextPageNotExists && CaLastPageShown)
         {
-            _wsReturnMsg = "No more pages to display"; // source: :1539-1540
+            _returnMessage = "No more pages to display"; // source: :1539-1540
         }
         else if (CcardAidPfk08 && CaNextPageNotExists)
         {
             // source: :1541-1549
-            if (WsNoInfoMessage)
-                _wsInfoMsg = INFO_REC_ACTIONS;        // SET WS-INFORM-REC-ACTIONS. source: :1544
+            if (HasNoInfoMessage)
+                _infoMessage = InfoRecActions;        // SET WS-INFORM-REC-ACTIONS. source: :1544
             if (CaLastPageNotShown() && CaNextPageNotExists)
                 SetCaLastPageShown();                 // SET CA-LAST-PAGE-SHOWN. source: :1548
         }
-        else if (WsNoInfoMessage || CaNextPageExists)
+        else if (HasNoInfoMessage || CaNextPageExists)
         {
-            _wsInfoMsg = INFO_REC_ACTIONS; // SET WS-INFORM-REC-ACTIONS. source: :1552
+            _infoMessage = InfoRecActions; // SET WS-INFORM-REC-ACTIONS. source: :1552
         }
         else
         {
             SetNoInfoMessage(); // SET WS-NO-INFO-MESSAGE. source: :1554
         }
 
-        _map.Field("ERRMSG").SetValue(_wsReturnMsg, setMdt: false); // MOVE WS-RETURN-MSG TO ERRMSGO. source: :1557
+        _map.Field("ERRMSG").SetValue(_returnMessage, setMdt: false); // MOVE WS-RETURN-MSG TO ERRMSGO. source: :1557
 
         // Center justify the info text. source: :1562-1571
-        _wsStringLen = _wsInfoMsg.Trim().Length;                       // WS-STRING-LEN = LEN(TRIM(WS-INFO-MSG)). source: :1562-1565
-        _wsStringMid = (45 - _wsStringLen) / 2 + 1;                    // integer division truncates toward zero. source: :1566-1568
-        _wsStringOut = CenterInto(_wsInfoMsg, _wsStringLen, _wsStringMid);
+        _stringLen = _infoMessage.Trim().Length;                       // WS-STRING-LEN = LEN(TRIM(WS-INFO-MSG)). source: :1562-1565
+        _stringMid = (45 - _stringLen) / 2 + 1;                    // integer division truncates toward zero. source: :1566-1568
+        _stringOut = CenterInto(_infoMessage, _stringLen, _stringMid);
 
         // source: :1575-1579
-        if (!WsNoInfoMessage && !WsMesgNoRecordsFound)
+        if (!HasNoInfoMessage && !IsNoRecordsFoundMessage)
         {
-            _map.Field("INFOMSG").SetValue(_wsStringOut, setMdt: false);          // MOVE WS-STRING-OUT TO INFOMSGO. source: :1577
+            _map.Field("INFOMSG").SetValue(_stringOut, setMdt: false);          // MOVE WS-STRING-OUT TO INFOMSGO. source: :1577
             _map.Field("INFOMSG").AttributeOverride = BmsAttribute.Protected;     // MOVE DFHNEUTR TO INFOMSGC. source: :1578
             _map.Field("INFOMSG").ColorOverride = BmsColor.Neutral;
         }
@@ -1338,10 +1338,10 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  2600-SEND-SCREEN. source: COTRTLIC.cbl:1587-1599
     // =============================================================================================
-    private void SendScreen2600(CicsContext ctx)
+    private void SendScreen(CicsContext ctx)  // COBOL paragraph: 2600-SEND-SCREEN
     {
         // EXEC CICS SEND MAP('CTRTLIA') MAPSET('COTRTLI') FROM(CTRTLIAO) CURSOR ERASE FREEKB. source: :1588-1595
-        ctx.SendMap(LIT_THISMAP, LIT_THISMAPSET, _map, new SendMapOptions
+        ctx.SendMap(ThisMapId, ThisMapSet, _map, new SendMapOptions
         {
             Erase = true,
             FreeKb = true,
@@ -1352,12 +1352,12 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  8000-READ-FORWARD. source: COTRTLIC.cbl:1603-1726
     // =============================================================================================
-    private void ReadForward8000()
+    private void ReadForward()  // COBOL paragraph: 8000-READ-FORWARD
     {
         ClearPageBuffer();             // MOVE LOW-VALUES TO WS-CA-ALL-ROWS-OUT. source: :1604
 
-        OpenForwardCursor9400();       // PERFORM 9400-OPEN-FORWARD-CURSOR. source: :1609
-        if (WsDb2Error)
+        OpenForwardCursor();       // PERFORM 9400-OPEN-FORWARD-CURSOR. source: :1609
+        if (HasDb2Error)
         {
             // GO TO 8000-READ-FORWARD-EXIT — the EXIT label is below the 9450 close, so the close is
             // bypassed on an open failure (faithful). Dispose any half-opened reader to avoid a leak. source: :1612-1613
@@ -1368,7 +1368,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
             return;
         }
 
-        _wsRowNumber = 0;              // MOVE ZEROES TO WS-ROW-NUMBER. source: :1618
+        _rowNumber = 0;              // MOVE ZEROES TO WS-ROW-NUMBER. source: :1618
         SetCaNextPageExists();         // SET CA-NEXT-PAGE-EXISTS. source: :1619
         SetMoreRecordsToRead();        // SET MORE-RECORDS-TO-READ. source: :1620
 
@@ -1376,28 +1376,28 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         {
             InitDcl();                 // INITIALIZE DCLTRANSACTION-TYPE. source: :1624
             FetchForward();            // EXEC SQL FETCH C-TR-TYPE-FORWARD. source: :1626-1630
-            _wsDispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1632
+            _dispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1632
 
             if (_sqlcode == 0)
             {
-                _wsRowNumber += 1;     // ADD 1 TO WS-ROW-NUMBER. source: :1636
-                _caRowTrCodeOut[_wsRowNumber - 1] = _dclTrType;                    // source: :1638
-                _caRowTrDescOut[_wsRowNumber - 1] = _dclTrDescriptionText;         // source: :1641
-                if (_wsRowNumber == 1)
+                _rowNumber += 1;     // ADD 1 TO WS-ROW-NUMBER. source: :1636
+                _caRowTrCodeOut[_rowNumber - 1] = _dclTrType;                    // source: :1638
+                _caRowTrDescOut[_rowNumber - 1] = _dclTrDescriptionText;         // source: :1641
+                if (_rowNumber == 1)
                 {
                     _caFirstTrCode = _dclTrType;          // MOVE DCL-TR-TYPE TO WS-CA-FIRST-TR-CODE. source: :1645
                     if (_caScreenNum == 0)
                         _caScreenNum += 1;                // ADD +1 TO WS-CA-SCREEN-NUM. source: :1647
                 }
 
-                if (_wsRowNumber == WS_MAX_SCREEN_LINES)
+                if (_rowNumber == MaxScreenLines)
                 {
                     SetReadLoopExit();                    // SET READ-LOOP-EXIT. source: :1658
                     _caLastTrCode = _dclTrType;           // MOVE DCL-TR-TYPE TO WS-CA-LAST-TR-CODE. source: :1659
 
                     // Look-ahead fetch one more row. source: :1661-1665
                     FetchForward();
-                    _wsDispSqlcode = FormatSqlcode(_sqlcode); // source: :1667
+                    _dispSqlcode = FormatSqlcode(_sqlcode); // source: :1667
 
                     if (_sqlcode == 0)
                     {
@@ -1407,16 +1407,16 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
                     else if (_sqlcode == 100)
                     {
                         SetCaNextPageNotExists();          // source: :1675
-                        if (WsReturnMsgOff && CcardAidPfk08)
-                            _wsReturnMsg = MESG_NO_MORE_RECORDS; // source: :1679
+                        if (ReturnMessageIsBlank && CcardAidPfk08)
+                            _returnMessage = MesgNoMoreRecords; // source: :1679
                     }
                     else
                     {
                         SetReadLoopExit();                 // source: :1684
-                        if (WsReturnMsgOff)
+                        if (ReturnMessageIsBlank)
                         {
-                            _wsDb2CurrentAction = "C-TR-TYPE-FORWARD fetch"; // source: :1686
-                            FormatDb2Message9999();        // source: :1689
+                            _db2CurrentAction = "C-TR-TYPE-FORWARD fetch"; // source: :1686
+                            FormatDb2Message();        // source: :1689
                         }
                     }
                 }
@@ -1426,52 +1426,52 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
                 SetReadLoopExit();             // source: :1695
                 SetCaNextPageNotExists();      // source: :1696
                 _caLastTrCode = _dclTrType;    // MOVE DCL-TR-TYPE TO WS-CA-LAST-TR-CODE. source: :1697
-                if (WsReturnMsgOff && CcardAidPfk08)
-                    _wsReturnMsg = MESG_NO_MORE_RECORDS;          // source: :1700
-                if (_caScreenNum == 1 && _wsRowNumber == 0)
-                    _wsReturnMsg = MESG_NO_RECORDS_FOUND;         // source: :1704
+                if (ReturnMessageIsBlank && CcardAidPfk08)
+                    _returnMessage = MesgNoMoreRecords;          // source: :1700
+                if (_caScreenNum == 1 && _rowNumber == 0)
+                    _returnMessage = MesgNoRecordsFound;         // source: :1704
             }
             else
             {
                 SetReadLoopExit();   // source: :1709
-                SetWsDb2Error();     // source: :1710
-                if (WsReturnMsgOff)
+                SetHasDb2Error();     // source: :1710
+                if (ReturnMessageIsBlank)
                 {
-                    _wsDb2CurrentAction = "C-TR-TYPE-FORWARD close"; // source: :1712
-                    FormatDb2Message9999();                          // source: :1715
+                    _db2CurrentAction = "C-TR-TYPE-FORWARD close"; // source: :1712
+                    FormatDb2Message();                          // source: :1715
                 }
             }
         }
 
-        CloseForwardCursor9450(); // PERFORM 9450-CLOSE-FORWARD-CURSOR. source: :1721
+        CloseForwardCursor(); // PERFORM 9450-CLOSE-FORWARD-CURSOR. source: :1721
     }
 
     // =============================================================================================
     //  8100-READ-BACKWARDS (+ -EXIT closes cursor). source: COTRTLIC.cbl:1727-1799
     // =============================================================================================
-    private void ReadBackwards8100()
+    private void ReadBackwards()  // COBOL paragraph: 8100-READ-BACKWARDS
     {
         ClearPageBuffer();             // MOVE LOW-VALUES TO WS-CA-ALL-ROWS-OUT. source: :1729
         _caLastTrCode = _caFirstTrCode;// MOVE WS-CA-FIRST-TTYPEKEY TO WS-CA-LAST-TTYPEKEY. source: :1731
 
-        _wsRowNumber = WS_MAX_SCREEN_LINES; // COMPUTE WS-ROW-NUMBER = 7. source: :1735-1737
+        _rowNumber = MaxScreenLines; // COMPUTE WS-ROW-NUMBER = 7. source: :1735-1737
         SetCaNextPageExists();         // SET CA-NEXT-PAGE-EXISTS. source: :1738
         SetMoreRecordsToRead();        // SET MORE-RECORDS-TO-READ. source: :1739
 
-        OpenBackwardCursor9500();      // PERFORM 9500-OPEN-BACKWARD-CURSOR. source: :1746
+        OpenBackwardCursor();      // PERFORM 9500-OPEN-BACKWARD-CURSOR. source: :1746
 
         while (!ReadLoopExit)          // PERFORM UNTIL READ-LOOP-EXIT. source: :1749
         {
             InitDcl();                 // INITIALIZE DCLTRANSACTION-TYPE. source: :1751
             FetchBackward();           // EXEC SQL FETCH C-TR-TYPE-BACKWARD. source: :1753-1757
-            _wsDispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1759
+            _dispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1759
 
             if (_sqlcode == 0)
             {
-                _caRowTrCodeOut[_wsRowNumber - 1] = _dclTrType;             // source: :1763
-                _caRowTrDescOut[_wsRowNumber - 1] = _dclTrDescriptionText;  // source: :1765
-                _wsRowNumber -= 1;     // SUBTRACT 1 FROM WS-ROW-NUMBER. source: :1769
-                if (_wsRowNumber == 0)
+                _caRowTrCodeOut[_rowNumber - 1] = _dclTrType;             // source: :1763
+                _caRowTrDescOut[_rowNumber - 1] = _dclTrDescriptionText;  // source: :1765
+                _rowNumber -= 1;     // SUBTRACT 1 FROM WS-ROW-NUMBER. source: :1769
+                if (_rowNumber == 0)
                 {
                     SetReadLoopExit();             // source: :1771
                     _caFirstTrCode = _dclTrType;   // MOVE DCL-TR-TYPE TO WS-CA-FIRST-TR-CODE. source: :1772
@@ -1481,22 +1481,22 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
             {
                 // B-5: +100 (end of cursor) is NOT special-cased; it lands here as a hard error. source: :1777-1790
                 SetReadLoopExit();  // source: :1780
-                SetWsDb2Error();    // source: :1781
-                if (WsReturnMsgOff)
+                SetHasDb2Error();    // source: :1781
+                if (ReturnMessageIsBlank)
                 {
-                    _wsDb2CurrentAction = "Error on fetch Cursor C-TR-TYPE-BACKWARD"; // source: :1784
-                    FormatDb2Message9999();                                          // source: :1786
+                    _db2CurrentAction = "Error on fetch Cursor C-TR-TYPE-BACKWARD"; // source: :1784
+                    FormatDb2Message();                                          // source: :1786
                 }
             }
         }
 
-        CloseBackCursor9550(); // 8100-READ-BACKWARDS-EXIT -> PERFORM 9550-CLOSE-BACK-CURSOR. source: :1795
+        CloseBackCursor(); // 8100-READ-BACKWARDS-EXIT -> PERFORM 9550-CLOSE-BACK-CURSOR. source: :1795
     }
 
     // =============================================================================================
     //  9100-CHECK-FILTERS. source: COTRTLIC.cbl:1801-1836
     // =============================================================================================
-    private void CheckFilters9100()
+    private void CheckFilters()  // COBOL paragraph: 9100-CHECK-FILTERS
     {
         // EXEC SQL SELECT COUNT(1) INTO :WS-RECORDS-COUNT FROM CARDDEMO.TRANSACTION_TYPE WHERE (type) AND (desc). source: :1803-1815
         try
@@ -1506,14 +1506,14 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
                 "WHERE ((@typeFlag = '1' AND TR_TYPE = @typeCd) OR @typeFlag <> '1') " +
                 "AND ((@descFlag = '1' AND TR_DESCRIPTION LIKE TRIM(@descFilter)) OR @descFlag <> '1')");
             BindFilterParams(c);
-            _wsRecordsCount = Convert.ToInt32(c.ExecuteScalar() ?? 0);
+            _recordsCount = Convert.ToInt32(c.ExecuteScalar() ?? 0);
             _sqlcode = 0;
         }
         catch (SqliteException e)
         {
             _sqlcode = NegativeSqlcode(e);
         }
-        _wsDispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1817
+        _dispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1817
 
         if (_sqlcode == 0)
         {
@@ -1522,10 +1522,10 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         else
         {
             SetInputError(); // source: :1823
-            if (WsReturnMsgOff)
+            if (ReturnMessageIsBlank)
             {
-                _wsDb2CurrentAction = "Error reading TRANSACTION_TYPE table "; // source: :1826
-                FormatDb2Message9999();                                        // source: :1828
+                _db2CurrentAction = "Error reading TRANSACTION_TYPE table "; // source: :1826
+                FormatDb2Message();                                        // source: :1828
             }
             // GO TO 9100-CHECK-FILTERS-EXIT. source: :1831
         }
@@ -1534,7 +1534,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  9200-UPDATE-RECORD. source: COTRTLIC.cbl:1837-1894
     // =============================================================================================
-    private void UpdateRecord9200()
+    private void UpdateRecord()  // COBOL paragraph: 9200-UPDATE-RECORD
     {
         _dclTrType = _rowTrCodeIn[_iSelected - 1];                       // MOVE WS-ROW-TR-CODE-IN(I-SELECTED) TO DCL-TR-TYPE. source: :1839
         _dclTrDescriptionText = (_rowTrDescIn[_iSelected - 1] ?? "").Trim(); // MOVE FUNCTION TRIM(...) TO DCL-TR-DESCRIPTION-TEXT. source: :1841
@@ -1556,22 +1556,22 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         {
             _sqlcode = NegativeSqlcode(e);
         }
-        _wsDispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1852
+        _dispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1852
 
         if (_sqlcode == 0)
         {
             Syncpoint();                    // EXEC CICS SYNCPOINT. source: :1856
             SetCaUpdateSucceeded();         // SET CA-UPDATE-SUCCEEDED. source: :1857
-            if (WsNoInfoMessage)
-                _wsInfoMsg = INFO_UPDATE_SUCCESS; // SET WS-INFORM-UPDATE-SUCCESS. source: :1859
+            if (HasNoInfoMessage)
+                _infoMessage = InfoUpdateSuccess; // SET WS-INFORM-UPDATE-SUCCESS. source: :1859
         }
         else if (_sqlcode == 100)
         {
             SetCaUpdateRequested();         // SET CA-UPDATE-REQUESTED. source: :1862
-            if (WsReturnMsgOff)
+            if (ReturnMessageIsBlank)
             {
-                _wsDb2CurrentAction = "Record not found. Deleted by others ? "; // source: :1864
-                FormatDb2Message9999();                                         // source: :1866
+                _db2CurrentAction = "Record not found. Deleted by others ? "; // source: :1864
+                FormatDb2Message();                                         // source: :1866
             }
             // GO TO 9200-UPDATE-RECORD-EXIT. source: :1869
         }
@@ -1579,20 +1579,20 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         {
             SetCaUpdateRequested();         // SET CA-UPDATE-REQUESTED. source: :1871
             SetInputError();                // SET INPUT-ERROR. source: :1872
-            if (WsReturnMsgOff)
+            if (ReturnMessageIsBlank)
             {
-                _wsDb2CurrentAction = "Deadlock. Someone else updating ?"; // source: :1874
-                FormatDb2Message9999();                                    // source: :1876
+                _db2CurrentAction = "Deadlock. Someone else updating ?"; // source: :1874
+                FormatDb2Message();                                    // source: :1876
             }
             // GO TO 9200-UPDATE-RECORD-EXIT. source: :1879
         }
         else if (_sqlcode < 0)
         {
             SetCaUpdateRequested();         // SET CA-UPDATE-REQUESTED. source: :1881
-            if (WsReturnMsgOff)
+            if (ReturnMessageIsBlank)
             {
-                _wsDb2CurrentAction = "Update failed with"; // source: :1883
-                FormatDb2Message9999();                     // source: :1885
+                _db2CurrentAction = "Update failed with"; // source: :1883
+                FormatDb2Message();                     // source: :1885
             }
             // GO TO 9200-UPDATE-RECORD-EXIT. source: :1888
         }
@@ -1601,7 +1601,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  9300-DELETE-RECORD. source: COTRTLIC.cbl:1896-1940
     // =============================================================================================
-    private void DeleteRecord9300()
+    private void DeleteRecord()  // COBOL paragraph: 9300-DELETE-RECORD
     {
         _dclTrType = _rowTrCodeIn[_iSelected - 1]; // MOVE WS-ROW-TR-CODE-IN(I-SELECTED) TO DCL-TR-TYPE. source: :1898
 
@@ -1628,31 +1628,31 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         {
             _sqlcode = NegativeSqlcode(e);
         }
-        _wsDispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1905
+        _dispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1905
 
         if (_sqlcode == 0)
         {
             Syncpoint();                    // EXEC CICS SYNCPOINT. source: :1909
             SetCaDeleteSucceeded();         // SET CA-DELETE-SUCCEEDED. source: :1910
-            if (WsNoInfoMessage)
-                _wsInfoMsg = INFO_DELETE_SUCCESS; // SET WS-INFORM-DELETE-SUCCESS. source: :1912
+            if (HasNoInfoMessage)
+                _infoMessage = InfoDeleteSuccess; // SET WS-INFORM-DELETE-SUCCESS. source: :1912
         }
         else if (_sqlcode == -532)
         {
             SetCaDeleteRequested();         // SET CA-DELETE-REQUESTED. source: :1915
-            if (WsReturnMsgOff)
+            if (ReturnMessageIsBlank)
             {
-                _wsDb2CurrentAction = "Please delete associated child records first:"; // source: :1919
-                FormatDb2Message9999();                                                // source: :1921
+                _db2CurrentAction = "Please delete associated child records first:"; // source: :1919
+                FormatDb2Message();                                                // source: :1921
             }
             // GO TO 9300-DELETE-RECORD-EXIT. source: :1925
         }
         else
         {
-            if (WsReturnMsgOff)
+            if (ReturnMessageIsBlank)
             {
-                _wsDb2CurrentAction = "Delete failed with message:"; // source: :1929
-                FormatDb2Message9999();                              // source: :1931
+                _db2CurrentAction = "Delete failed with message:"; // source: :1929
+                FormatDb2Message();                              // source: :1931
             }
             // GO TO 9300-DELETE-RECORD-EXIT. source: :1934
         }
@@ -1666,7 +1666,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     private SqliteDataReader? _backwardReader;
     private SqliteCommand? _backwardCmd;
 
-    private void OpenForwardCursor9400()
+    private void OpenForwardCursor()  // COBOL paragraph: 9400-OPEN-FORWARD-CURSOR
     {
         // EXEC SQL OPEN C-TR-TYPE-FORWARD. source: :1943-1945
         try
@@ -1677,7 +1677,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
                 "AND ((@typeFlag = '1' AND TR_TYPE = @typeCd) OR @typeFlag <> '1') " +
                 "AND ((@descFlag = '1' AND TR_DESCRIPTION LIKE TRIM(@descFilter)) OR @descFlag <> '1') " +
                 "ORDER BY TR_TYPE ASC");
-            _forwardCmd.Parameters.AddWithValue("@start", _wsStartKey ?? "");
+            _forwardCmd.Parameters.AddWithValue("@start", _startKey ?? "");
             BindFilterParams(_forwardCmd);
             _forwardReader = _forwardCmd.ExecuteReader();
             _sqlcode = 0;
@@ -1686,20 +1686,20 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         {
             _sqlcode = NegativeSqlcode(e);
         }
-        _wsDispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1947
+        _dispSqlcode = FormatSqlcode(_sqlcode); // MOVE SQLCODE TO WS-DISP-SQLCODE. source: :1947
 
         if (_sqlcode != 0)
         {
-            SetWsDb2Error(); // source: :1955
-            if (WsReturnMsgOff)
+            SetHasDb2Error(); // source: :1955
+            if (ReturnMessageIsBlank)
             {
-                _wsDb2CurrentAction = "C-TR-TYPE-FORWARD Open"; // source: :1958
-                FormatDb2Message9999();                         // source: :1960
+                _db2CurrentAction = "C-TR-TYPE-FORWARD Open"; // source: :1958
+                FormatDb2Message();                         // source: :1960
             }
         }
     }
 
-    private void CloseForwardCursor9450()
+    private void CloseForwardCursor()  // COBOL paragraph: 9450-CLOSE-FORWARD-CURSOR
     {
         // EXEC SQL CLOSE C-TR-TYPE-FORWARD. source: :1971-1973
         _forwardReader?.Dispose();
@@ -1707,11 +1707,11 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         _forwardCmd?.Dispose();
         _forwardCmd = null;
         _sqlcode = 0;
-        _wsDispSqlcode = FormatSqlcode(_sqlcode); // source: :1975
+        _dispSqlcode = FormatSqlcode(_sqlcode); // source: :1975
         // SQLCODE 0 -> CONTINUE; non-zero never produced by the in-proc close. source: :1978-1991
     }
 
-    private void OpenBackwardCursor9500()
+    private void OpenBackwardCursor()  // COBOL paragraph: 9500-OPEN-BACKWARD-CURSOR
     {
         // EXEC SQL OPEN C-TR-TYPE-BACKWARD. source: :1998-2000
         try
@@ -1722,7 +1722,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
                 "AND ((@typeFlag = '1' AND TR_TYPE = @typeCd) OR @typeFlag <> '1') " +
                 "AND ((@descFlag = '1' AND TR_DESCRIPTION LIKE TRIM(@descFilter)) OR @descFlag <> '1') " +
                 "ORDER BY TR_TYPE DESC");
-            _backwardCmd.Parameters.AddWithValue("@start", _wsStartKey ?? "");
+            _backwardCmd.Parameters.AddWithValue("@start", _startKey ?? "");
             BindFilterParams(_backwardCmd);
             _backwardReader = _backwardCmd.ExecuteReader();
             _sqlcode = 0;
@@ -1731,20 +1731,20 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         {
             _sqlcode = NegativeSqlcode(e);
         }
-        _wsDispSqlcode = FormatSqlcode(_sqlcode); // source: :2002
+        _dispSqlcode = FormatSqlcode(_sqlcode); // source: :2002
 
         if (_sqlcode != 0)
         {
-            SetWsDb2Error(); // source: :2010
-            if (WsReturnMsgOff)
+            SetHasDb2Error(); // source: :2010
+            if (ReturnMessageIsBlank)
             {
-                _wsDb2CurrentAction = "C-TR-TYPE-BACKWARD Open"; // source: :2013
-                FormatDb2Message9999();                          // source: :2015
+                _db2CurrentAction = "C-TR-TYPE-BACKWARD Open"; // source: :2013
+                FormatDb2Message();                          // source: :2015
             }
         }
     }
 
-    private void CloseBackCursor9550()
+    private void CloseBackCursor()  // COBOL paragraph: 9550-CLOSE-BACK-CURSOR
     {
         // EXEC SQL CLOSE C-TR-TYPE-BACKWARD. source: :2027-2029
         _backwardReader?.Dispose();
@@ -1752,7 +1752,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         _backwardCmd?.Dispose();
         _backwardCmd = null;
         _sqlcode = 0;
-        _wsDispSqlcode = FormatSqlcode(_sqlcode); // source: :2031
+        _dispSqlcode = FormatSqlcode(_sqlcode); // source: :2031
     }
 
     /// <summary>EXEC SQL FETCH C-TR-TYPE-FORWARD INTO :DCL-TR-TYPE, :DCL-TR-DESCRIPTION. source: :1626-1630</summary>
@@ -1788,7 +1788,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  9998-PRIMING-QUERY (CSDB2RPY) — Db2 connectivity probe. source: CSDB2RPY:21-48
     // =============================================================================================
-    private void PrimingQuery9998()
+    private void PrimingQuery()  // COBOL paragraph: 9998-PRIMING-QUERY
     {
         // SELECT 1 INTO :hv FROM SYSIBM.SYSDUMMY1 FETCH FIRST 1 ROW ONLY. In-proc SQLite always succeeds.
         try
@@ -1803,11 +1803,11 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
         catch (SqliteException e)
         {
             _sqlcode = NegativeSqlcode(e);
-            SetWsDb2Error();
-            if (WsReturnMsgOff)
+            SetHasDb2Error();
+            if (ReturnMessageIsBlank)
             {
-                _wsDb2CurrentAction = "Db2 access failure. ";
-                FormatDb2Message9999();
+                _db2CurrentAction = "Db2 access failure. ";
+                FormatDb2Message();
             }
         }
     }
@@ -1815,12 +1815,12 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     //  9999-FORMAT-DB2-MESSAGE (CSDB2RPY) — synthesize the Db2 error text. source: CSDB2RPY:53-89
     // =============================================================================================
-    private void FormatDb2Message9999()
+    private void FormatDb2Message()  // COBOL paragraph: 9999-FORMAT-DB2-MESSAGE
     {
         // STRING TRIM(action) ' SQLCODE:' WS-DISP-SQLCODE ' ' formatted-text INTO WS-LONG-MSG; MOVE -> WS-RETURN-MSG.
         string formatted = $"SQLCODE {_sqlcode}"; // stand-in for the DSNTIAC-formatted SQLCA text.
-        _wsLongMsg = $"{_wsDb2CurrentAction.Trim()} SQLCODE:{_wsDispSqlcode} {formatted}";
-        _wsReturnMsg = Left(_wsLongMsg, 75); // MOVE WS-LONG-MSG TO WS-RETURN-MSG (X75).
+        _longMessage = $"{_db2CurrentAction.Trim()} SQLCODE:{_dispSqlcode} {formatted}";
+        _returnMessage = Left(_longMessage, 75); // MOVE WS-LONG-MSG TO WS-RETURN-MSG (X75).
     }
 
     // =============================================================================================
@@ -1829,7 +1829,7 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     private void SendLongText(CicsContext ctx)
     {
         // EXEC CICS SEND TEXT FROM(WS-LONG-MSG) LENGTH(...) ERASE FREEKB; EXEC CICS RETURN.
-        ctx.SendText(_wsLongMsg, erase: true, freeKb: true);
+        ctx.SendText(_longMessage, erase: true, freeKb: true);
     }
 
     // =============================================================================================
@@ -1956,33 +1956,33 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     private void InitWsMiscStorage()
     {
         // INITIALIZE WS-MISC-STORAGE — reset the working flags/counters that survive within the task. source: :744
-        _wsInputFlag = '\0';
-        _wsEditTypeFlag = '\0';
-        _wsEditDescFlag = '\0';
-        _wsTypeFilterChanged = '\0';
-        _wsDescFilterChanged = '\0';
-        _wsDeleteStatus = '\0';
-        _wsUpdateStatus = '\0';
-        _wsRowSelectionChanged = '\0';
-        _wsBadSelectionAction = '\0';
-        _wsArrayDescriptionFlgs = '\0';
-        _wsDataChangedFlag = '\0';
+        _inputFlag = '\0';
+        _editTypeFlag = '\0';
+        _editDescFlag = '\0';
+        _typeFilterChanged = '\0';
+        _descFilterChanged = '\0';
+        _deleteStatus = '\0';
+        _updateStatus = '\0';
+        _rowSelectionChanged = '\0';
+        _badSelectionAction = '\0';
+        _arrayDescriptionFlags = '\0';
+        _dataChangedFlag = '\0';
         _flgProtectSelectRows = '0';
-        _wsInfoMsg = "";
-        _wsReturnMsg = "";
-        _wsPfkFlag = '0';
-        _wsStartKey = "";
-        _wsTypeCdFilter = "";
-        _wsTypeDescFilter = "";
-        _wsInTypeCd = "";
-        _wsInTypeDesc = "";
-        _wsRowNumber = 0;
-        _wsRecordsToProcessFlag = '\0';
-        _wsActionsRequested = 0;
-        _wsDeletesRequested = 0;
-        _wsUpdatesRequested = 0;
-        _wsNoActionsSelected = 0;
-        _wsValidActionsSelected = 0;
+        _infoMessage = "";
+        _returnMessage = "";
+        _pfkFlag = '0';
+        _startKey = "";
+        _typeCdFilter = "";
+        _typeDescFilter = "";
+        _inTypeCd = "";
+        _inTypeDesc = "";
+        _rowNumber = 0;
+        _recordsToProcessFlag = '\0';
+        _actionsRequested = 0;
+        _deletesRequested = 0;
+        _updatesRequested = 0;
+        _noActionsSelected = 0;
+        _validActionsSelected = 0;
         _iSelected = 0;
         _editSelect = NewChars(7, '\0');
         _editSelectError = NewChars(7, '\0');
@@ -2065,10 +2065,10 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     // =============================================================================================
     private void BindFilterParams(SqliteCommand c)
     {
-        c.Parameters.AddWithValue("@typeFlag", FlagChar(_wsEditTypeFlag)); // :WS-EDIT-TYPE-FLAG
-        c.Parameters.AddWithValue("@typeCd", PadX(_wsTypeCdFilter, 2));    // :WS-TYPE-CD-FILTER
-        c.Parameters.AddWithValue("@descFlag", FlagChar(_wsEditDescFlag)); // :WS-EDIT-DESC-FLAG
-        c.Parameters.AddWithValue("@descFilter", _wsTypeDescFilter ?? ""); // :WS-TYPE-DESC-FILTER
+        c.Parameters.AddWithValue("@typeFlag", FlagChar(_editTypeFlag)); // :WS-EDIT-TYPE-FLAG
+        c.Parameters.AddWithValue("@typeCd", PadX(_typeCdFilter, 2));    // :WS-TYPE-CD-FILTER
+        c.Parameters.AddWithValue("@descFlag", FlagChar(_editDescFlag)); // :WS-EDIT-DESC-FLAG
+        c.Parameters.AddWithValue("@descFilter", _typeDescFilter ?? ""); // :WS-TYPE-DESC-FILTER
     }
 
     private SqliteCommand NewCmd(string sql)
@@ -2197,10 +2197,10 @@ public sealed class TransactionTypeListProgram : ITransactionHandler
     //  source: app-transaction-type-db2/bms/COTRTLI.bms / SCREEN_COTRTLI.md
     // =============================================================================================
     /// <summary>The DFHMDI map name. source: COTRTLI.bms:25.</summary>
-    public const string MapName = LIT_THISMAP;     // 'CTRTLIA'
+    public const string MapName = ThisMapId;     // 'CTRTLIA'
 
     /// <summary>The DFHMSD mapset name. source: COTRTLI.bms:20.</summary>
-    public const string MapsetName = LIT_THISMAPSET; // 'COTRTLI'
+    public const string MapsetName = ThisMapSet; // 'COTRTLI'
 
     /// <summary>
     /// Constructs the <c>CTRTLIA</c> screen map: every <c>DFHMDF</c> as a <see cref="ScreenField"/> with its

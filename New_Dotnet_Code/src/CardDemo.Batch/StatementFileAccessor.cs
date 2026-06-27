@@ -132,25 +132,25 @@ public sealed class StatementFileAccessor
         switch (Trim8(area.Dd))                          // EVALUATE LK-M03B-DD // source: CBSTM03B.cbl:118
         {
             case "TRNXFILE":                             // source: CBSTM03B.cbl:119-120
-                Trnxfile1000Proc(area);
+                ProcessTrnxFile(area);
                 break;
             case "XREFFILE":                             // source: CBSTM03B.cbl:121-122
-                Xreffile2000Proc(area);
+                ProcessXrefFile(area);
                 break;
             case "CUSTFILE":                             // source: CBSTM03B.cbl:123-124
-                Custfile3000Proc(area);
+                ProcessCustFile(area);
                 break;
             case "ACCTFILE":                             // source: CBSTM03B.cbl:125-126
-                Acctfile4000Proc(area);
+                ProcessAcctFile(area);
                 break;
             default:                                     // WHEN OTHER // source: CBSTM03B.cbl:127-128
-                Goback9999();                            // GO TO 9999-GOBACK
+                Goback();                                // GO TO 9999-GOBACK
                 break;
         }
     }
 
     // 9999-GOBACK. // source: CBSTM03B.cbl:130-131
-    private static void Goback9999()
+    private static void Goback()                          // COBOL paragraph: 9999-GOBACK
     {
         // GOBACK — no status change; the area is returned as-is.
     }
@@ -158,7 +158,7 @@ public sealed class StatementFileAccessor
     // =================================================================================================
     // 1000-TRNXFILE-PROC — OPEN INPUT / sequential READ INTO FLDT / CLOSE. // source: CBSTM03B.cbl:133-155
     // =================================================================================================
-    private void Trnxfile1000Proc(M03BArea area)
+    private void ProcessTrnxFile(M03BArea area)          // COBOL paragraph: 1000-TRNXFILE-PROC
     {
         if (area.M03BOpen)                               // IF M03B-OPEN // source: CBSTM03B.cbl:135
         {
@@ -168,7 +168,7 @@ public sealed class StatementFileAccessor
                 .ThenBy(t => t.TranId, StringComparer.Ordinal)
                 .GetEnumerator();
             _trnxfileStatus = FileStatus.Ok;
-            Trnx1900Exit(area);                          // GO TO 1900-EXIT // source: CBSTM03B.cbl:137
+            TrnxExit(area);                              // GO TO 1900-EXIT // source: CBSTM03B.cbl:137
             return;
         }
 
@@ -184,7 +184,7 @@ public sealed class StatementFileAccessor
             {
                 _trnxfileStatus = FileStatus.EndOfFile;  // '10' AT END
             }
-            Trnx1900Exit(area);                          // GO TO 1900-EXIT // source: CBSTM03B.cbl:143
+            TrnxExit(area);                              // GO TO 1900-EXIT // source: CBSTM03B.cbl:143
             return;
         }
 
@@ -194,28 +194,28 @@ public sealed class StatementFileAccessor
             _trnxCursor?.Dispose();
             _trnxCursor = null;
             _trnxfileStatus = FileStatus.Ok;
-            Trnx1900Exit(area);                          // GO TO 1900-EXIT // source: CBSTM03B.cbl:148
+            TrnxExit(area);                              // GO TO 1900-EXIT // source: CBSTM03B.cbl:148
             return;
         }
 
         // No matching operation (e.g. W/Z): fall through to 1900-EXIT, returning the current status.
-        Trnx1900Exit(area);
+        TrnxExit(area);
     }
 
     // 1900-EXIT. MOVE TRNXFILE-STATUS TO LK-M03B-RC. // source: CBSTM03B.cbl:151-152
-    private void Trnx1900Exit(M03BArea area) => area.Rc = _trnxfileStatus;
+    private void TrnxExit(M03BArea area) => area.Rc = _trnxfileStatus; // COBOL paragraph: 1900-EXIT
 
     // =================================================================================================
     // 2000-XREFFILE-PROC — OPEN INPUT / sequential READ INTO FLDT / CLOSE. // source: CBSTM03B.cbl:157-179
     // =================================================================================================
-    private void Xreffile2000Proc(M03BArea area)
+    private void ProcessXrefFile(M03BArea area)          // COBOL paragraph: 2000-XREFFILE-PROC
     {
         if (area.M03BOpen)                               // IF M03B-OPEN // source: CBSTM03B.cbl:159
         {
             // OPEN INPUT XREF-FILE -> forward browse over CARD_XREF (xref_card_num order). // source: CBSTM03B.cbl:160
             _xrefCursor = _xref.ReadAll().GetEnumerator();
             _xreffileStatus = FileStatus.Ok;
-            Xref2900Exit(area);                          // GO TO 2900-EXIT // source: CBSTM03B.cbl:161
+            XrefExit(area);                              // GO TO 2900-EXIT // source: CBSTM03B.cbl:161
             return;
         }
 
@@ -231,7 +231,7 @@ public sealed class StatementFileAccessor
             {
                 _xreffileStatus = FileStatus.EndOfFile;  // '10' AT END
             }
-            Xref2900Exit(area);                          // GO TO 2900-EXIT // source: CBSTM03B.cbl:167
+            XrefExit(area);                              // GO TO 2900-EXIT // source: CBSTM03B.cbl:167
             return;
         }
 
@@ -241,26 +241,26 @@ public sealed class StatementFileAccessor
             _xrefCursor?.Dispose();
             _xrefCursor = null;
             _xreffileStatus = FileStatus.Ok;
-            Xref2900Exit(area);                          // GO TO 2900-EXIT // source: CBSTM03B.cbl:172
+            XrefExit(area);                              // GO TO 2900-EXIT // source: CBSTM03B.cbl:172
             return;
         }
 
-        Xref2900Exit(area);
+        XrefExit(area);
     }
 
     // 2900-EXIT. MOVE XREFFILE-STATUS TO LK-M03B-RC. // source: CBSTM03B.cbl:175-176
-    private void Xref2900Exit(M03BArea area) => area.Rc = _xreffileStatus;
+    private void XrefExit(M03BArea area) => area.Rc = _xreffileStatus; // COBOL paragraph: 2900-EXIT
 
     // =================================================================================================
     // 3000-CUSTFILE-PROC — OPEN INPUT / keyed READ INTO FLDT / CLOSE. // source: CBSTM03B.cbl:181-204
     // =================================================================================================
-    private void Custfile3000Proc(M03BArea area)
+    private void ProcessCustFile(M03BArea area)          // COBOL paragraph: 3000-CUSTFILE-PROC
     {
         if (area.M03BOpen)                               // IF M03B-OPEN // source: CBSTM03B.cbl:183
         {
             // OPEN INPUT CUST-FILE (RANDOM access KSDS — no browse to position). // source: CBSTM03B.cbl:184
             _custfileStatus = FileStatus.Ok;
-            Cust3900Exit(area);                          // GO TO 3900-EXIT // source: CBSTM03B.cbl:185
+            CustExit(area);                              // GO TO 3900-EXIT // source: CBSTM03B.cbl:185
             return;
         }
 
@@ -272,7 +272,7 @@ public sealed class StatementFileAccessor
             _custfileStatus = _customer.ReadByKey(custId, out Customer? cust);
             if (_custfileStatus == FileStatus.Ok)
                 area.Fldt = ToFldt(SerializeCustRecord(cust!));
-            Cust3900Exit(area);                          // GO TO 3900-EXIT // source: CBSTM03B.cbl:192
+            CustExit(area);                              // GO TO 3900-EXIT // source: CBSTM03B.cbl:192
             return;
         }
 
@@ -280,26 +280,26 @@ public sealed class StatementFileAccessor
         {
             // CLOSE CUST-FILE. // source: CBSTM03B.cbl:196
             _custfileStatus = FileStatus.Ok;
-            Cust3900Exit(area);                          // GO TO 3900-EXIT // source: CBSTM03B.cbl:197
+            CustExit(area);                              // GO TO 3900-EXIT // source: CBSTM03B.cbl:197
             return;
         }
 
-        Cust3900Exit(area);
+        CustExit(area);
     }
 
     // 3900-EXIT. MOVE CUSTFILE-STATUS TO LK-M03B-RC. // source: CBSTM03B.cbl:200-201
-    private void Cust3900Exit(M03BArea area) => area.Rc = _custfileStatus;
+    private void CustExit(M03BArea area) => area.Rc = _custfileStatus; // COBOL paragraph: 3900-EXIT
 
     // =================================================================================================
     // 4000-ACCTFILE-PROC — OPEN INPUT / keyed READ INTO FLDT / CLOSE. // source: CBSTM03B.cbl:206-229
     // =================================================================================================
-    private void Acctfile4000Proc(M03BArea area)
+    private void ProcessAcctFile(M03BArea area)          // COBOL paragraph: 4000-ACCTFILE-PROC
     {
         if (area.M03BOpen)                               // IF M03B-OPEN // source: CBSTM03B.cbl:208
         {
             // OPEN INPUT ACCT-FILE (RANDOM access KSDS — no browse to position). // source: CBSTM03B.cbl:209
             _acctfileStatus = FileStatus.Ok;
-            Acct4900Exit(area);                          // GO TO 4900-EXIT // source: CBSTM03B.cbl:210
+            AcctExit(area);                              // GO TO 4900-EXIT // source: CBSTM03B.cbl:210
             return;
         }
 
@@ -311,7 +311,7 @@ public sealed class StatementFileAccessor
             _acctfileStatus = _account.ReadByKey(acctId, out Account? acct);
             if (_acctfileStatus == FileStatus.Ok)
                 area.Fldt = ToFldt(SerializeAcctRecord(acct!));
-            Acct4900Exit(area);                          // GO TO 4900-EXIT // source: CBSTM03B.cbl:217
+            AcctExit(area);                              // GO TO 4900-EXIT // source: CBSTM03B.cbl:217
             return;
         }
 
@@ -319,15 +319,15 @@ public sealed class StatementFileAccessor
         {
             // CLOSE ACCT-FILE. // source: CBSTM03B.cbl:221
             _acctfileStatus = FileStatus.Ok;
-            Acct4900Exit(area);                          // GO TO 4900-EXIT // source: CBSTM03B.cbl:222
+            AcctExit(area);                              // GO TO 4900-EXIT // source: CBSTM03B.cbl:222
             return;
         }
 
-        Acct4900Exit(area);
+        AcctExit(area);
     }
 
     // 4900-EXIT. MOVE ACCTFILE-STATUS TO LK-M03B-RC. // source: CBSTM03B.cbl:225-226
-    private void Acct4900Exit(M03BArea area) => area.Rc = _acctfileStatus;
+    private void AcctExit(M03BArea area) => area.Rc = _acctfileStatus; // COBOL paragraph: 4900-EXIT
 
     // =================================================================================================
     // Record serializers — build each file's fixed-width host image (the bytes the READ ... INTO places
@@ -437,10 +437,10 @@ public sealed class StatementFileAccessor
     private static string KeyPrefix(M03BArea area)
     {
         string key = area.Key ?? "";
-        int n = area.KeyLn;
-        if (n <= 0) return "";
-        if (n > key.Length) key = key.PadRight(n, ' ');
-        return key[..n];
+        int keyLength = area.KeyLn;
+        if (keyLength <= 0) return "";
+        if (keyLength > key.Length) key = key.PadRight(keyLength, ' ');
+        return key[..keyLength];
     }
 
     /// <summary>

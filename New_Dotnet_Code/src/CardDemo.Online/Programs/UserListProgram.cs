@@ -60,16 +60,16 @@ public sealed class UserListProgram : ITransactionHandler
     // =============================================================================================
     //  WS-VARIABLES — source: COUSR00C.cbl:35-54
     // =============================================================================================
-    private const string WS_PGMNAME = "COUSR00C";     // 05 WS-PGMNAME PIC X(08) VALUE 'COUSR00C'. source: :36
-    private const string WS_TRANID = "CU00";          // 05 WS-TRANID  PIC X(04) VALUE 'CU00'.     source: :37
-    private const string WS_USRSEC_FILE = "USRSEC  "; // 05 WS-USRSEC-FILE PIC X(08) VALUE 'USRSEC  '. source: :39
+    private const string ProgramId = "COUSR00C";     // WS-PGMNAME — 05 WS-PGMNAME PIC X(08) VALUE 'COUSR00C'. source: :36
+    private const string TranId = "CU00";          // WS-TRANID — 05 WS-TRANID  PIC X(04) VALUE 'CU00'.     source: :37
+    private const string UserSecFileName = "USRSEC  "; // WS-USRSEC-FILE — 05 WS-USRSEC-FILE PIC X(08) VALUE 'USRSEC  '. source: :39
 
-    private string _wsMessage = "";                   // 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
+    private string _message = "";                   // WS-MESSAGE — 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
 
     // 05 WS-ERR-FLG PIC X(01) VALUE 'N'. 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. source: :40-42
-    private bool _errFlgOn;
-    private bool ErrFlgOn => _errFlgOn;   // 88 ERR-FLG-ON
-    private bool ErrFlgOff => !_errFlgOn; // 88 ERR-FLG-OFF
+    private bool _errorFlagOn; // WS-ERR-FLG
+    private bool ErrFlgOn => _errorFlagOn;   // 88 ERR-FLG-ON
+    private bool ErrFlgOff => !_errorFlagOn; // 88 ERR-FLG-OFF
 
     // 05 WS-USER-SEC-EOF PIC X(01) VALUE 'N'. 88 USER-SEC-EOF='Y' / USER-SEC-NOT-EOF='N'. source: :43-45
     private bool _userSecEof;
@@ -81,43 +81,43 @@ public sealed class UserListProgram : ITransactionHandler
     private bool SendEraseYes => _sendEraseYes;   // 88 SEND-ERASE-YES
 
     // 05 WS-RESP-CD / WS-REAS-CD PIC S9(09) COMP. source: :50-51
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode; // WS-RESP-CD
+    private int _reasonCode;    // WS-REAS-CD
 
     // 05 WS-REC-COUNT / WS-IDX / WS-PAGE-NUM PIC S9(04) COMP. source: :52-54
     // (WS-REC-COUNT, WS-PAGE-NUM declared but never referenced; WS-IDX drives the row loops.)
-    private int _wsIdx;
+    private int _rowIndex; // WS-IDX
 
     // CCDA-TITLE01/02 (COTTL01Y) + CCDA-MSG-INVALID-KEY (CSMSG01Y) — shared screen header / messages.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...         ";
+    private const string Title01 = "      AWS Mainframe Modernization       ";
+    private const string Title02 = "              CardDemo                  ";
+    private const string MsgInvalidKey = "Invalid key pressed. Please see below...         ";
 
     // =============================================================================================
     //  COCOM01Y trailer — CDEMO-CU00-INFO (the program-private paging state). source: :66-75
     // =============================================================================================
     // 10 CDEMO-CU00-USRID-FIRST   PIC X(08). source: :67
-    private string _cu00UsridFirst = "";
+    private string _firstUserIdOnPage = "";
     // 10 CDEMO-CU00-USRID-LAST    PIC X(08). source: :68
-    private string _cu00UsridLast = "";
+    private string _lastUserIdOnPage = "";
     // 10 CDEMO-CU00-PAGE-NUM      PIC 9(08). source: :69
-    private int _cu00PageNum;
+    private int _pageNumber;
     // 10 CDEMO-CU00-NEXT-PAGE-FLG PIC X(01) VALUE 'N'. 88 NEXT-PAGE-YES='Y' / NEXT-PAGE-NO='N'. source: :70-72
-    private char _cu00NextPageFlg = 'N';
-    private bool NextPageYes => _cu00NextPageFlg == 'Y'; // 88 NEXT-PAGE-YES
-    private void SetNextPageYes() => _cu00NextPageFlg = 'Y';
-    private void SetNextPageNo() => _cu00NextPageFlg = 'N';
+    private char _nextPageFlag = 'N';
+    private bool NextPageYes => _nextPageFlag == 'Y'; // 88 NEXT-PAGE-YES
+    private void SetNextPageYes() => _nextPageFlag = 'Y';
+    private void SetNextPageNo() => _nextPageFlag = 'N';
     // 10 CDEMO-CU00-USR-SEL-FLG   PIC X(01). source: :73
-    private string _cu00UsrSelFlg = "";
+    private string _selectionFlag = "";
     // 10 CDEMO-CU00-USR-SELECTED  PIC X(08). source: :74
-    private string _cu00UsrSelected = "";
+    private string _selectedUserId = "";
 
     // =============================================================================================
     //  SEC-USR-ID RIDFLD + the SEC-USER-DATA currently read by the browse (CSUSR01Y). source: :81,588,623
     // =============================================================================================
     // SEC-USR-ID X(8) — the STARTBR/READNEXT/READPREV RID. Empty string = LOW-VALUES (browse from first),
     // the 8x0xFF sentinel = HIGH-VALUES (browse past the last record).
-    private string _secUsrId = "";
+    private string _recordKey = ""; // SEC-USR-ID (RIDFLD)
     private const string HighValues8 = "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
 
     // The SEC-USER-DATA record just read by the browse.
@@ -146,10 +146,10 @@ public sealed class UserListProgram : ITransactionHandler
     public UserListProgram() => _db = null!;
 
     /// <inheritdoc/>
-    public string ProgramName => WS_PGMNAME; // PROGRAM-ID. COUSR00C. source: :23
+    public string ProgramName => ProgramId; // PROGRAM-ID. COUSR00C. source: :23
 
     /// <inheritdoc/>
-    public string TransId => WS_TRANID;      // CSD: CU00 -> COUSR00C. source: CSD_TRANSACTIONS.md:84; cbl:37
+    public string TransId => TranId;      // CSD: CU00 -> COUSR00C. source: CSD_TRANSACTIONS.md:84; cbl:37
 
     // =============================================================================================
     //  MAIN-PARA — source: COUSR00C.cbl:98-144
@@ -162,13 +162,13 @@ public sealed class UserListProgram : ITransactionHandler
         if (_db is not null) _users = new UserSecurityRepository(_db.Connection);
 
         // SET ERR-FLG-OFF / USER-SEC-NOT-EOF / NEXT-PAGE-NO / SEND-ERASE-YES TO TRUE. source: :100-103
-        _errFlgOn = false;
+        _errorFlagOn = false;
         _userSecEof = false;
         SetNextPageNo();
         _sendEraseYes = true;
 
         // MOVE SPACES TO WS-MESSAGE  ERRMSGO OF COUSR0AO. source: :105-106
-        _wsMessage = "";
+        _message = "";
         _map.Field("ERRMSG").SetValue("", setMdt: false);
 
         // MOVE -1 TO USRIDINL OF COUSR0AI. source: :108
@@ -185,7 +185,7 @@ public sealed class UserListProgram : ITransactionHandler
         {
             // MOVE DFHCOMMAREA(1:EIBCALEN) TO CARDDEMO-COMMAREA. source: :114
             _commArea = ctx.CommArea!;
-            RestoreCu00Info();
+            RestorePagingState();
 
             if (!_commArea.IsReenter)
             {
@@ -193,11 +193,11 @@ public sealed class UserListProgram : ITransactionHandler
                 _commArea.SetReenter();              // SET CDEMO-PGM-REENTER TO TRUE. source: :116
                 MoveLowValuesToMapOut();             // MOVE LOW-VALUES TO COUSR0AO. source: :117
                 ProcessEnterKey(ctx);                // PERFORM PROCESS-ENTER-KEY. source: :118
-                SendUsrlstScreen(ctx);               // PERFORM SEND-USRLST-SCREEN. source: :119
+                SendUserListScreen(ctx);               // PERFORM SEND-USRLST-SCREEN. source: :119
             }
             else
             {
-                ReceiveUsrlstScreen(ctx);            // PERFORM RECEIVE-USRLST-SCREEN. source: :121
+                ReceiveUserListScreen(ctx);            // PERFORM RECEIVE-USRLST-SCREEN. source: :121
                 // EVALUATE EIBAID. source: :122
                 switch (ctx.EibAid)
                 {
@@ -216,10 +216,10 @@ public sealed class UserListProgram : ITransactionHandler
                         break;
                     default:
                         // WHEN OTHER. source: :132-136
-                        _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :133
+                        _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :133
                         _map.Field("USRIDIN").CursorLength = -1;           // MOVE -1 TO USRIDINL. source: :134
-                        _wsMessage = CCDA_MSG_INVALID_KEY;                 // MOVE CCDA-MSG-INVALID-KEY. source: :135
-                        SendUsrlstScreen(ctx);                             // PERFORM SEND-USRLST-SCREEN. source: :136
+                        _message = MsgInvalidKey;                 // MOVE CCDA-MSG-INVALID-KEY. source: :135
+                        SendUserListScreen(ctx);                             // PERFORM SEND-USRLST-SCREEN. source: :136
                         break;
                 }
             }
@@ -228,8 +228,8 @@ public sealed class UserListProgram : ITransactionHandler
         // EXEC CICS RETURN TRANSID(WS-TRANID) COMMAREA(CARDDEMO-COMMAREA). source: :141-144
         if (ctx.Outcome is null)
         {
-            SaveCu00Info();
-            ctx.ReturnTransId(WS_TRANID, _commArea);
+            SavePagingState();
+            ctx.ReturnTransId(TranId, _commArea);
         }
     }
 
@@ -239,78 +239,78 @@ public sealed class UserListProgram : ITransactionHandler
     private void ProcessEnterKey(CicsContext ctx)
     {
         // EVALUATE TRUE — first non-blank selection row wins. source: :151-185
-        if (NotSpacesOrLow(SelIn(1)))
+        if (NotSpacesOrLow(SelectionInput(1)))
         {
-            _cu00UsrSelFlg = SelIn(1); _cu00UsrSelected = UsrIdIn(1);   // source: :152-154
+            _selectionFlag = SelectionInput(1); _selectedUserId = UserIdInput(1);   // source: :152-154
         }
-        else if (NotSpacesOrLow(SelIn(2)))
+        else if (NotSpacesOrLow(SelectionInput(2)))
         {
-            _cu00UsrSelFlg = SelIn(2); _cu00UsrSelected = UsrIdIn(2);   // source: :155-157
+            _selectionFlag = SelectionInput(2); _selectedUserId = UserIdInput(2);   // source: :155-157
         }
-        else if (NotSpacesOrLow(SelIn(3)))
+        else if (NotSpacesOrLow(SelectionInput(3)))
         {
-            _cu00UsrSelFlg = SelIn(3); _cu00UsrSelected = UsrIdIn(3);   // source: :158-160
+            _selectionFlag = SelectionInput(3); _selectedUserId = UserIdInput(3);   // source: :158-160
         }
-        else if (NotSpacesOrLow(SelIn(4)))
+        else if (NotSpacesOrLow(SelectionInput(4)))
         {
-            _cu00UsrSelFlg = SelIn(4); _cu00UsrSelected = UsrIdIn(4);   // source: :161-163
+            _selectionFlag = SelectionInput(4); _selectedUserId = UserIdInput(4);   // source: :161-163
         }
-        else if (NotSpacesOrLow(SelIn(5)))
+        else if (NotSpacesOrLow(SelectionInput(5)))
         {
-            _cu00UsrSelFlg = SelIn(5); _cu00UsrSelected = UsrIdIn(5);   // source: :164-166
+            _selectionFlag = SelectionInput(5); _selectedUserId = UserIdInput(5);   // source: :164-166
         }
-        else if (NotSpacesOrLow(SelIn(6)))
+        else if (NotSpacesOrLow(SelectionInput(6)))
         {
-            _cu00UsrSelFlg = SelIn(6); _cu00UsrSelected = UsrIdIn(6);   // source: :167-169
+            _selectionFlag = SelectionInput(6); _selectedUserId = UserIdInput(6);   // source: :167-169
         }
-        else if (NotSpacesOrLow(SelIn(7)))
+        else if (NotSpacesOrLow(SelectionInput(7)))
         {
-            _cu00UsrSelFlg = SelIn(7); _cu00UsrSelected = UsrIdIn(7);   // source: :170-172
+            _selectionFlag = SelectionInput(7); _selectedUserId = UserIdInput(7);   // source: :170-172
         }
-        else if (NotSpacesOrLow(SelIn(8)))
+        else if (NotSpacesOrLow(SelectionInput(8)))
         {
-            _cu00UsrSelFlg = SelIn(8); _cu00UsrSelected = UsrIdIn(8);   // source: :173-175
+            _selectionFlag = SelectionInput(8); _selectedUserId = UserIdInput(8);   // source: :173-175
         }
-        else if (NotSpacesOrLow(SelIn(9)))
+        else if (NotSpacesOrLow(SelectionInput(9)))
         {
-            _cu00UsrSelFlg = SelIn(9); _cu00UsrSelected = UsrIdIn(9);   // source: :176-178
+            _selectionFlag = SelectionInput(9); _selectedUserId = UserIdInput(9);   // source: :176-178
         }
-        else if (NotSpacesOrLow(SelIn(10)))
+        else if (NotSpacesOrLow(SelectionInput(10)))
         {
-            _cu00UsrSelFlg = SelIn(10); _cu00UsrSelected = UsrIdIn(10); // source: :179-181
+            _selectionFlag = SelectionInput(10); _selectedUserId = UserIdInput(10); // source: :179-181
         }
         else
         {
-            _cu00UsrSelFlg = "";       // WHEN OTHER -> MOVE SPACES. source: :182-184
-            _cu00UsrSelected = "";
+            _selectionFlag = "";       // WHEN OTHER -> MOVE SPACES. source: :182-184
+            _selectedUserId = "";
         }
 
         // IF (USR-SEL-FLG NOT = SPACES AND LOW-VALUES) AND (USR-SELECTED NOT = SPACES AND LOW-VALUES). source: :187-216
-        if (NotSpacesOrLow(_cu00UsrSelFlg) && NotSpacesOrLow(_cu00UsrSelected))
+        if (NotSpacesOrLow(_selectionFlag) && NotSpacesOrLow(_selectedUserId))
         {
             // EVALUATE CDEMO-CU00-USR-SEL-FLG. source: :189-215
-            string flg = _cu00UsrSelFlg.Length > 0 ? _cu00UsrSelFlg.Substring(0, 1) : "";
-            if (flg == "U" || flg == "u")
+            string selectionChar = _selectionFlag.Length > 0 ? _selectionFlag.Substring(0, 1) : "";
+            if (selectionChar == "U" || selectionChar == "u")
             {
                 // WHEN 'U' / 'u' — XCTL to the user update program. source: :190-199
                 _commArea.ToProgram = "COUSR02C";   // MOVE 'COUSR02C' TO CDEMO-TO-PROGRAM. source: :192
-                _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :193
-                _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :194
+                _commArea.FromTranId = TranId;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :193
+                _commArea.FromProgram = ProgramId; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :194
                 _commArea.SetFirstEntry();          // MOVE 0 TO CDEMO-PGM-CONTEXT. source: :195
                 // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :196-199
-                SaveCu00Info();
+                SavePagingState();
                 ctx.Xctl("COUSR02C", _commArea);
                 return;
             }
-            else if (flg == "D" || flg == "d")
+            else if (selectionChar == "D" || selectionChar == "d")
             {
                 // WHEN 'D' / 'd' — XCTL to the user delete program. source: :200-209
                 _commArea.ToProgram = "COUSR03C";   // MOVE 'COUSR03C' TO CDEMO-TO-PROGRAM. source: :202
-                _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :203
-                _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :204
+                _commArea.FromTranId = TranId;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :203
+                _commArea.FromProgram = ProgramId; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :204
                 _commArea.SetFirstEntry();          // MOVE 0 TO CDEMO-PGM-CONTEXT. source: :205
                 // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :206-209
-                SaveCu00Info();
+                SavePagingState();
                 ctx.Xctl("COUSR03C", _commArea);
                 return;
             }
@@ -319,24 +319,24 @@ public sealed class UserListProgram : ITransactionHandler
                 // WHEN OTHER — build the invalid-selection message. B-2: there is NO SEND here, so the
                 // program does NOT stop; control falls through to the user-id edit + page logic and the
                 // message gets overwritten by the page send. source: :210-215
-                _wsMessage = "Invalid selection. Valid values are U and D"; // source: :211-213
+                _message = "Invalid selection. Valid values are U and D"; // source: :211-213
                 _map.Field("USRIDIN").CursorLength = -1;                    // MOVE -1 TO USRIDINL. source: :214
             }
         }
 
         // IF USRIDINI = SPACES OR LOW-VALUES -> MOVE LOW-VALUES TO SEC-USR-ID; ELSE MOVE USRIDINI. source: :218-222
         // B-6: there is NO numeric/format validation here, unlike COTRN00C.
-        string usridin = _map.Field("USRIDIN").Value;
-        if (IsSpacesOrLowValues(usridin))
-            _secUsrId = ""; // MOVE LOW-VALUES TO SEC-USR-ID. source: :219
+        string userIdInput = _map.Field("USRIDIN").Value;
+        if (IsSpacesOrLowValues(userIdInput))
+            _recordKey = ""; // MOVE LOW-VALUES TO SEC-USR-ID. source: :219
         else
-            _secUsrId = PadX(usridin, 8); // MOVE USRIDINI (X(8)) TO SEC-USR-ID (X(8)). source: :221
+            _recordKey = PadX(userIdInput, 8); // MOVE USRIDINI (X(8)) TO SEC-USR-ID (X(8)). source: :221
 
         // MOVE -1 TO USRIDINL. source: :224
         _map.Field("USRIDIN").CursorLength = -1;
 
         // MOVE 0 TO CDEMO-CU00-PAGE-NUM; PERFORM PROCESS-PAGE-FORWARD. source: :227-228
-        _cu00PageNum = 0;
+        _pageNumber = 0;
         ProcessPageForward(ctx);
 
         // IF NOT ERR-FLG-ON -> MOVE SPACE TO USRIDINO. source: :230-232
@@ -350,20 +350,20 @@ public sealed class UserListProgram : ITransactionHandler
     private void ProcessPf7Key(CicsContext ctx)
     {
         // IF CDEMO-CU00-USRID-FIRST = SPACES OR LOW-VALUES -> LOW-VALUES else USRID-FIRST. source: :239-243
-        _secUsrId = IsSpacesOrLowValues(_cu00UsridFirst) ? "" : _cu00UsridFirst;
+        _recordKey = IsSpacesOrLowValues(_firstUserIdOnPage) ? "" : _firstUserIdOnPage;
 
         SetNextPageYes();                              // SET NEXT-PAGE-YES TO TRUE. source: :245
         _map.Field("USRIDIN").CursorLength = -1;       // MOVE -1 TO USRIDINL. source: :246
 
-        if (_cu00PageNum > 1)
+        if (_pageNumber > 1)
         {
             ProcessPageBackward(ctx);                  // PERFORM PROCESS-PAGE-BACKWARD. source: :249
         }
         else
         {
-            _wsMessage = "You are already at the top of the page..."; // source: :251-252
+            _message = "You are already at the top of the page..."; // source: :251-252
             _sendEraseYes = false;                     // SET SEND-ERASE-NO TO TRUE. source: :253
-            SendUsrlstScreen(ctx);                     // PERFORM SEND-USRLST-SCREEN. source: :254
+            SendUserListScreen(ctx);                     // PERFORM SEND-USRLST-SCREEN. source: :254
         }
     }
 
@@ -373,7 +373,7 @@ public sealed class UserListProgram : ITransactionHandler
     private void ProcessPf8Key(CicsContext ctx)
     {
         // IF CDEMO-CU00-USRID-LAST = SPACES OR LOW-VALUES -> HIGH-VALUES else USRID-LAST. source: :262-266
-        _secUsrId = IsSpacesOrLowValues(_cu00UsridLast) ? HighValues8 : _cu00UsridLast;
+        _recordKey = IsSpacesOrLowValues(_lastUserIdOnPage) ? HighValues8 : _lastUserIdOnPage;
 
         _map.Field("USRIDIN").CursorLength = -1;       // MOVE -1 TO USRIDINL. source: :268
 
@@ -383,9 +383,9 @@ public sealed class UserListProgram : ITransactionHandler
         }
         else
         {
-            _wsMessage = "You are already at the bottom of the page..."; // source: :273-274
+            _message = "You are already at the bottom of the page..."; // source: :273-274
             _sendEraseYes = false;                     // SET SEND-ERASE-NO TO TRUE. source: :275
-            SendUsrlstScreen(ctx);                     // PERFORM SEND-USRLST-SCREEN. source: :276
+            SendUserListScreen(ctx);                     // PERFORM SEND-USRLST-SCREEN. source: :276
         }
     }
 
@@ -394,7 +394,7 @@ public sealed class UserListProgram : ITransactionHandler
     // =============================================================================================
     private void ProcessPageForward(CicsContext ctx)
     {
-        StartbrUserSecFile(ctx);               // PERFORM STARTBR-USER-SEC-FILE. source: :284
+        StartBrowseUserSecFile(ctx);               // PERFORM STARTBR-USER-SEC-FILE. source: :284
 
         if (!ErrFlgOn)                         // IF NOT ERR-FLG-ON. source: :286
         {
@@ -402,33 +402,33 @@ public sealed class UserListProgram : ITransactionHandler
             //   NOT=ENTER AND NOT=PF7 AND NOT=PF3. On PF8 (and any other key) this fires one extra
             //   READNEXT to step over the boundary record. source: :288-290
             if (ctx.EibAid != AidKey.Enter && ctx.EibAid != AidKey.Pf7 && ctx.EibAid != AidKey.Pf3)
-                ReadnextUserSecFile(ctx);      // PERFORM READNEXT-USER-SEC-FILE. source: :289
+                ReadNextUserSecFile(ctx);      // PERFORM READNEXT-USER-SEC-FILE. source: :289
 
             // IF USER-SEC-NOT-EOF AND ERR-FLG-OFF -> clear the 10 display rows. source: :292-296
             if (UserSecNotEof && ErrFlgOff)
             {
-                for (_wsIdx = 1; _wsIdx <= 10; _wsIdx++) // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL > 10. source: :293
+                for (_rowIndex = 1; _rowIndex <= 10; _rowIndex++) // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL > 10. source: :293
                     InitializeUserData();                 // PERFORM INITIALIZE-USER-DATA. source: :294
             }
 
-            _wsIdx = 1;                        // MOVE 1 TO WS-IDX. source: :298
+            _rowIndex = 1;                        // MOVE 1 TO WS-IDX. source: :298
 
             // PERFORM UNTIL WS-IDX >= 11 OR USER-SEC-EOF OR ERR-FLG-ON. source: :300-306
-            while (!(_wsIdx >= 11 || UserSecEof || ErrFlgOn))
+            while (!(_rowIndex >= 11 || UserSecEof || ErrFlgOn))
             {
-                ReadnextUserSecFile(ctx);      // PERFORM READNEXT-USER-SEC-FILE. source: :301
+                ReadNextUserSecFile(ctx);      // PERFORM READNEXT-USER-SEC-FILE. source: :301
                 if (UserSecNotEof && ErrFlgOff) // IF USER-SEC-NOT-EOF AND ERR-FLG-OFF. source: :302
                 {
                     PopulateUserData();          // PERFORM POPULATE-USER-DATA. source: :303
-                    _wsIdx = _wsIdx + 1;         // COMPUTE WS-IDX = WS-IDX + 1. source: :304
+                    _rowIndex = _rowIndex + 1;         // COMPUTE WS-IDX = WS-IDX + 1. source: :304
                 }
             }
 
             // IF USER-SEC-NOT-EOF AND ERR-FLG-OFF — peek for a next page. source: :308-323
             if (UserSecNotEof && ErrFlgOff)
             {
-                _cu00PageNum = _cu00PageNum + 1; // COMPUTE CDEMO-CU00-PAGE-NUM = + 1. source: :309-310
-                ReadnextUserSecFile(ctx);        // PERFORM READNEXT-USER-SEC-FILE. source: :311
+                _pageNumber = _pageNumber + 1; // COMPUTE CDEMO-CU00-PAGE-NUM = + 1. source: :309-310
+                ReadNextUserSecFile(ctx);        // PERFORM READNEXT-USER-SEC-FILE. source: :311
                 if (UserSecNotEof && ErrFlgOff)  // IF USER-SEC-NOT-EOF AND ERR-FLG-OFF. source: :312
                     SetNextPageYes();            // SET NEXT-PAGE-YES TO TRUE. source: :313
                 else
@@ -437,18 +437,18 @@ public sealed class UserListProgram : ITransactionHandler
             else
             {
                 SetNextPageNo();                 // SET NEXT-PAGE-NO TO TRUE. source: :318
-                if (_wsIdx > 1)                  // IF WS-IDX > 1. source: :319
-                    _cu00PageNum = _cu00PageNum + 1; // COMPUTE CDEMO-CU00-PAGE-NUM = + 1. source: :320-321
+                if (_rowIndex > 1)                  // IF WS-IDX > 1. source: :319
+                    _pageNumber = _pageNumber + 1; // COMPUTE CDEMO-CU00-PAGE-NUM = + 1. source: :320-321
             }
 
-            EndbrUserSecFile();                  // PERFORM ENDBR-USER-SEC-FILE. source: :325
+            EndBrowseUserSecFile();                  // PERFORM ENDBR-USER-SEC-FILE. source: :325
 
             // MOVE CDEMO-CU00-PAGE-NUM TO PAGENUMI; MOVE SPACE TO USRIDINO; PERFORM SEND. source: :327-329
             // CDEMO-CU00-PAGE-NUM PIC 9(08) -> PAGENUMI PIC X(8): the numeric-to-alphanumeric MOVE copies the
             // 8 zoned digits left-justified, so page 1 renders as "00000001" (zero-filled), not "1".
-            _map.Field("PAGENUM").SetValue(_cu00PageNum.ToString("D8"), setMdt: false);
+            _map.Field("PAGENUM").SetValue(_pageNumber.ToString("D8"), setMdt: false);
             _map.Field("USRIDIN").SetValue(" ", setMdt: false);
-            SendUsrlstScreen(ctx);
+            SendUserListScreen(ctx);
         }
     }
 
@@ -457,54 +457,54 @@ public sealed class UserListProgram : ITransactionHandler
     // =============================================================================================
     private void ProcessPageBackward(CicsContext ctx)
     {
-        StartbrUserSecFile(ctx);               // PERFORM STARTBR-USER-SEC-FILE. source: :338
+        StartBrowseUserSecFile(ctx);               // PERFORM STARTBR-USER-SEC-FILE. source: :338
 
         if (!ErrFlgOn)                         // IF NOT ERR-FLG-ON. source: :340
         {
             // B-1: IF EIBAID NOT = DFHENTER AND DFHPF8 -> NOT=ENTER AND NOT=PF8. On PF7 this fires an extra
             //   READPREV to step over the boundary record. source: :342-344
             if (ctx.EibAid != AidKey.Enter && ctx.EibAid != AidKey.Pf8)
-                ReadprevUserSecFile(ctx);      // PERFORM READPREV-USER-SEC-FILE. source: :343
+                ReadPreviousUserSecFile(ctx);      // PERFORM READPREV-USER-SEC-FILE. source: :343
 
             // IF USER-SEC-NOT-EOF AND ERR-FLG-OFF -> clear the 10 display rows. source: :346-350
             if (UserSecNotEof && ErrFlgOff)
             {
-                for (_wsIdx = 1; _wsIdx <= 10; _wsIdx++) // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL > 10. source: :347
+                for (_rowIndex = 1; _rowIndex <= 10; _rowIndex++) // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL > 10. source: :347
                     InitializeUserData();                 // PERFORM INITIALIZE-USER-DATA. source: :348
             }
 
-            _wsIdx = 10;                       // MOVE 10 TO WS-IDX. source: :352
+            _rowIndex = 10;                       // MOVE 10 TO WS-IDX. source: :352
 
             // PERFORM UNTIL WS-IDX <= 0 OR USER-SEC-EOF OR ERR-FLG-ON. source: :354-360
-            while (!(_wsIdx <= 0 || UserSecEof || ErrFlgOn))
+            while (!(_rowIndex <= 0 || UserSecEof || ErrFlgOn))
             {
-                ReadprevUserSecFile(ctx);      // PERFORM READPREV-USER-SEC-FILE. source: :355
+                ReadPreviousUserSecFile(ctx);      // PERFORM READPREV-USER-SEC-FILE. source: :355
                 if (UserSecNotEof && ErrFlgOff) // IF USER-SEC-NOT-EOF AND ERR-FLG-OFF. source: :356
                 {
                     PopulateUserData();          // PERFORM POPULATE-USER-DATA. source: :357
-                    _wsIdx = _wsIdx - 1;         // COMPUTE WS-IDX = WS-IDX - 1. source: :358
+                    _rowIndex = _rowIndex - 1;         // COMPUTE WS-IDX = WS-IDX - 1. source: :358
                 }
             }
 
             // IF USER-SEC-NOT-EOF AND ERR-FLG-OFF — adjust the page number. source: :362-372
             if (UserSecNotEof && ErrFlgOff)
             {
-                ReadprevUserSecFile(ctx);        // PERFORM READPREV-USER-SEC-FILE. source: :363
+                ReadPreviousUserSecFile(ctx);        // PERFORM READPREV-USER-SEC-FILE. source: :363
                 if (NextPageYes)                 // IF NEXT-PAGE-YES. source: :364
                 {
-                    if (UserSecNotEof && ErrFlgOff && _cu00PageNum > 1) // source: :365-366
-                        _cu00PageNum = _cu00PageNum - 1; // SUBTRACT 1 FROM CDEMO-CU00-PAGE-NUM. source: :367
+                    if (UserSecNotEof && ErrFlgOff && _pageNumber > 1) // source: :365-366
+                        _pageNumber = _pageNumber - 1; // SUBTRACT 1 FROM CDEMO-CU00-PAGE-NUM. source: :367
                     else
-                        _cu00PageNum = 1;        // MOVE 1 TO CDEMO-CU00-PAGE-NUM. source: :369
+                        _pageNumber = 1;        // MOVE 1 TO CDEMO-CU00-PAGE-NUM. source: :369
                 }
             }
 
-            EndbrUserSecFile();                  // PERFORM ENDBR-USER-SEC-FILE. source: :374
+            EndBrowseUserSecFile();                  // PERFORM ENDBR-USER-SEC-FILE. source: :374
 
             // MOVE CDEMO-CU00-PAGE-NUM TO PAGENUMI; PERFORM SEND. source: :376-377
             // CDEMO-CU00-PAGE-NUM PIC 9(08) -> PAGENUMI PIC X(8): zero-filled 8-digit render (e.g. "00000002").
-            _map.Field("PAGENUM").SetValue(_cu00PageNum.ToString("D8"), setMdt: false);
-            SendUsrlstScreen(ctx);
+            _map.Field("PAGENUM").SetValue(_pageNumber.ToString("D8"), setMdt: false);
+            SendUserListScreen(ctx);
         }
     }
 
@@ -514,12 +514,12 @@ public sealed class UserListProgram : ITransactionHandler
     private void PopulateUserData()
     {
         // EVALUATE WS-IDX -> stamp the row's USRID / FNAME / LNAME / UTYPE fields. source: :386-441
-        int n = _wsIdx;
+        int n = _rowIndex;
         if (n is < 1 or > 10) return; // WHEN OTHER -> CONTINUE. source: :439-440
 
         _map.Field($"USRID{n:D2}").SetValue(SecUsrId, setMdt: false);    // MOVE SEC-USR-ID TO USRIDnnI. source: :388,394,...
-        if (n == 1) _cu00UsridFirst = SecUsrId;  // WHEN 1 also -> CDEMO-CU00-USRID-FIRST. source: :388-389
-        if (n == 10) _cu00UsridLast = SecUsrId;  // WHEN 10 also -> CDEMO-CU00-USRID-LAST. source: :434-435
+        if (n == 1) _firstUserIdOnPage = SecUsrId;  // WHEN 1 also -> CDEMO-CU00-USRID-FIRST. source: :388-389
+        if (n == 10) _lastUserIdOnPage = SecUsrId;  // WHEN 10 also -> CDEMO-CU00-USRID-LAST. source: :434-435
         _map.Field($"FNAME{n:D2}").SetValue(SecUsrFname, setMdt: false); // MOVE SEC-USR-FNAME TO FNAMEnnI. source: :390,...
         _map.Field($"LNAME{n:D2}").SetValue(SecUsrLname, setMdt: false); // MOVE SEC-USR-LNAME TO LNAMEnnI. source: :391,...
         _map.Field($"UTYPE{n:D2}").SetValue(SecUsrType, setMdt: false);  // MOVE SEC-USR-TYPE TO UTYPEnnI. source: :392,...
@@ -531,7 +531,7 @@ public sealed class UserListProgram : ITransactionHandler
     private void InitializeUserData()
     {
         // EVALUATE WS-IDX -> MOVE SPACES to the row's four display fields. source: :448-501
-        int n = _wsIdx;
+        int n = _rowIndex;
         if (n is < 1 or > 10) return; // WHEN OTHER -> CONTINUE. source: :499-500
         _map.Field($"USRID{n:D2}").SetValue(" ", setMdt: false); // MOVE SPACES TO USRIDnnI. source: :450,...
         _map.Field($"FNAME{n:D2}").SetValue(" ", setMdt: false); // MOVE SPACES TO FNAMEnnI. source: :451,...
@@ -548,23 +548,23 @@ public sealed class UserListProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_commArea.ToProgram))
             _commArea.ToProgram = "COSGN00C";
 
-        _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :511
-        _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :512
+        _commArea.FromTranId = TranId;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :511
+        _commArea.FromProgram = ProgramId; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :512
         _commArea.SetFirstEntry();          // MOVE ZEROS TO CDEMO-PGM-CONTEXT. source: :513
 
         // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :514-517
-        SaveCu00Info();
+        SavePagingState();
         ctx.Xctl(_commArea.ToProgram.TrimEnd(), _commArea);
     }
 
     // =============================================================================================
     //  SEND-USRLST-SCREEN — source: COUSR00C.cbl:522-544
     // =============================================================================================
-    private void SendUsrlstScreen(CicsContext ctx)
+    private void SendUserListScreen(CicsContext ctx) // COBOL paragraph: SEND-USRLST-SCREEN
     {
         PopulateHeaderInfo(ctx);                                     // PERFORM POPULATE-HEADER-INFO. source: :524
 
-        _map.Field("ERRMSG").SetValue(_wsMessage, setMdt: false);   // MOVE WS-MESSAGE TO ERRMSGO. source: :526
+        _map.Field("ERRMSG").SetValue(_message, setMdt: false);   // MOVE WS-MESSAGE TO ERRMSGO. source: :526
 
         // IF SEND-ERASE-YES -> SEND ... ERASE CURSOR; ELSE SEND ... CURSOR (no erase). source: :528-544
         ctx.SendMap("COUSR0A", "COUSR00", _map, new SendMapOptions
@@ -573,18 +573,18 @@ public sealed class UserListProgram : ITransactionHandler
             FreeKb = true,
             Cursor = -1, // CURSOR — honour the MOVE -1 TO USRIDINL set throughout.
         });
-        _wsRespCd = (int)Resp.Normal;
+        _responseCode = (int)Resp.Normal;
     }
 
     // =============================================================================================
     //  RECEIVE-USRLST-SCREEN — source: COUSR00C.cbl:549-557
     // =============================================================================================
-    private void ReceiveUsrlstScreen(CicsContext ctx)
+    private void ReceiveUserListScreen(CicsContext ctx) // COBOL paragraph: RECEIVE-USRLST-SCREEN
     {
         // EXEC CICS RECEIVE MAP('COUSR0A') MAPSET('COUSR00') INTO(COUSR0AI) RESP. source: :551-557
         ctx.ReceiveMap("COUSR0A", "COUSR00", _map);
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
     }
 
     // =============================================================================================
@@ -595,10 +595,10 @@ public sealed class UserListProgram : ITransactionHandler
         // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: :564
         DateTime now = ctx.Clock.Now;
 
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :566
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :567
-        _map.Field("TRNNAME").SetValue(WS_TRANID, setMdt: false);    // MOVE WS-TRANID  TO TRNNAMEO. source: :568
-        _map.Field("PGMNAME").SetValue(WS_PGMNAME, setMdt: false);   // MOVE WS-PGMNAME TO PGMNAMEO. source: :569
+        _map.Field("TITLE01").SetValue(Title01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :566
+        _map.Field("TITLE02").SetValue(Title02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :567
+        _map.Field("TRNNAME").SetValue(TranId, setMdt: false);    // MOVE WS-TRANID  TO TRNNAMEO. source: :568
+        _map.Field("PGMNAME").SetValue(ProgramId, setMdt: false);   // MOVE WS-PGMNAME TO PGMNAMEO. source: :569
 
         // CURDATEO = mm/dd/yy (year last two digits). source: :571-575
         _map.Field("CURDATE").SetValue($"{Two(now.Month)}/{Two(now.Day)}/{Four(now.Year).Substring(2, 2)}", setMdt: false);
@@ -610,21 +610,21 @@ public sealed class UserListProgram : ITransactionHandler
     // =============================================================================================
     //  STARTBR-USER-SEC-FILE — source: COUSR00C.cbl:586-614
     // =============================================================================================
-    private void StartbrUserSecFile(CicsContext ctx)
+    private void StartBrowseUserSecFile(CicsContext ctx) // COBOL paragraph: STARTBR-USER-SEC-FILE
     {
         // EXEC CICS STARTBR DATASET(WS-USRSEC-FILE) RIDFLD(SEC-USR-ID) RESP. source: :588-595
         // STARTBR is GTEQ (the GTEQ is commented but CICS default is GTEQ): position at-or-after SEC-USR-ID.
         // LOW-VALUES (empty) -> from the first record; HIGH-VALUES -> past the last record (NOTFND).
-        _ = WS_USRSEC_FILE; // dataset name (fixed) — repository is keyed by usr_id.
-        if (_secUsrId.Length == 0)
+        _ = UserSecFileName; // dataset name (fixed) — repository is keyed by usr_id.
+        if (_recordKey.Length == 0)
             _users.StartBrowse();
         else
-            _users.StartBrowse(_secUsrId);
+            _users.StartBrowse(_recordKey);
         string fileStatus = PeekForwardExists() ? FileStatus.Ok : FileStatus.RecordNotFound;
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :597-614
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal: // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :598-599
                 break;
@@ -632,15 +632,15 @@ public sealed class UserListProgram : ITransactionHandler
                 // NOTE (B-4): unlike COTRN00C, NO 'MOVE Y TO WS-ERR-FLG' here, so the caller's
                 //   IF NOT ERR-FLG-ON still runs the EOF-guarded page loop.
                 _userSecEof = true;                                   // SET USER-SEC-EOF TO TRUE. source: :602
-                _wsMessage = "You are at the top of the page...";     // source: :603-604
+                _message = "You are at the top of the page...";     // source: :603-604
                 _map.Field("USRIDIN").CursorLength = -1;              // MOVE -1 TO USRIDINL. source: :605
-                SendUsrlstScreen(ctx);                                // PERFORM SEND-USRLST-SCREEN. source: :606
+                SendUserListScreen(ctx);                                // PERFORM SEND-USRLST-SCREEN. source: :606
                 break;
             default: // WHEN OTHER. source: :607-613
-                _errFlgOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :609
-                _wsMessage = "Unable to lookup User...";              // source: :610-611
+                _errorFlagOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :609
+                _message = "Unable to lookup User...";              // source: :610-611
                 _map.Field("USRIDIN").CursorLength = -1;              // MOVE -1 TO USRIDINL. source: :612
-                SendUsrlstScreen(ctx);                                // PERFORM SEND-USRLST-SCREEN. source: :613
+                SendUserListScreen(ctx);                                // PERFORM SEND-USRLST-SCREEN. source: :613
                 break;
         }
     }
@@ -648,30 +648,30 @@ public sealed class UserListProgram : ITransactionHandler
     // =============================================================================================
     //  READNEXT-USER-SEC-FILE — source: COUSR00C.cbl:619-648
     // =============================================================================================
-    private void ReadnextUserSecFile(CicsContext ctx)
+    private void ReadNextUserSecFile(CicsContext ctx) // COBOL paragraph: READNEXT-USER-SEC-FILE
     {
         // EXEC CICS READNEXT DATASET(WS-USRSEC-FILE) INTO(SEC-USER-DATA) RIDFLD(SEC-USR-ID) RESP. source: :621-629
         string fileStatus = _users.ReadNext(out _secUserData);
         if (fileStatus == FileStatus.Ok && _secUserData is not null)
-            _secUsrId = _secUserData.UsrId; // RIDFLD is updated with the key just read. source: :625
+            _recordKey = _secUserData.UsrId; // RIDFLD is updated with the key just read. source: :625
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :631-648
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal: // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :632-633
                 break;
             case Resp.EndFile: // WHEN DFHRESP(ENDFILE). source: :634-640
                 _userSecEof = true;                                        // SET USER-SEC-EOF TO TRUE. source: :636
-                _wsMessage = "You have reached the bottom of the page..."; // source: :637-638
+                _message = "You have reached the bottom of the page..."; // source: :637-638
                 _map.Field("USRIDIN").CursorLength = -1;                   // MOVE -1 TO USRIDINL. source: :639
-                SendUsrlstScreen(ctx);                                     // PERFORM SEND-USRLST-SCREEN. source: :640
+                SendUserListScreen(ctx);                                     // PERFORM SEND-USRLST-SCREEN. source: :640
                 break;
             default: // WHEN OTHER. source: :641-647
-                _errFlgOn = true;                                          // MOVE 'Y' TO WS-ERR-FLG. source: :643
-                _wsMessage = "Unable to lookup User...";                  // source: :644-645
+                _errorFlagOn = true;                                          // MOVE 'Y' TO WS-ERR-FLG. source: :643
+                _message = "Unable to lookup User...";                  // source: :644-645
                 _map.Field("USRIDIN").CursorLength = -1;                   // MOVE -1 TO USRIDINL. source: :646
-                SendUsrlstScreen(ctx);                                     // PERFORM SEND-USRLST-SCREEN. source: :647
+                SendUserListScreen(ctx);                                     // PERFORM SEND-USRLST-SCREEN. source: :647
                 break;
         }
     }
@@ -679,30 +679,30 @@ public sealed class UserListProgram : ITransactionHandler
     // =============================================================================================
     //  READPREV-USER-SEC-FILE — source: COUSR00C.cbl:653-682
     // =============================================================================================
-    private void ReadprevUserSecFile(CicsContext ctx)
+    private void ReadPreviousUserSecFile(CicsContext ctx) // COBOL paragraph: READPREV-USER-SEC-FILE
     {
         // EXEC CICS READPREV DATASET(WS-USRSEC-FILE) INTO(SEC-USER-DATA) RIDFLD(SEC-USR-ID) RESP. source: :655-663
         string fileStatus = _users.ReadPrevious(out _secUserData);
         if (fileStatus == FileStatus.Ok && _secUserData is not null)
-            _secUsrId = _secUserData.UsrId; // RIDFLD updated with the key just read. source: :659
+            _recordKey = _secUserData.UsrId; // RIDFLD updated with the key just read. source: :659
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :665-682
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal: // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :666-667
                 break;
             case Resp.EndFile: // WHEN DFHRESP(ENDFILE). source: :668-674
                 _userSecEof = true;                                   // SET USER-SEC-EOF TO TRUE. source: :670
-                _wsMessage = "You have reached the top of the page..."; // source: :671-672
+                _message = "You have reached the top of the page..."; // source: :671-672
                 _map.Field("USRIDIN").CursorLength = -1;              // MOVE -1 TO USRIDINL. source: :673
-                SendUsrlstScreen(ctx);                                // PERFORM SEND-USRLST-SCREEN. source: :674
+                SendUserListScreen(ctx);                                // PERFORM SEND-USRLST-SCREEN. source: :674
                 break;
             default: // WHEN OTHER. source: :675-681
-                _errFlgOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :677
-                _wsMessage = "Unable to lookup User...";              // source: :678-679
+                _errorFlagOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :677
+                _message = "Unable to lookup User...";              // source: :678-679
                 _map.Field("USRIDIN").CursorLength = -1;              // MOVE -1 TO USRIDINL. source: :680
-                SendUsrlstScreen(ctx);                                // PERFORM SEND-USRLST-SCREEN. source: :681
+                SendUserListScreen(ctx);                                // PERFORM SEND-USRLST-SCREEN. source: :681
                 break;
         }
     }
@@ -710,7 +710,7 @@ public sealed class UserListProgram : ITransactionHandler
     // =============================================================================================
     //  ENDBR-USER-SEC-FILE — source: COUSR00C.cbl:687-691
     // =============================================================================================
-    private void EndbrUserSecFile() => _users.EndBrowse(); // EXEC CICS ENDBR DATASET(WS-USRSEC-FILE). source: :689
+    private void EndBrowseUserSecFile() => _users.EndBrowse(); // COBOL paragraph: ENDBR-USER-SEC-FILE; EXEC CICS ENDBR DATASET(WS-USRSEC-FILE). source: :689
 
     // =============================================================================================
     //  STARTBR positioning helper — emulate CICS RESP after STARTBR GTEQ.
@@ -722,12 +722,12 @@ public sealed class UserListProgram : ITransactionHandler
     /// </summary>
     private bool PeekForwardExists()
     {
-        string st = _users.ReadNext(out _);
+        string fileStatus = _users.ReadNext(out _);
         // Re-position at-or-after the same RID so the caller's first READNEXT returns the same record,
         // and a first READPREV returns the record at-or-before it (matching CICS browse after STARTBR).
-        if (_secUsrId.Length == 0) _users.StartBrowse();
-        else _users.StartBrowse(_secUsrId);
-        return st == FileStatus.Ok;
+        if (_recordKey.Length == 0) _users.StartBrowse();
+        else _users.StartBrowse(_recordKey);
+        return fileStatus == FileStatus.Ok;
     }
 
     // =============================================================================================
@@ -735,7 +735,7 @@ public sealed class UserListProgram : ITransactionHandler
     // =============================================================================================
     private void SetResp(string fileStatus)
     {
-        _wsRespCd = fileStatus switch
+        _responseCode = fileStatus switch
         {
             FileStatus.Ok => (int)Resp.Normal,             // '00' -> DFHRESP(NORMAL)
             FileStatus.EndOfFile => (int)Resp.EndFile,     // '10' -> DFHRESP(ENDFILE)
@@ -743,14 +743,14 @@ public sealed class UserListProgram : ITransactionHandler
             FileStatus.DuplicateKey => (int)Resp.DupRec,   // '02' -> DFHRESP(DUPREC)
             _ => (int)Resp.Error,                          // any other -> WHEN OTHER (file error)
         };
-        _wsReasCd = 0; // RESP2 unavailable from the relational repo; 0 for parity.
+        _reasonCode = 0; // RESP2 unavailable from the relational repo; 0 for parity.
     }
 
     // =============================================================================================
     //  Symbolic-map input readers — SEL000nI / USRIDnnI.
     // =============================================================================================
-    private string SelIn(int n) => _map.Field($"SEL{n:D4}").Value;     // SEL0001I..SEL0010I
-    private string UsrIdIn(int n) => _map.Field($"USRID{n:D2}").Value; // USRID01I..USRID10I
+    private string SelectionInput(int n) => _map.Field($"SEL{n:D4}").Value;     // SEL0001I..SEL0010I
+    private string UserIdInput(int n) => _map.Field($"USRID{n:D2}").Value; // USRID01I..USRID10I
 
     /// <summary>MOVE LOW-VALUES TO COUSR0AO — blank every named output field + clear per-turn overrides. source: :117</summary>
     private void MoveLowValuesToMapOut()
@@ -774,32 +774,32 @@ public sealed class UserListProgram : ITransactionHandler
     // below MUST match COUSR02C/COUSR03C Save/RestoreCuNNInfo or the selection is lost across the XCTL.
     // Pack layout into CustFName(25)+CustMName(25)+CustLName(25) = 75 bytes:
     //   USRID-FIRST X(8) | USRID-LAST X(8) | PAGE-NUM 9(8) | NEXT X(1) | SEL-FLG X(1) | USR-SELECTED X(8).
-    private void SaveCu00Info()
+    private void SavePagingState()
     {
         string packed =
-            PadX(_cu00UsridFirst, 8) +
-            PadX(_cu00UsridLast, 8) +
-            Zoned(_cu00PageNum, 8) +
-            (_cu00NextPageFlg == '\0' ? 'N' : _cu00NextPageFlg) +
-            PadX(_cu00UsrSelFlg, 1) +
-            PadX(_cu00UsrSelected, 8);
+            PadX(_firstUserIdOnPage, 8) +
+            PadX(_lastUserIdOnPage, 8) +
+            Zoned(_pageNumber, 8) +
+            (_nextPageFlag == '\0' ? 'N' : _nextPageFlag) +
+            PadX(_selectionFlag, 1) +
+            PadX(_selectedUserId, 8);
         packed = PadX(packed, 75);
         _commArea.CustFName = packed.Substring(0, 25);
         _commArea.CustMName = packed.Substring(25, 25);
         _commArea.CustLName = packed.Substring(50, 25);
     }
 
-    private void RestoreCu00Info()
+    private void RestorePagingState()
     {
         string packed = PadX(_commArea.CustFName, 25) + PadX(_commArea.CustMName, 25) + PadX(_commArea.CustLName, 25);
         packed = PadX(packed, 75);
-        _cu00UsridFirst = packed.Substring(0, 8).TrimEnd();
-        _cu00UsridLast = packed.Substring(8, 8).TrimEnd();
-        _cu00PageNum = (int)ParseLong(packed.Substring(16, 8));
-        char nx = packed[24];
-        _cu00NextPageFlg = nx == 'Y' ? 'Y' : 'N';
-        _cu00UsrSelFlg = packed.Substring(25, 1).TrimEnd();
-        _cu00UsrSelected = packed.Substring(26, 8).TrimEnd();
+        _firstUserIdOnPage = packed.Substring(0, 8).TrimEnd();
+        _lastUserIdOnPage = packed.Substring(8, 8).TrimEnd();
+        _pageNumber = (int)ParseLong(packed.Substring(16, 8));
+        char nextPageChar = packed[24];
+        _nextPageFlag = nextPageChar == 'Y' ? 'Y' : 'N';
+        _selectionFlag = packed.Substring(25, 1).TrimEnd();
+        _selectedUserId = packed.Substring(26, 8).TrimEnd();
     }
 
     // =============================================================================================

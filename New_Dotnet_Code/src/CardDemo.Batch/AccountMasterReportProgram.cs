@@ -58,15 +58,15 @@ public sealed class AccountMasterReportProgram
     private FileStream? _vbrcFile;
 
     // WORKING-STORAGE flags / status (CBACT01C lines 91-122).
-    private string _acctfileStatus = "00"; // ACCTFILE-STATUS
-    private string _outfileStatus = "00";  // OUTFILE-STATUS
-    private string _arryfileStatus = "00"; // ARRYFILE-STATUS
-    private string _vbrcfileStatus = "00"; // VBRCFILE-STATUS
-    private int _applResult;               // APPL-RESULT S9(9) COMP (88 APPL-AOK=0, APPL-EOF=16)
+    private string _accountFileStatus = "00"; // ACCTFILE-STATUS
+    private string _outputFileStatus = "00";  // OUTFILE-STATUS
+    private string _arrayFileStatus = "00"; // ARRYFILE-STATUS
+    private string _vbrcFileStatus = "00"; // VBRCFILE-STATUS
+    private int _applicationResult;        // APPL-RESULT S9(9) COMP (88 APPL-AOK=0, APPL-EOF=16)
     private bool _endOfFile;               // END-OF-FILE 'N'/'Y'
 
     // ACCOUNT-RECORD (CVACT01Y) — the record just READ INTO (null before the first successful read).
-    private Account? _acct;
+    private Account? _accountRecord; // ACCOUNT-RECORD
 
     // --- OUT-ACCT-REC (FD OUT-FILE) — instance state, NOT re-initialized per record (bug #1) -----------
     private long _outAcctId;                 // OUT-ACCT-ID 9(11)
@@ -97,8 +97,8 @@ public sealed class AccountMasterReportProgram
 
     // --- WS-ACCT-REISSUE-DATE (X10 with embedded FILLERs) + WS-REISSUE-DATE redefine ------------------
     // Modeled as the flat 10-char string the redefine receives; WS-ACCT-REISSUE-YYYY = first 4 chars.
-    private string _wsReissueDate = new(' ', 10); // WS-REISSUE-DATE (redefine of WS-ACCT-REISSUE-DATE)
-    private string WsAcctReissueYyyy => _wsReissueDate.Length >= 4 ? _wsReissueDate[..4] : _wsReissueDate.PadRight(4);
+    private string _reissueDate = new(' ', 10); // WS-REISSUE-DATE (redefine of WS-ACCT-REISSUE-DATE)
+    private string ReissueYyyy => _reissueDate.Length >= 4 ? _reissueDate[..4] : _reissueDate.PadRight(4); // WS-ACCT-REISSUE-YYYY
 
     private AccountMasterReportProgram(AccountRepository account, string outFilePath, string arryFilePath, string vbrcFilePath, HostKind host)
     {
@@ -150,17 +150,17 @@ public sealed class AccountMasterReportProgram
         try
         {
             _sysout.Add("START OF EXECUTION OF PROGRAM CBACT01C");        // source: CBACT01C.cbl:141
-            Open0000Acctfile();                                          // source: CBACT01C.cbl:142
-            Open2000Outfile();                                           // source: CBACT01C.cbl:143
-            Open3000Arrfile();                                           // source: CBACT01C.cbl:144
-            Open4000Vbrfile();                                           // source: CBACT01C.cbl:145
+            OpenAccountFile();                                          // source: CBACT01C.cbl:142
+            OpenOutputFile();                                           // source: CBACT01C.cbl:143
+            OpenArrayFile();                                           // source: CBACT01C.cbl:144
+            OpenVbrcFile();                                           // source: CBACT01C.cbl:145
 
             // PERFORM UNTIL END-OF-FILE = 'Y' (the inner IFs are redundant with the loop test but kept).
             while (!_endOfFile)                                          // source: CBACT01C.cbl:147
             {
                 if (!_endOfFile)                                         // source: CBACT01C.cbl:148
                 {
-                    Get1000AcctfileNext();                               // source: CBACT01C.cbl:149
+                    GetNextAccountRecord();                               // source: CBACT01C.cbl:149
                     if (!_endOfFile)                                     // source: CBACT01C.cbl:150
                     {
                         _sysout.Add(DisplayAccountRecord());            // DISPLAY ACCOUNT-RECORD // source: CBACT01C.cbl:151
@@ -168,7 +168,7 @@ public sealed class AccountMasterReportProgram
                 }
             }
 
-            Close9000Acctfile();                                        // source: CBACT01C.cbl:156
+            CloseAccountFile();                                        // source: CBACT01C.cbl:156
 
             _sysout.Add("END OF EXECUTION OF PROGRAM CBACT01C");         // source: CBACT01C.cbl:158
             // GOBACK — note: NO CLOSE for OUTFILE/ARRYFILE/VBRCFILE (bug #2). // source: CBACT01C.cbl:160
@@ -186,57 +186,57 @@ public sealed class AccountMasterReportProgram
     // =================================================================================================
     // 1000-ACCTFILE-GET-NEXT // source: CBACT01C.cbl:165-198
     // =================================================================================================
-    private void Get1000AcctfileNext()
+    private void GetNextAccountRecord() // COBOL paragraph: 1000-ACCTFILE-GET-NEXT
     {
         // READ ACCTFILE-FILE INTO ACCOUNT-RECORD (sequential next). // source: CBACT01C.cbl:166
-        _acctfileStatus = _account.ReadNext(out Account? next);
+        _accountFileStatus = _account.ReadNext(out Account? next);
 
-        if (_acctfileStatus == FileStatus.Ok)                          // source: CBACT01C.cbl:167
+        if (_accountFileStatus == FileStatus.Ok)                          // source: CBACT01C.cbl:167
         {
-            _acct = next;
-            _applResult = 0;                                           // MOVE 0 TO APPL-RESULT // source: CBACT01C.cbl:168
+            _accountRecord = next;
+            _applicationResult = 0;                                           // MOVE 0 TO APPL-RESULT // source: CBACT01C.cbl:168
             InitializeArrArrayRec();                                   // INITIALIZE ARR-ARRAY-REC // source: CBACT01C.cbl:169
-            Display1100AcctRecord();                                   // source: CBACT01C.cbl:170
-            Popul1300AcctRecord();                                     // source: CBACT01C.cbl:171
-            Write1350AcctRecord();                                     // source: CBACT01C.cbl:172
-            Popul1400ArrayRecord();                                    // source: CBACT01C.cbl:173
-            Write1450ArryRecord();                                     // source: CBACT01C.cbl:174
+            DisplayAccountFields();                                   // source: CBACT01C.cbl:170
+            PopulateAccountRecord();                                     // source: CBACT01C.cbl:171
+            WriteAccountRecord();                                     // source: CBACT01C.cbl:172
+            PopulateArrayRecord();                                    // source: CBACT01C.cbl:173
+            WriteArrayRecord();                                     // source: CBACT01C.cbl:174
             InitializeVbrcRec1();                                      // INITIALIZE VBRC-REC1 // source: CBACT01C.cbl:175
-            Popul1500VbrcRecord();                                     // source: CBACT01C.cbl:176
-            Write1550Vb1Record();                                      // source: CBACT01C.cbl:177
-            Write1575Vb2Record();                                      // source: CBACT01C.cbl:178
+            PopulateVbrcRecord();                                     // source: CBACT01C.cbl:176
+            WriteVbrcRecord1();                                      // source: CBACT01C.cbl:177
+            WriteVbrcRecord2();                                      // source: CBACT01C.cbl:178
         }
-        else if (_acctfileStatus == FileStatus.EndOfFile)             // status '10' // source: CBACT01C.cbl:180
+        else if (_accountFileStatus == FileStatus.EndOfFile)             // status '10' // source: CBACT01C.cbl:180
         {
-            _applResult = 16;                                          // MOVE 16 TO APPL-RESULT // source: CBACT01C.cbl:181
+            _applicationResult = 16;                                          // MOVE 16 TO APPL-RESULT // source: CBACT01C.cbl:181
         }
         else
         {
-            _applResult = 12;                                          // MOVE 12 TO APPL-RESULT // source: CBACT01C.cbl:183
+            _applicationResult = 12;                                          // MOVE 12 TO APPL-RESULT // source: CBACT01C.cbl:183
         }
 
-        if (_applResult == 0)                                         // IF APPL-AOK // source: CBACT01C.cbl:186
+        if (_applicationResult == 0)                                         // IF APPL-AOK // source: CBACT01C.cbl:186
         {
             // CONTINUE
         }
-        else if (_applResult == 16)                                   // IF APPL-EOF // source: CBACT01C.cbl:189
+        else if (_applicationResult == 16)                                   // IF APPL-EOF // source: CBACT01C.cbl:189
         {
             _endOfFile = true;                                        // MOVE 'Y' TO END-OF-FILE // source: CBACT01C.cbl:190
         }
         else
         {
             _sysout.Add("ERROR READING ACCOUNT FILE");                // source: CBACT01C.cbl:192
-            Display9910IoStatus(_acctfileStatus);                     // source: CBACT01C.cbl:193-194
-            Abend9999Program();                                       // source: CBACT01C.cbl:195
+            DisplayIoStatus(_accountFileStatus);                     // source: CBACT01C.cbl:193-194
+            AbendProgram();                                       // source: CBACT01C.cbl:195
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 1100-DISPLAY-ACCT-RECORD // source: CBACT01C.cbl:200-213
     // Pure SYSOUT side-effect; the labels (2-space gaps) and misspelling are reproduced verbatim.
-    private void Display1100AcctRecord()
+    private void DisplayAccountFields() // COBOL paragraph: 1100-DISPLAY-ACCT-RECORD
     {
-        Account a = _acct!;
+        Account a = _accountRecord!;
         _sysout.Add("ACCT-ID                 :" + Zoned(a.AcctId, 11, 0, signed: false)); // source: CBACT01C.cbl:201
         _sysout.Add("ACCT-ACTIVE-STATUS      :" + a.ActiveStatus);                        // source: CBACT01C.cbl:202
         _sysout.Add("ACCT-CURR-BAL           :" + Zoned(a.CurrBal, MoneyDigits, MoneyScale, signed: true));        // source: CBACT01C.cbl:203
@@ -253,9 +253,9 @@ public sealed class AccountMasterReportProgram
 
     // -------------------------------------------------------------------------------------------------
     // 1300-POPUL-ACCT-RECORD (builds OUT-ACCT-REC) // source: CBACT01C.cbl:215-240
-    private void Popul1300AcctRecord()
+    private void PopulateAccountRecord() // COBOL paragraph: 1300-POPUL-ACCT-RECORD
     {
-        Account a = _acct!;
+        Account a = _accountRecord!;
         _outAcctId = a.AcctId;                                  // source: CBACT01C.cbl:216
         _outAcctActiveStatus = Fixed(a.ActiveStatus, 1);        // source: CBACT01C.cbl:217
         _outAcctCurrBal = a.CurrBal;                            // source: CBACT01C.cbl:218
@@ -267,7 +267,7 @@ public sealed class AccountMasterReportProgram
         // MOVE ACCT-REISSUE-DATE TO CODATECN-INP-DATE WS-REISSUE-DATE. // source: CBACT01C.cbl:223-224
         // ACCT-REISSUE-DATE is X(10); CODATECN-INP-DATE is X(20) -> right space-padded.
         // WS-REISSUE-DATE (X10 redefine) receives the raw 10 chars.
-        _wsReissueDate = Fixed(a.ReissueDate, 10);
+        _reissueDate = Fixed(a.ReissueDate, 10);
 
         // CODATECN-REC is an 80-byte buffer: TYPE(0,1) INP-DATE(1,20) OUTTYPE(21,1) OUT-DATE(22,20) ERR(42,38).
         byte[] codatecn = BlankCodatecnRec();
@@ -294,27 +294,27 @@ public sealed class AccountMasterReportProgram
 
     // -------------------------------------------------------------------------------------------------
     // 1350-WRITE-ACCT-RECORD // source: CBACT01C.cbl:242-251
-    private void Write1350AcctRecord()
+    private void WriteAccountRecord() // COBOL paragraph: 1350-WRITE-ACCT-RECORD
     {
         // Serialize OUT-ACCT-REC (LRECL 107): 11 zoned + 1 X + 4*12 zoned money + 10+10+10 X + 12 zoned
         // money + 7 COMP-3 + 10 X.
         byte[] image = BuildOutAcctRec();
         _outFile!.Write(image);                                  // WRITE OUT-ACCT-REC // source: CBACT01C.cbl:243
-        _outfileStatus = FileStatus.Ok;
+        _outputFileStatus = FileStatus.Ok;
 
-        if (_outfileStatus != FileStatus.Ok && _outfileStatus != FileStatus.EndOfFile) // source: CBACT01C.cbl:245
+        if (_outputFileStatus != FileStatus.Ok && _outputFileStatus != FileStatus.EndOfFile) // source: CBACT01C.cbl:245
         {
-            _sysout.Add("ACCOUNT FILE WRITE STATUS IS:" + _outfileStatus); // source: CBACT01C.cbl:246
-            Display9910IoStatus(_outfileStatus);                           // source: CBACT01C.cbl:247-248
-            Abend9999Program();                                            // source: CBACT01C.cbl:249
+            _sysout.Add("ACCOUNT FILE WRITE STATUS IS:" + _outputFileStatus); // source: CBACT01C.cbl:246
+            DisplayIoStatus(_outputFileStatus);                           // source: CBACT01C.cbl:247-248
+            AbendProgram();                                            // source: CBACT01C.cbl:249
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 1400-POPUL-ARRAY-RECORD (builds ARR-ARRAY-REC) // source: CBACT01C.cbl:253-261
-    private void Popul1400ArrayRecord()
+    private void PopulateArrayRecord() // COBOL paragraph: 1400-POPUL-ARRAY-RECORD
     {
-        Account a = _acct!;
+        Account a = _accountRecord!;
         _arrAcctId = a.AcctId;                       // source: CBACT01C.cbl:254
         _arrAcctCurrBal[0] = a.CurrBal;              // ARR-ACCT-CURR-BAL(1) // source: CBACT01C.cbl:255
         _arrAcctCurrCycDebit[0] = 1005.00m;          // ARR-ACCT-CURR-CYC-DEBIT(1) (magic) // source: CBACT01C.cbl:256
@@ -327,160 +327,160 @@ public sealed class AccountMasterReportProgram
 
     // -------------------------------------------------------------------------------------------------
     // 1450-WRITE-ARRY-RECORD // source: CBACT01C.cbl:263-274
-    private void Write1450ArryRecord()
+    private void WriteArrayRecord() // COBOL paragraph: 1450-WRITE-ARRY-RECORD
     {
         // Serialize ARR-ARRAY-REC (LRECL 110): 11 zoned + 5*(12 zoned + 7 COMP-3) + 4 X.
         byte[] image = BuildArrArrayRec();
         _arryFile!.Write(image);                                 // WRITE ARR-ARRAY-REC // source: CBACT01C.cbl:264
-        _arryfileStatus = FileStatus.Ok;
+        _arrayFileStatus = FileStatus.Ok;
 
-        if (_arryfileStatus != FileStatus.Ok && _arryfileStatus != FileStatus.EndOfFile) // source: CBACT01C.cbl:266-267
+        if (_arrayFileStatus != FileStatus.Ok && _arrayFileStatus != FileStatus.EndOfFile) // source: CBACT01C.cbl:266-267
         {
             // FAITHFUL BUG #3: misleading 'ACCOUNT FILE' label for the array-file write error.
-            _sysout.Add("ACCOUNT FILE WRITE STATUS IS:" + _arryfileStatus); // source: CBACT01C.cbl:268-269
-            Display9910IoStatus(_arryfileStatus);                           // source: CBACT01C.cbl:270-271
-            Abend9999Program();                                            // source: CBACT01C.cbl:272
+            _sysout.Add("ACCOUNT FILE WRITE STATUS IS:" + _arrayFileStatus); // source: CBACT01C.cbl:268-269
+            DisplayIoStatus(_arrayFileStatus);                           // source: CBACT01C.cbl:270-271
+            AbendProgram();                                            // source: CBACT01C.cbl:272
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 1500-POPUL-VBRC-RECORD (builds VBRC-REC1 & VBRC-REC2) // source: CBACT01C.cbl:276-285
-    private void Popul1500VbrcRecord()
+    private void PopulateVbrcRecord() // COBOL paragraph: 1500-POPUL-VBRC-RECORD
     {
-        Account a = _acct!;
+        Account a = _accountRecord!;
         _vb1AcctId = a.AcctId;                          // source: CBACT01C.cbl:277
         _vb2AcctId = a.AcctId;                           // source: CBACT01C.cbl:278
         _vb1AcctActiveStatus = Fixed(a.ActiveStatus, 1); // source: CBACT01C.cbl:279
         _vb2AcctCurrBal = a.CurrBal;                     // source: CBACT01C.cbl:280
         _vb2AcctCreditLimit = a.CreditLimit;             // source: CBACT01C.cbl:281
-        _vb2AcctReissueYyyy = WsAcctReissueYyyy;         // MOVE WS-ACCT-REISSUE-YYYY // source: CBACT01C.cbl:282
+        _vb2AcctReissueYyyy = ReissueYyyy;               // MOVE WS-ACCT-REISSUE-YYYY // source: CBACT01C.cbl:282
         _sysout.Add("VBRC-REC1:" + BuildVbrcRec1Text()); // source: CBACT01C.cbl:283
         _sysout.Add("VBRC-REC2:" + BuildVbrcRec2Text()); // source: CBACT01C.cbl:284
     }
 
     // -------------------------------------------------------------------------------------------------
     // 1550-WRITE-VB1-RECORD // source: CBACT01C.cbl:287-300
-    private void Write1550Vb1Record()
+    private void WriteVbrcRecord1() // COBOL paragraph: 1550-WRITE-VB1-RECORD
     {
         // MOVE 12 TO WS-RECD-LEN; MOVE VBRC-REC1 TO VBR-REC(1:12); WRITE VBR-REC. // source: CBACT01C.cbl:288-290
         const int len = 12;
         byte[] data = BuildVbrcRec1Bytes(); // exactly 12 bytes (VB1-ACCT-ID 9(11) + status X1)
         WriteVbRecord(data, len);
-        _vbrcfileStatus = FileStatus.Ok;
+        _vbrcFileStatus = FileStatus.Ok;
 
-        if (_vbrcfileStatus != FileStatus.Ok && _vbrcfileStatus != FileStatus.EndOfFile) // source: CBACT01C.cbl:292-293
+        if (_vbrcFileStatus != FileStatus.Ok && _vbrcFileStatus != FileStatus.EndOfFile) // source: CBACT01C.cbl:292-293
         {
             // FAITHFUL BUG #3: misleading 'ACCOUNT FILE' label for the VBRC-file write error.
-            _sysout.Add("ACCOUNT FILE WRITE STATUS IS:" + _vbrcfileStatus); // source: CBACT01C.cbl:294-295
-            Display9910IoStatus(_vbrcfileStatus);                           // source: CBACT01C.cbl:296-297
-            Abend9999Program();                                            // source: CBACT01C.cbl:298
+            _sysout.Add("ACCOUNT FILE WRITE STATUS IS:" + _vbrcFileStatus); // source: CBACT01C.cbl:294-295
+            DisplayIoStatus(_vbrcFileStatus);                           // source: CBACT01C.cbl:296-297
+            AbendProgram();                                            // source: CBACT01C.cbl:298
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 1575-WRITE-VB2-RECORD // source: CBACT01C.cbl:302-315
-    private void Write1575Vb2Record()
+    private void WriteVbrcRecord2() // COBOL paragraph: 1575-WRITE-VB2-RECORD
     {
         // MOVE 39 TO WS-RECD-LEN; MOVE VBRC-REC2 TO VBR-REC(1:39); WRITE VBR-REC. // source: CBACT01C.cbl:303-305
         const int len = 39;
         byte[] data = BuildVbrcRec2Bytes(); // exactly 39 bytes (id 11 + bal 12 + limit 12 + yyyy 4)
         WriteVbRecord(data, len);
-        _vbrcfileStatus = FileStatus.Ok;
+        _vbrcFileStatus = FileStatus.Ok;
 
-        if (_vbrcfileStatus != FileStatus.Ok && _vbrcfileStatus != FileStatus.EndOfFile) // source: CBACT01C.cbl:307-308
+        if (_vbrcFileStatus != FileStatus.Ok && _vbrcFileStatus != FileStatus.EndOfFile) // source: CBACT01C.cbl:307-308
         {
-            _sysout.Add("ACCOUNT FILE WRITE STATUS IS:" + _vbrcfileStatus); // source: CBACT01C.cbl:309-310
-            Display9910IoStatus(_vbrcfileStatus);                           // source: CBACT01C.cbl:311-312
-            Abend9999Program();                                            // source: CBACT01C.cbl:313
+            _sysout.Add("ACCOUNT FILE WRITE STATUS IS:" + _vbrcFileStatus); // source: CBACT01C.cbl:309-310
+            DisplayIoStatus(_vbrcFileStatus);                           // source: CBACT01C.cbl:311-312
+            AbendProgram();                                            // source: CBACT01C.cbl:313
         }
     }
 
     // =================================================================================================
     // 0000-ACCTFILE-OPEN // source: CBACT01C.cbl:317-333
     // =================================================================================================
-    private void Open0000Acctfile()
+    private void OpenAccountFile() // COBOL paragraph: 0000-ACCTFILE-OPEN
     {
-        _applResult = 8;                              // source: CBACT01C.cbl:318
+        _applicationResult = 8;                              // source: CBACT01C.cbl:318
         // OPEN INPUT ACCTFILE-FILE -> position the forward browse over ACCOUNT (ascending acct_id).
         _account.StartBrowse();
-        _acctfileStatus = FileStatus.Ok;             // OPEN of a present table succeeds.
-        if (_acctfileStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBACT01C.cbl:320-323
-        if (_applResult == 0) { /* CONTINUE */ }     // source: CBACT01C.cbl:325
+        _accountFileStatus = FileStatus.Ok;             // OPEN of a present table succeeds.
+        if (_accountFileStatus == FileStatus.Ok) _applicationResult = 0; else _applicationResult = 12; // source: CBACT01C.cbl:320-323
+        if (_applicationResult == 0) { /* CONTINUE */ }     // source: CBACT01C.cbl:325
         else
         {
             _sysout.Add("ERROR OPENING ACCTFILE");                  // source: CBACT01C.cbl:328
-            Display9910IoStatus(_acctfileStatus);                  // source: CBACT01C.cbl:329-330
-            Abend9999Program();                                    // source: CBACT01C.cbl:331
+            DisplayIoStatus(_accountFileStatus);                  // source: CBACT01C.cbl:329-330
+            AbendProgram();                                    // source: CBACT01C.cbl:331
         }
     }
 
     // 2000-OUTFILE-OPEN // source: CBACT01C.cbl:334-350
-    private void Open2000Outfile()
+    private void OpenOutputFile() // COBOL paragraph: 2000-OUTFILE-OPEN
     {
-        _applResult = 8;                             // source: CBACT01C.cbl:335
+        _applicationResult = 8;                             // source: CBACT01C.cbl:335
         // OPEN OUTPUT OUT-FILE -> create fresh (the JCL PREDEL step deletes it first; DISP=NEW).
         _outFile = OpenOutput(_outFilePath);
-        _outfileStatus = FileStatus.Ok;
-        if (_outfileStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBACT01C.cbl:337-340
-        if (_applResult == 0) { /* CONTINUE */ }     // source: CBACT01C.cbl:342
+        _outputFileStatus = FileStatus.Ok;
+        if (_outputFileStatus == FileStatus.Ok) _applicationResult = 0; else _applicationResult = 12; // source: CBACT01C.cbl:337-340
+        if (_applicationResult == 0) { /* CONTINUE */ }     // source: CBACT01C.cbl:342
         else
         {
-            _sysout.Add("ERROR OPENING OUTFILE" + _outfileStatus); // source: CBACT01C.cbl:345
-            Display9910IoStatus(_outfileStatus);                   // source: CBACT01C.cbl:346-347
-            Abend9999Program();                                    // source: CBACT01C.cbl:348
+            _sysout.Add("ERROR OPENING OUTFILE" + _outputFileStatus); // source: CBACT01C.cbl:345
+            DisplayIoStatus(_outputFileStatus);                   // source: CBACT01C.cbl:346-347
+            AbendProgram();                                    // source: CBACT01C.cbl:348
         }
     }
 
     // 3000-ARRFILE-OPEN // source: CBACT01C.cbl:352-368
-    private void Open3000Arrfile()
+    private void OpenArrayFile() // COBOL paragraph: 3000-ARRFILE-OPEN
     {
-        _applResult = 8;                             // source: CBACT01C.cbl:353
+        _applicationResult = 8;                             // source: CBACT01C.cbl:353
         _arryFile = OpenOutput(_arryFilePath);       // OPEN OUTPUT ARRY-FILE // source: CBACT01C.cbl:354
-        _arryfileStatus = FileStatus.Ok;
-        if (_arryfileStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBACT01C.cbl:355-358
-        if (_applResult == 0) { /* CONTINUE */ }     // source: CBACT01C.cbl:360
+        _arrayFileStatus = FileStatus.Ok;
+        if (_arrayFileStatus == FileStatus.Ok) _applicationResult = 0; else _applicationResult = 12; // source: CBACT01C.cbl:355-358
+        if (_applicationResult == 0) { /* CONTINUE */ }     // source: CBACT01C.cbl:360
         else
         {
-            _sysout.Add("ERROR OPENING ARRAYFILE" + _arryfileStatus); // source: CBACT01C.cbl:363
-            Display9910IoStatus(_arryfileStatus);                     // source: CBACT01C.cbl:364-365
-            Abend9999Program();                                       // source: CBACT01C.cbl:366
+            _sysout.Add("ERROR OPENING ARRAYFILE" + _arrayFileStatus); // source: CBACT01C.cbl:363
+            DisplayIoStatus(_arrayFileStatus);                     // source: CBACT01C.cbl:364-365
+            AbendProgram();                                       // source: CBACT01C.cbl:366
         }
     }
 
     // 4000-VBRFILE-OPEN // source: CBACT01C.cbl:370-386
-    private void Open4000Vbrfile()
+    private void OpenVbrcFile() // COBOL paragraph: 4000-VBRFILE-OPEN
     {
-        _applResult = 8;                             // source: CBACT01C.cbl:371
+        _applicationResult = 8;                             // source: CBACT01C.cbl:371
         _vbrcFile = OpenOutput(_vbrcFilePath);       // OPEN OUTPUT VBRC-FILE // source: CBACT01C.cbl:372
-        _vbrcfileStatus = FileStatus.Ok;
-        if (_vbrcfileStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBACT01C.cbl:373-376
-        if (_applResult == 0) { /* CONTINUE */ }     // source: CBACT01C.cbl:378
+        _vbrcFileStatus = FileStatus.Ok;
+        if (_vbrcFileStatus == FileStatus.Ok) _applicationResult = 0; else _applicationResult = 12; // source: CBACT01C.cbl:373-376
+        if (_applicationResult == 0) { /* CONTINUE */ }     // source: CBACT01C.cbl:378
         else
         {
-            _sysout.Add("ERROR OPENING VBRC FILE" + _vbrcfileStatus); // source: CBACT01C.cbl:381
-            Display9910IoStatus(_vbrcfileStatus);                     // source: CBACT01C.cbl:382-383
-            Abend9999Program();                                       // source: CBACT01C.cbl:384
+            _sysout.Add("ERROR OPENING VBRC FILE" + _vbrcFileStatus); // source: CBACT01C.cbl:381
+            DisplayIoStatus(_vbrcFileStatus);                     // source: CBACT01C.cbl:382-383
+            AbendProgram();                                       // source: CBACT01C.cbl:384
         }
     }
 
     // 9000-ACCTFILE-CLOSE // source: CBACT01C.cbl:388-404 (only ACCTFILE is closed — bug #2)
-    private void Close9000Acctfile()
+    private void CloseAccountFile() // COBOL paragraph: 9000-ACCTFILE-CLOSE
     {
-        _applResult = 8;                             // ADD 8 TO ZERO GIVING APPL-RESULT // source: CBACT01C.cbl:389
+        _applicationResult = 8;                             // ADD 8 TO ZERO GIVING APPL-RESULT // source: CBACT01C.cbl:389
         _account.EndBrowse();                        // CLOSE ACCTFILE-FILE // source: CBACT01C.cbl:390
-        _acctfileStatus = FileStatus.Ok;
-        if (_acctfileStatus == FileStatus.Ok) _applResult -= _applResult; else _applResult = 12; // source: CBACT01C.cbl:391-395
-        if (_applResult == 0) { /* CONTINUE */ }     // source: CBACT01C.cbl:396
+        _accountFileStatus = FileStatus.Ok;
+        if (_accountFileStatus == FileStatus.Ok) _applicationResult -= _applicationResult; else _applicationResult = 12; // source: CBACT01C.cbl:391-395
+        if (_applicationResult == 0) { /* CONTINUE */ }     // source: CBACT01C.cbl:396
         else
         {
             _sysout.Add("ERROR CLOSING ACCOUNT FILE");             // source: CBACT01C.cbl:399
-            Display9910IoStatus(_acctfileStatus);                  // source: CBACT01C.cbl:400-401
-            Abend9999Program();                                    // source: CBACT01C.cbl:402
+            DisplayIoStatus(_accountFileStatus);                  // source: CBACT01C.cbl:400-401
+            AbendProgram();                                    // source: CBACT01C.cbl:402
         }
     }
 
     // 9999-ABEND-PROGRAM // source: CBACT01C.cbl:406-410
-    private void Abend9999Program()
+    private void AbendProgram() // COBOL paragraph: 9999-ABEND-PROGRAM
     {
         _sysout.Add("ABENDING PROGRAM");             // source: CBACT01C.cbl:407
         // MOVE 0 TO TIMING; MOVE 999 TO ABCODE; CALL 'CEE3ABD' USING ABCODE, TIMING.
@@ -488,7 +488,7 @@ public sealed class AccountMasterReportProgram
     }
 
     // 9910-DISPLAY-IO-STATUS // source: CBACT01C.cbl:413-426
-    private void Display9910IoStatus(string ioStatus)
+    private void DisplayIoStatus(string ioStatus) // COBOL paragraph: 9910-DISPLAY-IO-STATUS
     {
         string s = ioStatus.Length >= 2 ? ioStatus[..2] : ioStatus.PadRight(2);
         char stat1 = s[0], stat2 = s[1];
@@ -610,7 +610,7 @@ public sealed class AccountMasterReportProgram
     // =================================================================================================
     private string DisplayAccountRecord()
     {
-        Account a = _acct!;
+        Account a = _accountRecord!;
         var w = new RecordWriter(_host);
         w.Zoned(a.AcctId, 11, 0, signed: false);
         w.Alpha(a.ActiveStatus, 1);

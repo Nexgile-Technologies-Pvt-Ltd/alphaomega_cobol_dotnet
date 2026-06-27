@@ -17,43 +17,43 @@ namespace CardDemo.Utilities;
 /// </remarks>
 public static class DateFormatConverter
 {
-    private const int Inp = 1;
-    private const int OutType = 21;
-    private const int Outp = 22;
-    private const int ErrMsg = 42;
+    private const int InputDateOffset = 1;    // INP-DATE (1,20)
+    private const int OutputTypeOffset = 21;  // OUTTYPE (21,1)
+    private const int OutputDateOffset = 22;  // OUT-DATE (22,20)
+    private const int ErrorMsgOffset = 42;    // ERROR-MSG (42,38)
 
     /// <summary>Applies the COBDATFT conversion in place to an 80-byte CODATECN-REC in the given host encoding.</summary>
-    public static void Convert(byte[] rec, HostKind host)
+    public static void Convert(byte[] record, HostKind host)
     {
-        if (rec.Length != 80)
-            throw new ArgumentException($"CODATECN-REC must be 80 bytes, was {rec.Length}.", nameof(rec));
+        if (record.Length != 80)
+            throw new ArgumentException($"CODATECN-REC must be 80 bytes, was {record.Length}.", nameof(record));
 
-        var enc = HostEncoding.For(host);
-        byte one = enc.GetBytes("1")[0], two = enc.GetBytes("2")[0], dash = enc.GetBytes("-")[0];
-        byte type = rec[0], outType = rec[OutType];
+        var encoding = HostEncoding.For(host);
+        byte typeOne = encoding.GetBytes("1")[0], typeTwo = encoding.GetBytes("2")[0], separator = encoding.GetBytes("-")[0];
+        byte inputType = record[0], outputType = record[OutputTypeOffset];
 
-        if (type == one)
+        if (inputType == typeOne)
         {
-            if (rec[Inp + 4] == dash || outType == two) { SetError(rec, host); return; }
-            Array.Copy(rec, Inp, rec, Outp, 4);          // YYYY
-            rec[Outp + 4] = dash;
-            Array.Copy(rec, Inp + 4, rec, Outp + 5, 2);  // MM
-            rec[Outp + 7] = dash;
-            Array.Copy(rec, Inp + 6, rec, Outp + 8, 2);  // DD
+            if (record[InputDateOffset + 4] == separator || outputType == typeTwo) { SetError(record, host); return; }
+            Array.Copy(record, InputDateOffset, record, OutputDateOffset, 4);          // YYYY
+            record[OutputDateOffset + 4] = separator;
+            Array.Copy(record, InputDateOffset + 4, record, OutputDateOffset + 5, 2);  // MM
+            record[OutputDateOffset + 7] = separator;
+            Array.Copy(record, InputDateOffset + 6, record, OutputDateOffset + 8, 2);  // DD
         }
-        else if (type == two)
+        else if (inputType == typeTwo)
         {
-            if (outType == one) { SetError(rec, host); return; }
-            Array.Copy(rec, Inp, rec, Outp, 4);          // YYYY
-            Array.Copy(rec, Inp + 5, rec, Outp + 4, 2);  // MM (skip the '-')
-            Array.Copy(rec, Inp + 8, rec, Outp + 6, 2);  // DD (skip the '-')
+            if (outputType == typeOne) { SetError(record, host); return; }
+            Array.Copy(record, InputDateOffset, record, OutputDateOffset, 4);          // YYYY
+            Array.Copy(record, InputDateOffset + 5, record, OutputDateOffset + 4, 2);  // MM (skip the '-')
+            Array.Copy(record, InputDateOffset + 8, record, OutputDateOffset + 6, 2);  // DD (skip the '-')
         }
         else
         {
-            SetError(rec, host);
+            SetError(record, host);
         }
     }
 
-    private static void SetError(byte[] rec, HostKind host) =>
-        HostEncoding.For(host).GetBytes("INVALID INPUT".PadRight(38)).CopyTo(rec, ErrMsg);
+    private static void SetError(byte[] record, HostKind host) =>
+        HostEncoding.For(host).GetBytes("INVALID INPUT".PadRight(38)).CopyTo(record, ErrorMsgOffset);
 }

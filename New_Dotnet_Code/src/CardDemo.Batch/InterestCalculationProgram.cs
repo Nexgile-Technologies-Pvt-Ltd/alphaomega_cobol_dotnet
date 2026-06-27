@@ -49,12 +49,12 @@ public sealed class InterestCalculationProgram
     private string _parmDate = "";
 
     // ---- WORKING-STORAGE (CBACT04C lines 166-173) ---------------------------------------------------
-    private string _wsLastAcctNum = "~UNSET~";  // WS-LAST-ACCT-NUM PIC X(11) VALUE SPACES (sentinel -> 1st rec breaks)
-    private decimal _wsMonthlyInt;              // WS-MONTHLY-INT  S9(09)V99
-    private decimal _wsTotalInt;               // WS-TOTAL-INT    S9(09)V99
-    private bool _wsFirstTime = true;          // WS-FIRST-TIME   'Y'
-    private long _wsRecordCount;               // WS-RECORD-COUNT 9(09)
-    private long _wsTranidSuffix;              // WS-TRANID-SUFFIX 9(06)
+    private string _lastAcctNum = "~UNSET~";   // WS-LAST-ACCT-NUM PIC X(11) VALUE SPACES (sentinel -> 1st rec breaks)
+    private decimal _monthlyInterest;          // WS-MONTHLY-INT  S9(09)V99
+    private decimal _totalInterest;            // WS-TOTAL-INT    S9(09)V99
+    private bool _firstTime = true;            // WS-FIRST-TIME   'Y'
+    private long _recordCount;                 // WS-RECORD-COUNT 9(09)
+    private long _tranIdSuffix;                // WS-TRANID-SUFFIX 9(06)
     private bool _endOfFile;                   // END-OF-FILE 'N'/'Y'
 
     // "Current" records the COBOL READ ... INTO populates.
@@ -69,10 +69,10 @@ public sealed class InterestCalculationProgram
     public IReadOnlyList<string> Sysout => _sysout;
 
     /// <summary>WS-RECORD-COUNT at end of run (TCATBAL records processed).</summary>
-    public long RecordCount => _wsRecordCount;
+    public long RecordCount => _recordCount;
 
     /// <summary>Interest transactions written (WS-TRANID-SUFFIX at end of run).</summary>
-    public long InterestTransactionsWritten => _wsTranidSuffix;
+    public long InterestTransactionsWritten => _tranIdSuffix;
 
     /// <summary>
     /// Runs CBACT04C over the relational <paramref name="db"/>. <paramref name="parmDate"/> is the 10-char
@@ -113,54 +113,54 @@ public sealed class InterestCalculationProgram
         _clock = clock ?? SystemClock.Instance;
 
         _sysout.Add("START OF EXECUTION OF PROGRAM CBACT04C");   // source: CBACT04C.cbl:181
-        Open0000TcatbalF();                                      // source: CBACT04C.cbl:182
-        Open0400TranFile();                                      // source: CBACT04C.cbl:186 (truncate target)
+        OpenTranCatBalFile();                                    // source: CBACT04C.cbl:182
+        OpenTransactionFile();                                   // source: CBACT04C.cbl:186 (truncate target)
 
         // PERFORM UNTIL END-OF-FILE = 'Y' (test-before; the ELSE flush at line 220 is unreachable — bug #1).
         while (!_endOfFile)                                      // source: CBACT04C.cbl:188
         {
             if (!_endOfFile)                                    // IF END-OF-FILE = 'N' // source: CBACT04C.cbl:189
             {
-                Get1000TcatbalFNext();                          // source: CBACT04C.cbl:190
+                ReadNextTranCatBal();                           // source: CBACT04C.cbl:190
                 if (!_endOfFile)                                // IF END-OF-FILE = 'N' // source: CBACT04C.cbl:191
                 {
-                    _wsRecordCount++;                           // ADD 1 TO WS-RECORD-COUNT // source: CBACT04C.cbl:192
-                    _sysout.Add(DisplayTcatbal(_tranCatBal!));  // DISPLAY TRAN-CAT-BAL-RECORD // source: CBACT04C.cbl:193
+                    _recordCount++;                             // ADD 1 TO WS-RECORD-COUNT // source: CBACT04C.cbl:192
+                    _sysout.Add(DisplayTranCatBal(_tranCatBal!)); // DISPLAY TRAN-CAT-BAL-RECORD // source: CBACT04C.cbl:193
 
                     string acctKey = _tranCatBal!.AcctId.ToString("D11");
-                    if (acctKey != _wsLastAcctNum)              // IF TRANCAT-ACCT-ID NOT= WS-LAST-ACCT-NUM // source: CBACT04C.cbl:194
+                    if (acctKey != _lastAcctNum)               // IF TRANCAT-ACCT-ID NOT= WS-LAST-ACCT-NUM // source: CBACT04C.cbl:194
                     {
-                        if (!_wsFirstTime) Update1050Account(); // source: CBACT04C.cbl:195-196
-                        else _wsFirstTime = false;              // source: CBACT04C.cbl:198
-                        _wsTotalInt = 0m;                       // source: CBACT04C.cbl:200
-                        _wsLastAcctNum = acctKey;               // source: CBACT04C.cbl:201
-                        Get1100AcctData(_tranCatBal.AcctId);    // source: CBACT04C.cbl:202-203
-                        Get1110XrefData(_tranCatBal.AcctId);    // source: CBACT04C.cbl:204-205
+                        if (!_firstTime) UpdateAccount();       // source: CBACT04C.cbl:195-196
+                        else _firstTime = false;                // source: CBACT04C.cbl:198
+                        _totalInterest = 0m;                    // source: CBACT04C.cbl:200
+                        _lastAcctNum = acctKey;                 // source: CBACT04C.cbl:201
+                        GetAccountData(_tranCatBal.AcctId);     // source: CBACT04C.cbl:202-203
+                        GetXrefData(_tranCatBal.AcctId);        // source: CBACT04C.cbl:204-205
                     }
 
-                    Get1200InterestRate();                     // source: CBACT04C.cbl:210-213
+                    GetInterestRate();                         // source: CBACT04C.cbl:210-213
                     if (_disGroup!.IntRate != 0m)              // IF DIS-INT-RATE NOT = 0 // source: CBACT04C.cbl:214
                     {
-                        Compute1300Interest();                 // source: CBACT04C.cbl:215
-                        Compute1400Fees();                     // source: CBACT04C.cbl:216 (no-op)
+                        ComputeInterest();                     // source: CBACT04C.cbl:215
+                        ComputeFees();                         // source: CBACT04C.cbl:216 (no-op)
                     }
                 }
             }
             else
             {
-                Update1050Account();                           // CBACT04C.cbl:220 — unreachable (bug #1)
+                UpdateAccount();                               // CBACT04C.cbl:220 — unreachable (bug #1)
             }
         }
 
-        Close9000TcatbalF();                                    // source: CBACT04C.cbl:224
+        CloseTranCatBalFile();                                  // source: CBACT04C.cbl:224
         _sysout.Add("END OF EXECUTION OF PROGRAM CBACT04C");    // source: CBACT04C.cbl:230
         return 0;                                               // GOBACK
     }
 
     // --- 0000-TCATBALF-OPEN / 0400-TRANFILE-OPEN -----------------------------------------------------
-    private void Open0000TcatbalF() => _tcatBal.StartBrowse();   // OPEN INPUT (position the forward cursor)
+    private void OpenTranCatBalFile() => _tcatBal.StartBrowse();   // OPEN INPUT (position the forward cursor) // COBOL paragraph: 0000-TCATBALF-OPEN
 
-    private void Open0400TranFile()
+    private void OpenTransactionFile()                            // COBOL paragraph: 0400-TRANFILE-OPEN
     {
         // OPEN OUTPUT TRANSACT-FILE (DISP=NEW): rebuild the target from empty (truncate-then-insert).
         foreach (Transaction t in _transact.ReadAll().ToList())
@@ -168,27 +168,27 @@ public sealed class InterestCalculationProgram
     }
 
     // --- 1000-TCATBALF-GET-NEXT (lines 324-348) ------------------------------------------------------
-    private void Get1000TcatbalFNext()
+    private void ReadNextTranCatBal()                            // COBOL paragraph: 1000-TCATBALF-GET-NEXT
     {
         string status = _tcatBal.ReadNext(out TranCatBalance? next);
         if (status == FileStatus.Ok) _tranCatBal = next;
         else if (status == FileStatus.EndOfFile) _endOfFile = true;
-        else { _sysout.Add("ERROR READING TRANSACTION CATEGORY FILE"); Abend9999(status); }
+        else { _sysout.Add("ERROR READING TRANSACTION CATEGORY FILE"); AbendProgram(status); }
     }
 
     // --- 1050-UPDATE-ACCOUNT (lines 349-370) ---------------------------------------------------------
-    private void Update1050Account()
+    private void UpdateAccount()                                 // COBOL paragraph: 1050-UPDATE-ACCOUNT
     {
         // ADD WS-TOTAL-INT TO ACCT-CURR-BAL (S9(10)V99, truncate/silent overflow); zero the cycle buckets.
-        _accountRecord!.CurrBal = Decimals.Store(_accountRecord.CurrBal + _wsTotalInt, BalDigits, MoneyScale, true);
+        _accountRecord!.CurrBal = Decimals.Store(_accountRecord.CurrBal + _totalInterest, BalDigits, MoneyScale, true);
         _accountRecord.CurrCycCredit = 0m;
         _accountRecord.CurrCycDebit = 0m;
         string status = _account.Update(_accountRecord);
-        if (status != FileStatus.Ok) { _sysout.Add("ERROR RE-WRITING ACCOUNT FILE"); Abend9999(status); }
+        if (status != FileStatus.Ok) { _sysout.Add("ERROR RE-WRITING ACCOUNT FILE"); AbendProgram(status); }
     }
 
     // --- 1100-GET-ACCT-DATA (lines 371-391) ----------------------------------------------------------
-    private void Get1100AcctData(long acctId)
+    private void GetAccountData(long acctId)                     // COBOL paragraph: 1100-GET-ACCT-DATA
     {
         string status = _account.ReadByKey(acctId, out Account? acct);
         if (status != FileStatus.Ok) _sysout.Add("ACCOUNT NOT FOUND: " + acctId.ToString("D11")); // INVALID KEY
@@ -196,20 +196,20 @@ public sealed class InterestCalculationProgram
         // 1100-GET-ACCT-DATA: INVALID KEY DISPLAYs 'ACCOUNT NOT FOUND' (above); then, because the file
         // status is not '00', the ELSE path also DISPLAYs 'ERROR READING ACCOUNT FILE' and abends. Faithful
         // to cbl:372-391 (this is NOT the numbered faithful-bug #2, which is the DISCGRP open-message label).
-        else { _sysout.Add("ERROR READING ACCOUNT FILE"); Abend9999(status); }
+        else { _sysout.Add("ERROR READING ACCOUNT FILE"); AbendProgram(status); }
     }
 
     // --- 1110-GET-XREF-DATA (lines 392-413) — alt key (account id) -----------------------------------
-    private void Get1110XrefData(long acctId)
+    private void GetXrefData(long acctId)                        // COBOL paragraph: 1110-GET-XREF-DATA
     {
         string status = _xref.ReadByAltKey(acctId, out CardXref? xref);
         if (status != FileStatus.Ok) _sysout.Add("ACCOUNT NOT FOUND: " + acctId.ToString("D11")); // INVALID KEY
         if (status == FileStatus.Ok) _xrefRecord = xref;
-        else { _sysout.Add("ERROR READING XREF FILE"); Abend9999(status); }
+        else { _sysout.Add("ERROR READING XREF FILE"); AbendProgram(status); }
     }
 
     // --- 1200-GET-INTEREST-RATE (lines 414-440) ------------------------------------------------------
-    private void Get1200InterestRate()
+    private void GetInterestRate()                              // COBOL paragraph: 1200-GET-INTEREST-RATE
     {
         string groupId = _accountRecord!.GroupId;
         string typeCd = _tranCatBal!.TypeCd;
@@ -217,13 +217,13 @@ public sealed class InterestCalculationProgram
 
         string status = _discGrp.ReadByKey(groupId, typeCd, catCd, out DisclosureGroup? grp);
         if (status != FileStatus.Ok && status != FileStatus.RecordNotFound)
-        { _sysout.Add("ERROR READING DISCLOSURE GROUP FILE"); Abend9999(status); }
+        { _sysout.Add("ERROR READING DISCLOSURE GROUP FILE"); AbendProgram(status); }
 
         if (status == FileStatus.RecordNotFound) // '23' -> retry with the DEFAULT group
         {
             _sysout.Add("DISCLOSURE GROUP RECORD MISSING");
             _sysout.Add("TRY WITH DEFAULT GROUP CODE");
-            GetA1200DefaultIntRate(typeCd, catCd);
+            GetDefaultIntRate(typeCd, catCd);
         }
         else
         {
@@ -232,31 +232,31 @@ public sealed class InterestCalculationProgram
     }
 
     // --- 1200-A-GET-DEFAULT-INT-RATE (lines 442-460) -------------------------------------------------
-    private void GetA1200DefaultIntRate(string typeCd, int catCd)
+    private void GetDefaultIntRate(string typeCd, int catCd)     // COBOL paragraph: 1200-A-GET-DEFAULT-INT-RATE
     {
         // MOVE 'DEFAULT' TO FD-DIS-ACCT-GROUP-ID — the field is X(10), so the literal is space-padded to 10.
         string status = _discGrp.ReadByKey("DEFAULT".PadRight(10), typeCd, catCd, out DisclosureGroup? grp);
-        if (status != FileStatus.Ok) { _sysout.Add("ERROR READING DEFAULT DISCLOSURE GROUP"); Abend9999(status); }
+        if (status != FileStatus.Ok) { _sysout.Add("ERROR READING DEFAULT DISCLOSURE GROUP"); AbendProgram(status); }
         _disGroup = grp;
     }
 
     // --- 1300-COMPUTE-INTEREST (lines 461-470) -------------------------------------------------------
-    private void Compute1300Interest()
+    private void ComputeInterest()                              // COBOL paragraph: 1300-COMPUTE-INTEREST
     {
         decimal bal = _tranCatBal!.TranCatBal;   // S9(09)V99
         decimal rate = _disGroup!.IntRate;       // S9(04)V99
         // COMPUTE WS-MONTHLY-INT = (TRAN-CAT-BAL * DIS-INT-RATE) / 1200 — truncate toward zero, no ROUNDED.
-        _wsMonthlyInt = Decimals.Store(bal * rate / 1200m, IntDigits, MoneyScale, true);
-        _wsTotalInt = Decimals.Store(_wsTotalInt + _wsMonthlyInt, IntDigits, MoneyScale, true);
-        WriteB1300Tx();
+        _monthlyInterest = Decimals.Store(bal * rate / 1200m, IntDigits, MoneyScale, true);
+        _totalInterest = Decimals.Store(_totalInterest + _monthlyInterest, IntDigits, MoneyScale, true);
+        WriteTransaction();
     }
 
     // --- 1300-B-WRITE-TX (lines 472-515) -------------------------------------------------------------
-    private void WriteB1300Tx()
+    private void WriteTransaction()                             // COBOL paragraph: 1300-B-WRITE-TX
     {
-        _wsTranidSuffix++;                                       // ADD 1 TO WS-TRANID-SUFFIX
+        _tranIdSuffix++;                                         // ADD 1 TO WS-TRANID-SUFFIX
         // STRING PARM-DATE, WS-TRANID-SUFFIX (9(6)) DELIMITED BY SIZE INTO TRAN-ID X(16).
-        string tranId = (_parmDate + (_wsTranidSuffix % 1_000_000L).ToString("D6"));
+        string tranId = (_parmDate + (_tranIdSuffix % 1_000_000L).ToString("D6"));
         string acctDigits = _accountRecord!.AcctId.ToString("D11");
 
         var tran = new Transaction
@@ -266,7 +266,7 @@ public sealed class InterestCalculationProgram
             CatCd = 5,                                           // MOVE '05' TO 9(4) -> 0005 (bug #3)
             Source = "System".PadRight(10),                     // MOVE 'System' TO TRAN-SOURCE X(10)
             Desc = ("Int. for a/c " + acctDigits).PadRight(100), // STRING 'Int. for a/c ', ACCT-ID
-            Amt = _wsMonthlyInt,                                 // MOVE WS-MONTHLY-INT TO TRAN-AMT
+            Amt = _monthlyInterest,                              // MOVE WS-MONTHLY-INT TO TRAN-AMT
             MerchantId = 0,
             MerchantName = new string(' ', 50),
             MerchantCity = new string(' ', 50),
@@ -278,29 +278,29 @@ public sealed class InterestCalculationProgram
         tran.ProcTs = ts;
 
         string status = _transact.Insert(tran);
-        if (status != FileStatus.Ok) { _sysout.Add("ERROR WRITING TRANSACTION RECORD"); Abend9999(status); }
+        if (status != FileStatus.Ok) { _sysout.Add("ERROR WRITING TRANSACTION RECORD"); AbendProgram(status); }
     }
 
-    private static void Compute1400Fees() { /* 1400-COMPUTE-FEES: no-op (bug #5) */ }
+    private static void ComputeFees() { /* 1400-COMPUTE-FEES: no-op (bug #5) */ } // COBOL paragraph: 1400-COMPUTE-FEES
 
-    private void Close9000TcatbalF() => _tcatBal.EndBrowse();
+    private void CloseTranCatBalFile() => _tcatBal.EndBrowse();  // COBOL paragraph: 9000-TCATBALF-CLOSE
 
     // --- Z-GET-DB2-FORMAT-TIMESTAMP (lines 613-626): YYYY-MM-DD-HH.MM.SS.hh0000 (bug #4) --------------
-    private static string Db2FormatTimestamp(DateTime now)
+    private static string Db2FormatTimestamp(DateTime now)       // COBOL paragraph: Z-GET-DB2-FORMAT-TIMESTAMP
     {
         int hundredths = now.Millisecond / 10;
         return $"{now:yyyy-MM-dd-HH.mm.ss}.{hundredths:D2}0000";
     }
 
     // --- 9999-ABEND-PROGRAM (lines 627-632) ----------------------------------------------------------
-    private void Abend9999(string status)
+    private void AbendProgram(string status)                    // COBOL paragraph: 9999-ABEND-PROGRAM
     {
         _sysout.Add("ABENDING PROGRAM");
         throw new AbendException("999", $"CBACT04C abend; FILE STATUS '{status}'.");
     }
 
     /// <summary>Reproduces DISPLAY TRAN-CAT-BAL-RECORD: the 50-byte CVTRA01Y image rendered as text.</summary>
-    private static string DisplayTcatbal(TranCatBalance b)
+    private static string DisplayTranCatBal(TranCatBalance b)
     {
         string acct = b.AcctId.ToString("D11");
         string type = (b.TypeCd ?? "").PadRight(2)[..2];

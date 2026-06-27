@@ -83,27 +83,27 @@ public sealed class AccountInquiryService : IMqServer
     //  WORKING-STORAGE flags — source: COACCT01.cbl:13-23
     // =================================================================================================
     // WS-MQ-MSG-FLAG X(1) VALUE 'N'; 88 NO-MORE-MSGS VALUE 'Y'. source: :13-14
-    private char _wsMqMsgFlag = 'N';
+    private char _mqMsgFlag = 'N';   // WS-MQ-MSG-FLAG
 
     // FB-1: the open/close flag names are swapped vs. their intuitive meaning but internally consistent.
     //   WS-RESP-QUEUE-STS  88 RESP-QUEUE-OPEN  -> set when the OUTPUT/reply queue opens. source: :16-17
     //   WS-ERR-QUEUE-STS   88 ERR-QUEUE-OPEN   -> set when the ERROR queue opens.        source: :19-20
     //   WS-REPLY-QUEUE-STS 88 REPLY-QUEUE-OPEN -> set when the INPUT/request queue opens. source: :22-23
-    private char _wsRespQueueSts = 'N';      // 88 RESP-QUEUE-OPEN  = 'Y'  (output/reply queue)
-    private char _wsErrQueueSts = 'N';       // 88 ERR-QUEUE-OPEN   = 'Y'  (error queue)
-    private char _wsReplyQueueSts = 'N';     // 88 REPLY-QUEUE-OPEN = 'Y'  (input/request queue)
+    private char _respQueueStatus = 'N';     // WS-RESP-QUEUE-STS  88 RESP-QUEUE-OPEN  = 'Y'  (output/reply queue)
+    private char _errQueueStatus = 'N';      // WS-ERR-QUEUE-STS   88 ERR-QUEUE-OPEN   = 'Y'  (error queue)
+    private char _replyQueueStatus = 'N';    // WS-REPLY-QUEUE-STS 88 REPLY-QUEUE-OPEN = 'Y'  (input/request queue)
 
     // WS-CICS-RESP-CDS — RETRIEVE RESP/RESP2 + their display copies. source: :26-30
-    private int _wsCicsResp1Cd;              // S9(8) COMP
-    private int _wsCicsResp2Cd;              // S9(8) COMP
-    private int _wsCicsResp1CdD;             // 9(8)  (display copy)
-    private int _wsCicsResp2CdD;             // 9(8)  (display copy — left 0 by FB-3)
+    private int _cicsResp1Code;              // WS-CICS-RESP1-CD   S9(8) COMP
+    private int _cicsResp2Code;              // WS-CICS-RESP2-CD   S9(8) COMP
+    private int _cicsResp1CodeDisplay;       // WS-CICS-RESP1-CD-D 9(8)  (display copy)
+    private int _cicsResp2CodeDisplay;       // WS-CICS-RESP2-CD-D 9(8)  (display copy — left 0 by FB-3)
 
     // =================================================================================================
     //  MQ work fields — source: COACCT01.cbl:42-67
     // =================================================================================================
-    private string _mqQueue = "";            // MQ-QUEUE X(48)
-    private string _mqQueueReply = "";       // MQ-QUEUE-REPLY X(48)  (REPLYTOQ — captured, FB-5)
+    private string _mqQueueName = "";        // MQ-QUEUE X(48)
+    private string _mqReplyToQueue = "";     // MQ-QUEUE-REPLY X(48)  (REPLYTOQ — captured, FB-5)
     private int _mqConditionCode;            // MQ-CONDITION-CODE (MQCC-*)
     private int _mqReasonCode;               // MQ-REASON-CODE    (MQRC-*)
     private string _mqBuffer = "";           // MQ-BUFFER X(1000)
@@ -111,12 +111,12 @@ public sealed class AccountInquiryService : IMqServer
     private byte[] _mqCorrelId = MqConstants.MqciNone;  // MQ-CORRELID X(24)
     private byte[] _mqMsgId = MqConstants.MqmiNone;     // MQ-MSG-ID   X(24)
     private int _mqMsgCount;                  // MQ-MSG-COUNT 9(9)  (FB-4: dead counter)
-    private byte[] _saveCorelid = MqConstants.MqciNone; // SAVE-CORELID X(24)
-    private byte[] _saveMsgid = MqConstants.MqmiNone;   // SAVE-MSGID   X(24)
-    private string _saveReply2q = "";        // SAVE-REPLY2Q X(48)  (FB-5: captured, never used for PUT)
+    private byte[] _savedCorrelId = MqConstants.MqciNone; // SAVE-CORELID X(24)
+    private byte[] _savedMsgId = MqConstants.MqmiNone;    // SAVE-MSGID   X(24)
+    private string _savedReplyToQueue = "";  // SAVE-REPLY2Q X(48)  (FB-5: captured, never used for PUT)
 
     // MQ-ERR-DISPLAY (the 80-ish byte error block written to CARD.DEMO.ERROR). source: :58-67
-    private string _mqErrorPara = "";        // MQ-ERROR-PARA X(25)
+    private string _mqErrorParagraph = "";   // MQ-ERROR-PARA X(25)
     private string _mqApplReturnMessage = "";// MQ-APPL-RETURN-MESSAGE X(25)
     private int _mqApplConditionCode;        // MQ-APPL-CONDITION-CODE 9(2)
     private int _mqApplReasonCode;           // MQ-APPL-REASON-CODE 9(5)
@@ -133,16 +133,16 @@ public sealed class AccountInquiryService : IMqServer
     private string _errorMessage = "";       // ERROR-MESSAGE     X(1000)
 
     // REQUEST-MSG-COPY overlay: WS-FUNC X(4) + WS-KEY 9(11) + WS-FILLER X(985). source: :109-112
-    private string _wsFunc = "";             // WS-FUNC X(4)
-    private long _wsKey;                     // WS-KEY  9(11)
+    private string _requestFunction = "";    // WS-FUNC X(4)
+    private long _requestKey;                // WS-KEY  9(11)
 
     // =================================================================================================
     //  WS-VARIABLES — source: COACCT01.cbl:114-128
     // =================================================================================================
-    private const string LitAcctFilename = "ACCTDAT ";   // LIT-ACCTFILENAME X(8) (trailing space). :115-116
-    private int _wsRespCd;                                // WS-RESP-CD S9(9) COMP (CICS READ RESP)
-    private int _wsReasCd;                                // WS-REAS-CD S9(9) COMP (CICS READ RESP2)
-    private long _wsCardRidAcctId;                        // WS-CARD-RID-ACCT-ID 9(11) (RIDFLD numeric). :126
+    private const string AcctFileName = "ACCTDAT ";      // LIT-ACCTFILENAME X(8) (trailing space). :115-116
+    private int _readRespCode;                            // WS-RESP-CD S9(9) COMP (CICS READ RESP)
+    private int _readReasonCode;                          // WS-REAS-CD S9(9) COMP (CICS READ RESP2)
+    private long _accountIdKey;                           // WS-CARD-RID-ACCT-ID 9(11) (RIDFLD numeric). :126
 
     // ACCOUNT-RECORD (COPY CVACT01Y) — the READ target. source: :171
     private Account? _accountRecord;
@@ -184,7 +184,7 @@ public sealed class AccountInquiryService : IMqServer
         _mq = mq;
         try
         {
-            Control1000(trigger);
+            Control(trigger);
         }
         catch (TerminationSignal)
         {
@@ -193,7 +193,7 @@ public sealed class AccountInquiryService : IMqServer
         return _mqMsgCount;   // FB-4: the COBOL never surfaces MQ-MSG-COUNT; returned here for the shim only.
     }
 
-    private void Control1000(TriggerMessage trigger)
+    private void Control(TriggerMessage trigger)  // COBOL paragraph: 1000-CONTROL
     {
         // MOVE SPACES TO INPUT-QUEUE-NAME, QMGR-NAME, QUEUE-MESSAGE. source: :180-183
         _inputQueueName = "";
@@ -201,13 +201,13 @@ public sealed class AccountInquiryService : IMqServer
         InitializeMqErrDisplay();
 
         // PERFORM 2100-OPEN-ERROR-QUEUE (open CARD.DEMO.ERROR first). source: :187
-        OpenErrorQueue2100();
+        OpenErrorQueue();
 
         // EXEC CICS RETRIEVE INTO(MQTM) RESP/RESP2. The shim always supplies the trigger. source: :191-195
-        _wsCicsResp1Cd = (int)Resp.Normal;
-        _wsCicsResp2Cd = 0;
+        _cicsResp1Code = (int)Resp.Normal;
+        _cicsResp2Code = 0;
 
-        if (_wsCicsResp1Cd == (int)Resp.Normal)                 // IF WS-CICS-RESP1-CD = DFHRESP(NORMAL). :196
+        if (_cicsResp1Code == (int)Resp.Normal)                 // IF WS-CICS-RESP1-CD = DFHRESP(NORMAL). :196
         {
             _inputQueueName = trigger.QueueName;                // MOVE MQTM-QNAME TO INPUT-QUEUE-NAME. :197
             _replyQueueName = MqQueues.ReplyAcct;               // MOVE 'CARD.DEMO.REPLY.ACCT' TO ...   . :198
@@ -215,27 +215,27 @@ public sealed class AccountInquiryService : IMqServer
         else
         {
             // FB-7: 'CICS RETREIVE' (sic) error label. source: :200
-            _mqErrorPara = "CICS RETREIVE";
-            _wsCicsResp1CdD = _wsCicsResp1Cd;                   // MOVE WS-CICS-RESP1-CD TO ...-CD-D. :201
+            _mqErrorParagraph = "CICS RETREIVE";
+            _cicsResp1CodeDisplay = _cicsResp1Code;                   // MOVE WS-CICS-RESP1-CD TO ...-CD-D. :201
             // FB-3: self-move (intended -CD-D), so WS-CICS-RESP2-CD-D stays 0. source: :202
-            _wsCicsResp2Cd = _wsCicsResp2Cd;
+            _cicsResp2Code = _cicsResp2Code;
             _mqApplReturnMessage =                              // STRING 'RESP: '... 'END'. source: :203-206
-                "RESP: " + Disp8(_wsCicsResp1CdD) + Disp8(_wsCicsResp2CdD) + "END";
-            Error9000();                                        // PERFORM 9000-ERROR. source: :208
-            Termination8000();                                 // PERFORM 8000-TERMINATION. source: :209
+                "RESP: " + Disp8(_cicsResp1CodeDisplay) + Disp8(_cicsResp2CodeDisplay) + "END";
+            Error();                                        // PERFORM 9000-ERROR. source: :208
+            Termination();                                 // PERFORM 8000-TERMINATION. source: :209
         }
 
-        OpenInputQueue2300();                                  // PERFORM 2300-OPEN-INPUT-QUEUE. source: :212
-        OpenOutputQueue2400();                                 // PERFORM 2400-OPEN-OUTPUT-QUEUE. source: :213
-        GetRequest3000();                                     // PERFORM 3000-GET-REQUEST (prime). source: :214
+        OpenInputQueue();                                  // PERFORM 2300-OPEN-INPUT-QUEUE. source: :212
+        OpenOutputQueue();                                 // PERFORM 2400-OPEN-OUTPUT-QUEUE. source: :213
+        GetRequest();                                     // PERFORM 3000-GET-REQUEST (prime). source: :214
 
         // PERFORM 4000-MAIN-PROCESS UNTIL NO-MORE-MSGS. source: :215-216
         while (!IsNoMoreMsgs())
         {
-            MainProcess4000();
+            MainProcess();
         }
 
-        Termination8000();                                    // PERFORM 8000-TERMINATION. source: :218
+        Termination();                                    // PERFORM 8000-TERMINATION. source: :218
     }
 
     // =================================================================================================
@@ -243,7 +243,7 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     /// <summary>Open the trigger-supplied request queue for GET (MQOO-INPUT-SHARED + SAVE-ALL-CONTEXT
     /// + FAIL-IF-QUIESCING). On success SET REPLY-QUEUE-OPEN (FB-1: the input queue sets the reply flag).</summary>
-    private void OpenInputQueue2300()
+    private void OpenInputQueue()  // COBOL paragraph: 2300-OPEN-INPUT-QUEUE
     {
         // MOVE SPACES TO MQOD-OBJECTQMGRNAME; MOVE INPUT-QUEUE-NAME TO MQOD-OBJECTNAME. source: :226-227
         // COMPUTE MQ-OPTIONS = MQOO-INPUT-SHARED + MQOO-SAVE-ALL-CONTEXT + MQOO-FAIL-IF-QUIESCING. :229-231
@@ -268,8 +268,8 @@ public sealed class AccountInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _inputQueueName;
                 _mqApplReturnMessage = "INP MQOPEN ERR";       // source: :250
-                Error9000();                                  // PERFORM 9000-ERROR. source: :251
-                Termination8000();                            // PERFORM 8000-TERMINATION. source: :252
+                Error();                                  // PERFORM 9000-ERROR. source: :251
+                Termination();                            // PERFORM 8000-TERMINATION. source: :252
                 break;
         }
     }
@@ -279,7 +279,7 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     /// <summary>Open CARD.DEMO.REPLY.ACCT for PUT (MQOO-OUTPUT + PASS-ALL-CONTEXT + FAIL-IF-QUIESCING).
     /// On success SET RESP-QUEUE-OPEN.</summary>
-    private void OpenOutputQueue2400()
+    private void OpenOutputQueue()  // COBOL paragraph: 2400-OPEN-OUTPUT-QUEUE
     {
         // MOVE SPACES TO MQOD-OBJECTQMGRNAME; MOVE REPLY-QUEUE-NAME TO MQOD-OBJECTNAME. source: :260-261
         // COMPUTE MQ-OPTIONS = MQOO-OUTPUT + MQOO-PASS-ALL-CONTEXT + MQOO-FAIL-IF-QUIESCING. :263-265
@@ -303,8 +303,8 @@ public sealed class AccountInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _replyQueueName;
                 _mqApplReturnMessage = "OUT MQOPEN ERR";       // source: :284
-                Error9000();                                  // PERFORM 9000-ERROR. source: :285
-                Termination8000();                            // PERFORM 8000-TERMINATION. source: :286
+                Error();                                  // PERFORM 9000-ERROR. source: :285
+                Termination();                            // PERFORM 8000-TERMINATION. source: :286
                 break;
         }
     }
@@ -314,7 +314,7 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     /// <summary>Open CARD.DEMO.ERROR for PUT (the error sink). On failure DISPLAY the block and TERMINATE
     /// (no 9000-ERROR here — you cannot write errors when the error queue itself failed to open).</summary>
-    private void OpenErrorQueue2100()
+    private void OpenErrorQueue()  // COBOL paragraph: 2100-OPEN-ERROR-QUEUE
     {
         _errorQueueName = MqQueues.Error;                     // MOVE 'CARD.DEMO.ERROR' TO ERROR-QUEUE-NAME. :294
         // MOVE SPACES TO MQOD-OBJECTQMGRNAME; MOVE ERROR-QUEUE-NAME TO MQOD-OBJECTNAME. source: :295-296
@@ -340,7 +340,7 @@ public sealed class AccountInquiryService : IMqServer
                 _mqApplQueueName = _errorQueueName;
                 _mqApplReturnMessage = "ERR MQOPEN ERR";       // source: :319
                 DisplayMqErrDisplay();                        // DISPLAY MQ-ERR-DISPLAY (not enqueued). :320
-                Termination8000();                            // PERFORM 8000-TERMINATION. source: :321
+                Termination();                            // PERFORM 8000-TERMINATION. source: :321
                 break;
         }
     }
@@ -350,11 +350,11 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     /// <summary>Per-message loop body (performed UNTIL NO-MORE-MSGS): SYNCPOINT the previous message's
     /// unit of work, then GET the next request.</summary>
-    private void MainProcess4000()
+    private void MainProcess()  // COBOL paragraph: 4000-MAIN-PROCESS
     {
         // EXEC CICS SYNCPOINT END-EXEC (commit previous message's UOW). The in-proc repository read +
         // PUT are already committed on the shared connection; this is the per-message boundary. source: :326-328
-        GetRequest3000();                                    // PERFORM 3000-GET-REQUEST. source: :330
+        GetRequest();                                    // PERFORM 3000-GET-REQUEST. source: :330
     }
 
     // =================================================================================================
@@ -362,19 +362,19 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     /// <summary>GET one request message (5 s wait, any next msg) and dispatch it; on the empty queue set
     /// NO-MORE-MSGS, on any other GET failure write the error and terminate.</summary>
-    private void GetRequest3000()
+    private void GetRequest()  // COBOL paragraph: 3000-GET-REQUEST
     {
         // MOVE 5000 TO MQGMO-WAITINTERVAL; MOVE SPACES TO MQ-CORRELID/MQ-MSG-ID; MOVE INPUT-QUEUE-NAME
         // TO MQ-QUEUE; MOVE INPUT-QUEUE-HANDLE TO MQ-HOBJ; MOVE 1000 TO MQ-BUFFER-LENGTH. source: :337-342
         _mqCorrelId = MqConstants.MqciNone;
         _mqMsgId = MqConstants.MqmiNone;
-        _mqQueue = _inputQueueName;
+        _mqQueueName = _inputQueueName;
         _mqBufferLength = 1000;
 
         // MOVE MQMI-NONE TO MQMD-MSGID; MOVE MQCI-NONE TO MQMD-CORRELID (take any next msg). source: :343-344
         // INITIALIZE REQUEST-MSG-COPY REPLACING NUMERIC BY ZEROES -> WS-FUNC spaces, WS-KEY 0. source: :345
-        _wsFunc = "";
-        _wsKey = 0;
+        _requestFunction = "";
+        _requestKey = 0;
 
         // COMPUTE MQGMO-OPTIONS = MQGMO-SYNCPOINT + FAIL-IF-QUIESCING + CONVERT + WAIT. source: :347-350
         // CALL 'MQGET' USING MQ-HCONN ... (FB-2: MQ-HCONN, not QMGR-HANDLE-CONN). source: :352-360
@@ -386,18 +386,18 @@ public sealed class AccountInquiryService : IMqServer
         {
             _mqMsgId = msg.MsgId;                             // MOVE MQMD-MSGID TO MQ-MSG-ID. source: :364
             _mqCorrelId = msg.CorrelId;                       // MOVE MQMD-CORRELID TO MQ-CORRELID. :365
-            _mqQueueReply = msg.ReplyToQueue;                 // MOVE MQMD-REPLYTOQ TO MQ-QUEUE-REPLY (FB-5). :366
+            _mqReplyToQueue = msg.ReplyToQueue;                 // MOVE MQMD-REPLYTOQ TO MQ-QUEUE-REPLY (FB-5). :366
             _mqApplConditionCode = _mqConditionCode;          // source: :367
             _mqApplReasonCode = _mqReasonCode;                // source: :368
             _requestMessage = Fixed(msg.Body, 1000);          // MOVE MQ-BUFFER TO REQUEST-MESSAGE. source: :369
-            _saveCorelid = _mqCorrelId;                       // MOVE MQ-CORRELID TO SAVE-CORELID. :370
-            _saveReply2q = _mqQueueReply;                     // MOVE MQ-QUEUE-REPLY TO SAVE-REPLY2Q (FB-5). :371
-            _saveMsgid = _mqMsgId;                            // MOVE MQ-MSG-ID TO SAVE-MSGID. :372
+            _savedCorrelId = _mqCorrelId;                       // MOVE MQ-CORRELID TO SAVE-CORELID. :370
+            _savedReplyToQueue = _mqReplyToQueue;                     // MOVE MQ-QUEUE-REPLY TO SAVE-REPLY2Q (FB-5). :371
+            _savedMsgId = _mqMsgId;                            // MOVE MQ-MSG-ID TO SAVE-MSGID. :372
 
             // MOVE REQUEST-MESSAGE TO REQUEST-MSG-COPY (overlay X(1000) onto FUNC/KEY/FILLER). source: :373
             OverlayRequestMsgCopy(_requestMessage);
 
-            ProcessRequestReply4000();                        // PERFORM 4000-PROCESS-REQUEST-REPLY. :374
+            ProcessRequestReply();                        // PERFORM 4000-PROCESS-REQUEST-REPLY. :374
             _mqMsgCount++;                                    // ADD 1 TO MQ-MSG-COUNT (FB-4: dead). :375
         }
         else                                                  // ELSE. source: :376
@@ -412,8 +412,8 @@ public sealed class AccountInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _inputQueueName;
                 _mqApplReturnMessage = "INP MQGET ERR:";      // source: :384
-                Error9000();                                  // PERFORM 9000-ERROR. source: :385
-                Termination8000();                            // PERFORM 8000-TERMINATION. source: :386
+                Error();                                  // PERFORM 9000-ERROR. source: :385
+                Termination();                            // PERFORM 8000-TERMINATION. source: :386
             }
         }
     }
@@ -424,54 +424,54 @@ public sealed class AccountInquiryService : IMqServer
     /// <summary>Build the reply for one parsed request: on a valid INQA+key inquiry read the ACCOUNT
     /// (NORMAL → labeled snapshot; NOTFND → invalid-params text; OTHER → write error + terminate);
     /// otherwise reply with the invalid-params + function text.</summary>
-    private void ProcessRequestReply4000()
+    private void ProcessRequestReply()  // COBOL paragraph: 4000-PROCESS-REQUEST-REPLY
     {
         _replyMessage = "";                                  // MOVE SPACES TO REPLY-MESSAGE. source: :391
         // INITIALIZE WS-DATE-TIME REPLACING NUMERIC BY ZEROES (WS-DATE-TIME is otherwise unused). source: :392
 
         // IF WS-FUNC = 'INQA' AND WS-KEY > ZEROES. source: :393
-        if (_wsFunc == "INQA" && _wsKey > 0)
+        if (_requestFunction == "INQA" && _requestKey > 0)
         {
-            _wsKey = Store11(_wsKey);                         // (the numeric WS-KEY is an 11-digit field)
-            _wsCardRidAcctId = _wsKey;                        // MOVE WS-KEY TO WS-CARD-RID-ACCT-ID. source: :394
+            _requestKey = Store11(_requestKey);                         // (the numeric WS-KEY is an 11-digit field)
+            _accountIdKey = _requestKey;                        // MOVE WS-KEY TO WS-CARD-RID-ACCT-ID. source: :394
 
             // EXEC CICS READ DATASET(ACCTDAT) RIDFLD(WS-CARD-RID-ACCT-ID-X) KEYLENGTH(11)
             //   INTO(ACCOUNT-RECORD) RESP(WS-RESP-CD) RESP2(WS-REAS-CD). source: :396-404
             // The X(11) RIDFLD is the zoned image of WS-CARD-RID-ACCT-ID; for SQL we pass the integer.
-            string resp = _accounts.ReadByKey(_wsCardRidAcctId, out _accountRecord);
-            _wsRespCd = RespFromStatus(resp);
-            _wsReasCd = 0;
+            string resp = _accounts.ReadByKey(_accountIdKey, out _accountRecord);
+            _readRespCode = RespFromStatus(resp);
+            _readReasonCode = 0;
 
             switch (resp)                                     // EVALUATE WS-RESP-CD. source: :406
             {
                 case FileStatus.Ok:                           // WHEN DFHRESP(NORMAL). source: :407
                     BuildAccountReply(_accountRecord!);       // MOVE 11 fields into WS-ACCT-RESPONSE. :408-425
-                    _replyMessage = _wsAcctResponse;          // MOVE WS-ACCT-RESPONSE TO REPLY-MESSAGE. :426
-                    PutReply4100();                           // PERFORM 4100-PUT-REPLY. source: :427
+                    _replyMessage = _acctResponse;          // MOVE WS-ACCT-RESPONSE TO REPLY-MESSAGE. :426
+                    PutReply();                           // PERFORM 4100-PUT-REPLY. source: :427
                     break;
 
                 case FileStatus.RecordNotFound:               // WHEN DFHRESP(NOTFND). source: :428
                     // STRING 'INVALID REQUEST PARAMETERS ' 'ACCT ID : ' WS-KEY DELIMITED BY SIZE. :429-434
-                    _replyMessage = "INVALID REQUEST PARAMETERS " + "ACCT ID : " + Key11(_wsKey);
-                    PutReply4100();                           // PERFORM 4100-PUT-REPLY. source: :435
+                    _replyMessage = "INVALID REQUEST PARAMETERS " + "ACCT ID : " + Key11(_requestKey);
+                    PutReply();                           // PERFORM 4100-PUT-REPLY. source: :435
                     break;
 
                 default:                                      // WHEN OTHER. source: :437
-                    _mqApplConditionCode = _wsRespCd;         // source: :439
-                    _mqApplReasonCode = _wsReasCd;            // source: :440
+                    _mqApplConditionCode = _readRespCode;         // source: :439
+                    _mqApplReasonCode = _readReasonCode;            // source: :440
                     _mqApplQueueName = _inputQueueName;       // source: :441
                     _mqApplReturnMessage = "ERROR WHILE READING ACCTFILE";  // source: :442-443
-                    Error9000();                              // PERFORM 9000-ERROR. source: :444
-                    Termination8000();                        // PERFORM 8000-TERMINATION. source: :445
+                    Error();                              // PERFORM 9000-ERROR. source: :444
+                    Termination();                        // PERFORM 8000-TERMINATION. source: :445
                     break;
             }
         }
         else                                                  // ELSE. source: :448
         {
             // STRING 'INVALID REQUEST PARAMETERS ' 'ACCT ID : ' WS-KEY 'FUNCTION : ' WS-FUNC. :449-455
-            _replyMessage = "INVALID REQUEST PARAMETERS " + "ACCT ID : " + Key11(_wsKey)
-                          + "FUNCTION : " + Fixed(_wsFunc, 4);
-            PutReply4100();                                   // PERFORM 4100-PUT-REPLY. source: :456
+            _replyMessage = "INVALID REQUEST PARAMETERS " + "ACCT ID : " + Key11(_requestKey)
+                          + "FUNCTION : " + Fixed(_requestFunction, 4);
+            PutReply();                                   // PERFORM 4100-PUT-REPLY. source: :456
         }
     }
 
@@ -480,7 +480,7 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     /// <summary>PUT the built reply to CARD.DEMO.REPLY.ACCT (the pre-opened OUTPUT-QUEUE-HANDLE — FB-5:
     /// never the request's ReplyToQ), echoing the saved MsgId/CorrelId.</summary>
-    private void PutReply4100()
+    private void PutReply()  // COBOL paragraph: 4100-PUT-REPLY
     {
         _mqBuffer = Fixed(_replyMessage, 1000);              // MOVE REPLY-MESSAGE TO MQ-BUFFER. source: :467
         _mqBufferLength = 1000;                              // MOVE 1000 TO MQ-BUFFER-LENGTH. source: :468
@@ -488,8 +488,8 @@ public sealed class AccountInquiryService : IMqServer
         var reply = new MqMessage
         {
             Body = _mqBuffer,
-            MsgId = _saveMsgid,                              // MOVE SAVE-MSGID TO MQMD-MSGID. source: :469
-            CorrelId = _saveCorelid,                         // MOVE SAVE-CORELID TO MQMD-CORRELID. :470
+            MsgId = _savedMsgId,                              // MOVE SAVE-MSGID TO MQMD-MSGID. source: :469
+            CorrelId = _savedCorrelId,                         // MOVE SAVE-CORELID TO MQMD-CORRELID. :470
             Format = MqConstants.MqfmtString,                // MOVE MQFMT-STRING TO MQMD-FORMAT. :471
             CodedCharSetId = MqConstants.MqccsiQMgr,         // COMPUTE MQMD-CODEDCHARSETID = MQCCSI-Q-MGR. :473
         };
@@ -511,8 +511,8 @@ public sealed class AccountInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _replyQueueName;
                 _mqApplReturnMessage = "MQPUT ERR";          // source: :496
-                Error9000();                                 // PERFORM 9000-ERROR. source: :497
-                Termination8000();                           // PERFORM 8000-TERMINATION. source: :498
+                Error();                                 // PERFORM 9000-ERROR. source: :497
+                Termination();                           // PERFORM 8000-TERMINATION. source: :498
                 break;
         }
     }
@@ -522,7 +522,7 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     /// <summary>PUT the MQ-ERR-DISPLAY block to CARD.DEMO.ERROR. On a PUT failure DISPLAY the block and
     /// terminate (no recursion into 9000-ERROR).</summary>
-    private void Error9000()
+    private void Error()  // COBOL paragraph: 9000-ERROR
     {
         _errorMessage = FormatMqErrDisplay();                // MOVE MQ-ERR-DISPLAY TO ERROR-MESSAGE. source: :505
         _mqBuffer = Fixed(_errorMessage, 1000);              // MOVE ERROR-MESSAGE TO MQ-BUFFER. source: :506
@@ -555,7 +555,7 @@ public sealed class AccountInquiryService : IMqServer
                 _mqApplQueueName = _errorQueueName;
                 _mqApplReturnMessage = "MQPUT ERR";          // source: :533
                 DisplayMqErrDisplay();                       // DISPLAY MQ-ERR-DISPLAY. source: :534
-                Termination8000();                           // PERFORM 8000-TERMINATION (no 9000 recursion). :535
+                Termination();                           // PERFORM 8000-TERMINATION (no 9000 recursion). :535
                 break;
         }
     }
@@ -565,7 +565,7 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     /// <summary>Close the open queues (FB-1 flag/queue mapping), EXEC CICS RETURN + GOBACK. FB-6: a close
     /// error re-PERFORMs 8000-TERMINATION; modeled idempotently — a re-entry short-circuits to the RETURN.</summary>
-    private void Termination8000()
+    private void Termination()  // COBOL paragraph: 8000-TERMINATION
     {
         if (_terminating)
         {
@@ -577,15 +577,15 @@ public sealed class AccountInquiryService : IMqServer
 
         if (IsReplyQueueOpen())                              // IF REPLY-QUEUE-OPEN. source: :540
         {
-            CloseInputQueue5000();                           // PERFORM 5000-CLOSE-INPUT-QUEUE (FB-1). :541
+            CloseInputQueue();                           // PERFORM 5000-CLOSE-INPUT-QUEUE (FB-1). :541
         }
         if (IsRespQueueOpen())                               // IF RESP-QUEUE-OPEN. source: :543
         {
-            CloseOutputQueue5100();                          // PERFORM 5100-CLOSE-OUTPUT-QUEUE. source: :544
+            CloseOutputQueue();                          // PERFORM 5100-CLOSE-OUTPUT-QUEUE. source: :544
         }
         if (IsErrQueueOpen())                                // IF ERR-QUEUE-OPEN. source: :546
         {
-            CloseErrorQueue5200();                           // PERFORM 5200-CLOSE-ERROR-QUEUE. source: :547
+            CloseErrorQueue();                           // PERFORM 5200-CLOSE-ERROR-QUEUE. source: :547
         }
 
         // EXEC CICS RETURN END-EXEC; GOBACK. source: :549-550
@@ -595,9 +595,9 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     //  5000-CLOSE-INPUT-QUEUE — source: COACCT01.cbl:552-573
     // =================================================================================================
-    private void CloseInputQueue5000()
+    private void CloseInputQueue()  // COBOL paragraph: 5000-CLOSE-INPUT-QUEUE
     {
-        _mqQueue = _inputQueueName;                          // MOVE INPUT-QUEUE-NAME TO MQ-QUEUE. source: :553
+        _mqQueueName = _inputQueueName;                          // MOVE INPUT-QUEUE-NAME TO MQ-QUEUE. source: :553
         // COMPUTE MQ-OPTIONS = MQCO-NONE. source: :555
         // CALL 'MQCLOSE' USING MQ-HCONN MQ-HOBJ ... source: :557-561
         MqResult r = _inputHandle is null ? MqResult.Success : _mq.Close(_inputHandle);
@@ -615,7 +615,7 @@ public sealed class AccountInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _inputQueueName;
                 _mqApplReturnMessage = "MQCLOSE ERR";        // source: :571
-                Termination8000();                           // PERFORM 8000-TERMINATION (FB-6). source: :572
+                Termination();                           // PERFORM 8000-TERMINATION (FB-6). source: :572
                 break;
         }
     }
@@ -623,9 +623,9 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     //  5100-CLOSE-OUTPUT-QUEUE — source: COACCT01.cbl:574-595
     // =================================================================================================
-    private void CloseOutputQueue5100()
+    private void CloseOutputQueue()  // COBOL paragraph: 5100-CLOSE-OUTPUT-QUEUE
     {
-        _mqQueue = _replyQueueName;                          // MOVE REPLY-QUEUE-NAME TO MQ-QUEUE. source: :575
+        _mqQueueName = _replyQueueName;                      // MOVE REPLY-QUEUE-NAME TO MQ-QUEUE. source: :575
         // COMPUTE MQ-OPTIONS = MQCO-NONE. source: :577
         // CALL 'MQCLOSE' USING MQ-HCONN MQ-HOBJ ... source: :579-583
         MqResult r = _outputHandle is null ? MqResult.Success : _mq.Close(_outputHandle);
@@ -644,7 +644,7 @@ public sealed class AccountInquiryService : IMqServer
                 // Copy/paste: uses INPUT-QUEUE-NAME in the error message (harmless). source: :592
                 _mqApplQueueName = _inputQueueName;
                 _mqApplReturnMessage = "MQCLOSE ERR";        // source: :593
-                Termination8000();                           // PERFORM 8000-TERMINATION (FB-6). source: :594
+                Termination();                           // PERFORM 8000-TERMINATION (FB-6). source: :594
                 break;
         }
     }
@@ -652,9 +652,9 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     //  5200-CLOSE-ERROR-QUEUE — source: COACCT01.cbl:597-619
     // =================================================================================================
-    private void CloseErrorQueue5200()
+    private void CloseErrorQueue()  // COBOL paragraph: 5200-CLOSE-ERROR-QUEUE
     {
-        _mqQueue = _errorQueueName;                          // MOVE ERROR-QUEUE-NAME TO MQ-QUEUE. source: :598
+        _mqQueueName = _errorQueueName;                      // MOVE ERROR-QUEUE-NAME TO MQ-QUEUE. source: :598
         // COMPUTE MQ-OPTIONS = MQCO-NONE. source: :600
         // CALL 'MQCLOSE' USING MQ-HCONN MQ-HOBJ ... source: :602-606
         MqResult r = _errorHandle is null ? MqResult.Success : _mq.Close(_errorHandle);
@@ -672,8 +672,8 @@ public sealed class AccountInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _errorQueueName;
                 _mqApplReturnMessage = "MQCLOSE ERR";        // source: :616
-                Error9000();                                 // PERFORM 9000-ERROR. source: :617
-                Termination8000();                           // PERFORM 8000-TERMINATION (FB-6). source: :618
+                Error();                                 // PERFORM 9000-ERROR. source: :617
+                Termination();                           // PERFORM 8000-TERMINATION (FB-6). source: :618
                 break;
         }
     }
@@ -681,7 +681,7 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     //  WS-ACCT-RESPONSE — the labeled reply block (built by BuildAccountReply). source: :130-169
     // =================================================================================================
-    private string _wsAcctResponse = "";
+    private string _acctResponse = "";       // WS-ACCT-RESPONSE
 
     /// <summary>
     /// MOVEs the 11 surfaced account fields into the <c>WS-ACCT-RESPONSE</c> group and re-serializes it to
@@ -715,7 +715,7 @@ public sealed class AccountInquiryService : IMqServer
         sb.Append(PicS9V99(a.CurrCycDebit));                 // WS-ACCT-CURR-CYC-DEBIT. :165,:423-424
         sb.Append("GROUP ID : ");                            // WS-ACCT-GRP-LBL X(11). source: :167-168
         sb.Append(Fixed(a.GroupId, 10));                     // WS-ACCT-GROUP-ID X(10). :169,:425
-        _wsAcctResponse = sb.ToString();
+        _acctResponse = sb.ToString();
         // FB-8: ACCT-ADDR-ZIP read but never surfaced (absent from the move list :407-425).
     }
 
@@ -731,8 +731,8 @@ public sealed class AccountInquiryService : IMqServer
     private void OverlayRequestMsgCopy(string buffer)
     {
         string b = Fixed(buffer, 1000);
-        _wsFunc = b.Substring(0, 4);                         // WS-FUNC X(4)
-        _wsKey = ParseKey11(b.Substring(4, 11));             // WS-KEY 9(11)
+        _requestFunction = b.Substring(0, 4);                         // WS-FUNC X(4)
+        _requestKey = ParseKey11(b.Substring(4, 11));             // WS-KEY 9(11)
     }
 
     // =================================================================================================
@@ -740,7 +740,7 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     private void InitializeMqErrDisplay()
     {
-        _mqErrorPara = "";
+        _mqErrorParagraph = "";
         _mqApplReturnMessage = "";
         _mqApplConditionCode = 0;
         _mqApplReasonCode = 0;
@@ -752,7 +752,7 @@ public sealed class AccountInquiryService : IMqServer
     private string FormatMqErrDisplay()
     {
         var sb = new StringBuilder(115);
-        sb.Append(Fixed(_mqErrorPara, 25));                  // MQ-ERROR-PARA X(25)
+        sb.Append(Fixed(_mqErrorParagraph, 25));             // MQ-ERROR-PARA X(25)
         sb.Append("  ");                                     // FILLER X(2)
         sb.Append(Fixed(_mqApplReturnMessage, 25));          // MQ-APPL-RETURN-MESSAGE X(25)
         sb.Append("  ");                                     // FILLER X(2)
@@ -769,17 +769,17 @@ public sealed class AccountInquiryService : IMqServer
     // =================================================================================================
     //  88-level flag setters / testers (FB-1 naming preserved).
     // =================================================================================================
-    private void SetNoMoreMsgs() => _wsMqMsgFlag = 'Y';
-    private bool IsNoMoreMsgs() => _wsMqMsgFlag == 'Y';
+    private void SetNoMoreMsgs() => _mqMsgFlag = 'Y';
+    private bool IsNoMoreMsgs() => _mqMsgFlag == 'Y';
 
-    private void SetRespQueueOpen() => _wsRespQueueSts = 'Y';   // output/reply queue (FB-1)
-    private bool IsRespQueueOpen() => _wsRespQueueSts == 'Y';
+    private void SetRespQueueOpen() => _respQueueStatus = 'Y';   // output/reply queue (FB-1)
+    private bool IsRespQueueOpen() => _respQueueStatus == 'Y';
 
-    private void SetErrQueueOpen() => _wsErrQueueSts = 'Y';
-    private bool IsErrQueueOpen() => _wsErrQueueSts == 'Y';
+    private void SetErrQueueOpen() => _errQueueStatus = 'Y';
+    private bool IsErrQueueOpen() => _errQueueStatus == 'Y';
 
-    private void SetReplyQueueOpen() => _wsReplyQueueSts = 'Y'; // input/request queue (FB-1)
-    private bool IsReplyQueueOpen() => _wsReplyQueueSts == 'Y';
+    private void SetReplyQueueOpen() => _replyQueueStatus = 'Y'; // input/request queue (FB-1)
+    private bool IsReplyQueueOpen() => _replyQueueStatus == 'Y';
 
     // =================================================================================================
     //  Numeric / string formatting helpers (zoned-decimal reply serialization + COBOL field widths).

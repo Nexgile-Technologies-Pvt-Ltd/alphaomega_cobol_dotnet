@@ -55,34 +55,34 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     // =============================================================================================
     //  WS-VARIABLES — source: COPAUS1C.cbl:32-54
     // =============================================================================================
-    private const string WS_PGM_AUTH_DTL = "COPAUS1C";   // 05 WS-PGM-AUTH-DTL   X(08) VALUE 'COPAUS1C'. :33
-    private const string WS_PGM_AUTH_SMRY = "COPAUS0C";  // 05 WS-PGM-AUTH-SMRY  X(08) VALUE 'COPAUS0C'. :34
-    private const string WS_PGM_AUTH_FRAUD = "COPAUS2C"; // 05 WS-PGM-AUTH-FRAUD X(08) VALUE 'COPAUS2C'. :35
-    private const string WS_CICS_TRANID = "CPVD";        // 05 WS-CICS-TRANID    X(04) VALUE 'CPVD'.     :36
+    private const string AuthDetailProgramId = "COPAUS1C";   // WS-PGM-AUTH-DTL   X(08) VALUE 'COPAUS1C'. :33
+    private const string AuthSummaryProgramId = "COPAUS0C";  // WS-PGM-AUTH-SMRY  X(08) VALUE 'COPAUS0C'. :34
+    private const string AuthFraudProgramId = "COPAUS2C"; // WS-PGM-AUTH-FRAUD X(08) VALUE 'COPAUS2C'. :35
+    private const string CicsTranId = "CPVD";        // WS-CICS-TRANID    X(04) VALUE 'CPVD'.     :36
 
-    private string _wsMessage = "";       // 05 WS-MESSAGE X(80) VALUE SPACES. :37
+    private string _message = "";       // WS-MESSAGE X(80) VALUE SPACES. :37
 
     // 05 WS-ERR-FLG X(01) VALUE 'N'. 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. :38-40
-    private bool _errFlgOn;
-    private bool ErrFlgOff => !_errFlgOn;
+    private bool _errorFlagOn;
+    private bool ErrorFlagOff => !_errorFlagOn; // WS-ERR-FLG ERR-FLG-OFF
 
     // 05 WS-AUTHS-EOF X(01) VALUE 'N'. 88 AUTHS-EOF='Y' / AUTHS-NOT-EOF='N'. :41-43
-    private bool _authsEof;
+    private bool _authsEof; // WS-AUTHS-EOF
 
     // 05 WS-SEND-ERASE-FLG X(01) VALUE 'Y'. 88 SEND-ERASE-YES='Y' / SEND-ERASE-NO='N'. :44-46
-    private bool _sendEraseYes = true;
+    private bool _sendEraseYes = true; // WS-SEND-ERASE-FLG SEND-ERASE-YES
 
     // 05 WS-RESP-CD / WS-REAS-CD S9(09) COMP VALUE ZEROS — FB-7: declared, never used. :47-48
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode; // WS-RESP-CD
+    private int _reasonCode; // WS-REAS-CD
 
-    private long _wsAcctId;               // 05 WS-ACCT-ID  9(11). :50 (<- CDEMO-ACCT-ID)
-    private string _wsAuthKey = "";       // 05 WS-AUTH-KEY X(08). :51 (<- CDEMO-CPVD-PAU-SELECTED)
+    private long _acctId;               // WS-ACCT-ID  9(11). :50 (<- CDEMO-ACCT-ID)
+    private string _authKey = "";       // WS-AUTH-KEY X(08). :51 (<- CDEMO-CPVD-PAU-SELECTED)
     // 05 WS-AUTH-AMT PIC -zzzzzzz9.99 (edited). :52
     // 05 WS-AUTH-DATE X(08) VALUE '00/00/00'. :53
-    private string _wsAuthDate = "00/00/00";
+    private string _authDate = "00/00/00"; // WS-AUTH-DATE
     // 05 WS-AUTH-TIME X(08) VALUE '00:00:00' — persists ':' separators (FB-1). :54
-    private string _wsAuthTime = "00:00:00";
+    private string _authTime = "00:00:00"; // WS-AUTH-TIME
 
     // =============================================================================================
     //  WS-IMS-VARIABLES — source: COPAUS1C.cbl:75-91
@@ -93,18 +93,18 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
 
     // 05 WS-IMS-PSB-SCHD-FLG X(1) — NO VALUE (FB-2). 88 IMS-PSB-SCHD='Y'/IMS-PSB-NOT-SCHD='N'. :89-91
     // Initial content is undefined/spaces -> not 'Y'.
-    private string _imsPsbSchdFlg = " ";
-    private bool ImsPsbSchd => _imsPsbSchdFlg == "Y";
+    private string _imsPsbScheduledFlag = " "; // WS-IMS-PSB-SCHD-FLG
+    private bool ImsPsbScheduled => _imsPsbScheduledFlag == "Y"; // IMS-PSB-SCHD
 
     // =============================================================================================
     //  PENDING-AUTH-SUMMARY / PENDING-AUTH-DETAILS io-areas (COPY CIPAUSMY / CIPAUDTY). :141-146
     // =============================================================================================
-    private PautSummary? _summaryRec;
-    private PautDetail _detailRec = new();
+    private PautSummary? _summaryRecord; // PENDING-AUTH-SUMMARY
+    private PautDetail _detailRecord = new(); // PENDING-AUTH-DETAILS
 
     // PA-AUTHORIZATION-KEY / PA-ACCT-ID set before each DL/I call. :436-437
-    private long _paAcctId;
-    private string _paAuthorizationKey = "";
+    private long _paAcctId; // PA-ACCT-ID
+    private string _paAuthorizationKey = ""; // PA-AUTHORIZATION-KEY
 
     // =============================================================================================
     //  Decline-reason lookup table (SEARCH ALL, ASCENDING KEY) — source: COPAUS1C.cbl:56-73
@@ -127,7 +127,7 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     // =============================================================================================
     //  WS-FRAUD-DATA — COMMAREA passed to COPAUS2C on LINK. source: COPAUS1C.cbl:93-104
     // =============================================================================================
-    private readonly WsFraudData _fraudData = new();
+    private readonly FraudData _fraudData = new();
 
     // =============================================================================================
     //  COMMAREA (typed view) + CPVD extension + per-turn map + DB. source: :109-120,171-172,202-205
@@ -137,20 +137,20 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
 
     // CDEMO-CPVD-INFO (appended after COCOM01Y). Only the selected key is read by this program; the rest
     // are screen-paging state owned by COPAUS0C, carried through unchanged. source: :110-120
-    private string _cpvdPauSelFlg = "";   // CDEMO-CPVD-PAU-SEL-FLG  X(01). :111
-    private string _cpvdPauSelected = ""; // CDEMO-CPVD-PAU-SELECTED X(08). :112  (the selected auth key)
+    private string _selectedAuthFlag = "";   // CDEMO-CPVD-PAU-SEL-FLG  X(01). :111
+    private string _selectedAuthKey = ""; // CDEMO-CPVD-PAU-SELECTED X(08). :112  (the selected auth key)
 
     // CCDA-* (COTTL01Y / CSMSG01Y).
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...         "; // CSMSG01Y :20-21
+    private const string Title01 = "      AWS Mainframe Modernization       "; // CCDA-TITLE01
+    private const string Title02 = "              CardDemo                  "; // CCDA-TITLE02
+    private const string InvalidKeyMessage = "Invalid key pressed. Please see below...         "; // CCDA-MSG-INVALID-KEY CSMSG01Y :20-21
 
     private readonly RelationalDb _db;
-    private PautSummaryRepository _summaryRepo = null!;
-    private PautDetailRepository _detailRepo = null!;
+    private PautSummaryRepository _summaryRepository = null!;
+    private PautDetailRepository _detailRepository = null!;
 
     // Unit of work opened by SCHEDULE-PSB; COMMIT on SYNCPOINT, ROLLBACK on SYNCPOINT ROLLBACK.
-    private SqliteTransaction? _uow;
+    private SqliteTransaction? _unitOfWork;
 
     /// <summary>Log sink for the stray DISPLAY (FB-5). Defaults to the console-region log (Console.Error).</summary>
     private readonly Action<string> _log;
@@ -169,10 +169,10 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     public PendingAuthDetailProgram() : this(null!, null) { }
 
     /// <inheritdoc/>
-    public string ProgramName => WS_PGM_AUTH_DTL; // PROGRAM-ID. COPAUS1C. :23
+    public string ProgramName => AuthDetailProgramId; // PROGRAM-ID. COPAUS1C. :23
 
     /// <inheritdoc/>
-    public string TransId => WS_CICS_TRANID;      // CSD: CPVD -> COPAUS1C. :36
+    public string TransId => CicsTranId;      // CSD: CPVD -> COPAUS1C. :36
 
     // =============================================================================================
     //  MAIN-PARA — source: COPAUS1C.cbl:156-206
@@ -183,14 +183,14 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
         _map = BuildMap();
         if (_db is not null)
         {
-            _summaryRepo = new PautSummaryRepository(_db.Connection);
-            _detailRepo = new PautDetailRepository(_db.Connection);
+            _summaryRepository = new PautSummaryRepository(_db.Connection);
+            _detailRepository = new PautDetailRepository(_db.Connection);
         }
 
-        _errFlgOn = false;            // SET ERR-FLG-OFF    TO TRUE. :159
+        _errorFlagOn = false;            // SET ERR-FLG-OFF    TO TRUE. :159
         _sendEraseYes = true;         // SET SEND-ERASE-YES TO TRUE. :160
 
-        _wsMessage = "";                                       // MOVE SPACES TO WS-MESSAGE. :162
+        _message = "";                                       // MOVE SPACES TO WS-MESSAGE. :162
         _map.Field("ERRMSG").SetValue("", setMdt: false);      //              ERRMSGO OF COPAU1AO. :163
 
         if (ctx.EibCalen == 0)
@@ -198,7 +198,7 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
             // IF EIBCALEN = 0 — cold start. :165-169
             _commArea = ctx.CommArea ?? new CardDemoCommArea();  // INITIALIZE CARDDEMO-COMMAREA. :166
             ResetCommArea();
-            _commArea.ToProgram = WS_PGM_AUTH_SMRY;              // MOVE WS-PGM-AUTH-SMRY TO CDEMO-TO-PROGRAM. :168
+            _commArea.ToProgram = AuthSummaryProgramId;              // MOVE WS-PGM-AUTH-SMRY TO CDEMO-TO-PROGRAM. :168
             ReturnToPrevScreen(ctx);                             // PERFORM RETURN-TO-PREV-SCREEN. :169
             return; // XCTL terminates this task.
         }
@@ -207,7 +207,7 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
             // MOVE DFHCOMMAREA(1:EIBCALEN) TO CARDDEMO-COMMAREA. :171
             _commArea = ctx.CommArea!;
             RestoreCpvdInfo();
-            _cpvdFraudData = "";                                 // MOVE SPACES TO CDEMO-CPVD-FRAUD-DATA. :172
+            _fraudDataArea = "";                                 // MOVE SPACES TO CDEMO-CPVD-FRAUD-DATA. :172
 
             if (!_commArea.IsReenter)
             {
@@ -227,7 +227,7 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
                         SendAuthviewScreen(ctx);                 // :183
                         break;
                     case AidKey.Pf3:
-                        _commArea.ToProgram = WS_PGM_AUTH_SMRY;  // WHEN DFHPF3 — back to summary. :184-185
+                        _commArea.ToProgram = AuthSummaryProgramId;  // WHEN DFHPF3 — back to summary. :184-185
                         ReturnToPrevScreen(ctx);                 // PERFORM RETURN-TO-PREV-SCREEN. :186
                         return;                                   // XCTL terminates this task.
                     case AidKey.Pf5:
@@ -240,7 +240,7 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
                         break;
                     default:
                         ProcessEnterKey(ctx);                    // WHEN OTHER. :193-194
-                        _wsMessage = CCDA_MSG_INVALID_KEY;       // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. :196
+                        _message = InvalidKeyMessage;       // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. :196
                         SendAuthviewScreen(ctx);                 // :197
                         break;
                 }
@@ -249,7 +249,7 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
 
         // EXEC CICS RETURN TRANSID('CPVD') COMMAREA(CARDDEMO-COMMAREA). :202-205
         SaveCpvdInfo();
-        ctx.ReturnTransId(WS_CICS_TRANID, _commArea);
+        ctx.ReturnTransId(CicsTranId, _commArea);
     }
 
     // =============================================================================================
@@ -260,22 +260,22 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
         MoveLowValuesToMapOut();   // MOVE LOW-VALUES TO COPAU1AO. :210
 
         // IF CDEMO-ACCT-ID IS NUMERIC AND CDEMO-CPVD-PAU-SELECTED NOT = SPACES AND LOW-VALUES. :211-212
-        if (IsNumeric(_commArea.AcctId) && NotSpacesOrLow(_cpvdPauSelected))
+        if (IsNumeric(_commArea.AcctId) && NotSpacesOrLow(_selectedAuthKey))
         {
-            _wsAcctId = _commArea.AcctId;        // MOVE CDEMO-ACCT-ID TO WS-ACCT-ID. :213
-            _wsAuthKey = _cpvdPauSelected;       // MOVE CDEMO-CPVD-PAU-SELECTED TO WS-AUTH-KEY. :214-215
+            _acctId = _commArea.AcctId;        // MOVE CDEMO-ACCT-ID TO WS-ACCT-ID. :213
+            _authKey = _selectedAuthKey;       // MOVE CDEMO-CPVD-PAU-SELECTED TO WS-AUTH-KEY. :214-215
             ReadAuthRecord(ctx);                 // PERFORM READ-AUTH-RECORD. :216
 
-            if (ImsPsbSchd)
+            if (ImsPsbScheduled)
             {
                 // IF IMS-PSB-SCHD — reset + commit. :218-221
-                _imsPsbSchdFlg = "N";            // SET IMS-PSB-NOT-SCHD TO TRUE.
+                _imsPsbScheduledFlag = "N";            // SET IMS-PSB-NOT-SCHD TO TRUE.
                 TakeSyncpoint();                 // PERFORM TAKE-SYNCPOINT.
             }
         }
         else
         {
-            _errFlgOn = true;                    // SET ERR-FLG-ON TO TRUE. :223-224
+            _errorFlagOn = true;                    // SET ERR-FLG-ON TO TRUE. :223-224
         }
 
         PopulateAuthDetails();                   // PERFORM POPULATE-AUTH-DETAILS. :227
@@ -287,20 +287,20 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     // =============================================================================================
     private void MarkAuthFraud(CicsContext ctx)
     {
-        _wsAcctId = _commArea.AcctId;            // MOVE CDEMO-ACCT-ID TO WS-ACCT-ID. :231
-        _wsAuthKey = _cpvdPauSelected;           // MOVE CDEMO-CPVD-PAU-SELECTED TO WS-AUTH-KEY. :232
+        _acctId = _commArea.AcctId;            // MOVE CDEMO-ACCT-ID TO WS-ACCT-ID. :231
+        _authKey = _selectedAuthKey;           // MOVE CDEMO-CPVD-PAU-SELECTED TO WS-AUTH-KEY. :232
 
         ReadAuthRecord(ctx);                     // PERFORM READ-AUTH-RECORD. :234
 
         // Toggle. :236-242
-        if (_detailRec.AuthFraud == "F")         // IF PA-FRAUD-CONFIRMED ('F').
+        if (_detailRecord.AuthFraud == "F")         // IF PA-FRAUD-CONFIRMED ('F').
         {
-            _detailRec.AuthFraud = "R";          // SET PA-FRAUD-REMOVED TO TRUE ('R').
+            _detailRecord.AuthFraud = "R";          // SET PA-FRAUD-REMOVED TO TRUE ('R').
             _fraudData.FrdAction = "R";          // SET WS-REMOVE-FRAUD TO TRUE ('R').
         }
         else
         {
-            _detailRec.AuthFraud = "F";          // SET PA-FRAUD-CONFIRMED TO TRUE ('F').
+            _detailRecord.AuthFraud = "F";          // SET PA-FRAUD-CONFIRMED TO TRUE ('F').
             _fraudData.FrdAction = "F";          // SET WS-REPORT-FRAUD TO TRUE ('F').
         }
 
@@ -317,7 +317,7 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
                 UpdateAuthDetails(ctx);          // PERFORM UPDATE-AUTH-DETAILS. :255
             else
             {
-                _wsMessage = _fraudData.FrdActMsg; // MOVE WS-FRD-ACT-MSG TO WS-MESSAGE. :257
+                _message = _fraudData.FrdActMsg; // MOVE WS-FRD-ACT-MSG TO WS-MESSAGE. :257
                 RollBack();                      // PERFORM ROLL-BACK. :258
             }
         }
@@ -326,7 +326,7 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
             RollBack();                          // ELSE (LINK failed) — PERFORM ROLL-BACK. :260-262
         }
 
-        _cpvdPauSelected = _detailRec.AuthKey;   // MOVE PA-AUTHORIZATION-KEY TO CDEMO-CPVD-PAU-SELECTED. :264
+        _selectedAuthKey = _detailRecord.AuthKey;   // MOVE PA-AUTHORIZATION-KEY TO CDEMO-CPVD-PAU-SELECTED. :264
         PopulateAuthDetails();                   // PERFORM POPULATE-AUTH-DETAILS. :265
     }
 
@@ -335,16 +335,16 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     // =============================================================================================
     private void ProcessPf8Key(CicsContext ctx)
     {
-        _wsAcctId = _commArea.AcctId;            // MOVE CDEMO-ACCT-ID TO WS-ACCT-ID. :270
-        _wsAuthKey = _cpvdPauSelected;           // MOVE CDEMO-CPVD-PAU-SELECTED TO WS-AUTH-KEY. :271
+        _acctId = _commArea.AcctId;            // MOVE CDEMO-ACCT-ID TO WS-ACCT-ID. :270
+        _authKey = _selectedAuthKey;           // MOVE CDEMO-CPVD-PAU-SELECTED TO WS-AUTH-KEY. :271
 
         ReadAuthRecord(ctx);                     // PERFORM READ-AUTH-RECORD (reposition at current key). :273
         ReadNextAuthRecord(ctx);                 // PERFORM READ-NEXT-AUTH-RECORD (GNP next). :274
 
-        if (ImsPsbSchd)
+        if (ImsPsbScheduled)
         {
             // IF IMS-PSB-SCHD. :276-279
-            _imsPsbSchdFlg = "N";                // SET IMS-PSB-NOT-SCHD TO TRUE.
+            _imsPsbScheduledFlag = "N";                // SET IMS-PSB-NOT-SCHD TO TRUE.
             TakeSyncpoint();                     // PERFORM TAKE-SYNCPOINT.
         }
 
@@ -352,11 +352,11 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
         {
             // IF AUTHS-EOF. :281-284
             _sendEraseYes = false;               // SET SEND-ERASE-NO TO TRUE.
-            _wsMessage = "Already at the last Authorization...";
+            _message = "Already at the last Authorization...";
         }
         else
         {
-            _cpvdPauSelected = _detailRec.AuthKey; // MOVE PA-AUTHORIZATION-KEY TO CDEMO-CPVD-PAU-SELECTED. :286
+            _selectedAuthKey = _detailRecord.AuthKey; // MOVE PA-AUTHORIZATION-KEY TO CDEMO-CPVD-PAU-SELECTED. :286
             PopulateAuthDetails();               // PERFORM POPULATE-AUTH-DETAILS. :287
         }
     }
@@ -366,35 +366,35 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     // =============================================================================================
     private void PopulateAuthDetails()
     {
-        if (!ErrFlgOff) return; // IF ERR-FLG-OFF (else leave the map cleared). :294
+        if (!ErrorFlagOff) return; // IF ERR-FLG-OFF (else leave the map cleared). :294
 
-        PautDetail pa = _detailRec;
+        PautDetail detail = _detailRecord; // PENDING-AUTH-DETAILS (PA-* io-area)
 
-        SetOut("CARDNUM", Fixed(pa.CardNum, 16));            // MOVE PA-CARD-NUM TO CARDNUMO. :295
+        SetOut("CARDNUM", Fixed(detail.CardNum, 16));            // MOVE PA-CARD-NUM TO CARDNUMO. :295
 
         // Auth date MM/DD/YY from PA-AUTH-ORIG-DATE (YYMMDD): split (1:2)/(3:2)/(5:2) -> YY/MM/DD. :297-300
-        string od = Fixed(pa.AuthOrigDate, 6);
-        string yy = od.Substring(0, 2);
-        string mm = od.Substring(2, 2);
-        string dd = od.Substring(4, 2);
-        _wsAuthDate = $"{mm}/{dd}/{yy}";                     // MOVE WS-CURDATE-MM-DD-YY TO WS-AUTH-DATE.
-        SetOut("AUTHDT", _wsAuthDate);                       // MOVE WS-AUTH-DATE TO AUTHDTO. :301
+        string origDate = Fixed(detail.AuthOrigDate, 6);
+        string year = origDate.Substring(0, 2);
+        string month = origDate.Substring(2, 2);
+        string day = origDate.Substring(4, 2);
+        _authDate = $"{month}/{day}/{year}";                     // MOVE WS-CURDATE-MM-DD-YY TO WS-AUTH-DATE.
+        SetOut("AUTHDT", _authDate);                       // MOVE WS-AUTH-DATE TO AUTHDTO. :301
 
         // Auth time HH:MM:SS — overlay digit pairs onto the '00:00:00' init, keeping ':' (FB-1). :303-306
-        string ot = Fixed(pa.AuthOrigTime, 6);
-        char[] t = _wsAuthTime.ToCharArray();                // persisted '00:00:00' (or last turn's value).
-        t[0] = ot[0]; t[1] = ot[1];                          // WS-AUTH-TIME(1:2) <- PA-AUTH-ORIG-TIME(1:2).
-        t[3] = ot[2]; t[4] = ot[3];                          // (4:2) <- (3:2).
-        t[6] = ot[4]; t[7] = ot[5];                          // (7:2) <- (5:2).
-        _wsAuthTime = new string(t);
-        SetOut("AUTHTM", _wsAuthTime);                       // MOVE WS-AUTH-TIME TO AUTHTMO. :306
+        string origTime = Fixed(detail.AuthOrigTime, 6);
+        char[] timeBuffer = _authTime.ToCharArray();                // persisted '00:00:00' (or last turn's value).
+        timeBuffer[0] = origTime[0]; timeBuffer[1] = origTime[1];                          // WS-AUTH-TIME(1:2) <- PA-AUTH-ORIG-TIME(1:2).
+        timeBuffer[3] = origTime[2]; timeBuffer[4] = origTime[3];                          // (4:2) <- (3:2).
+        timeBuffer[6] = origTime[4]; timeBuffer[7] = origTime[5];                          // (7:2) <- (5:2).
+        _authTime = new string(timeBuffer);
+        SetOut("AUTHTM", _authTime);                       // MOVE WS-AUTH-TIME TO AUTHTMO. :306
 
         // Amount — PA-APPROVED-AMT into PIC -zzzzzzz9.99, truncate toward zero. :308-309
-        string wsAuthAmt = EditedNumeric.Format(pa.ApprovedAmt, "-zzzzzzz9.99");
-        SetOut("AUTHAMT", wsAuthAmt);                        // MOVE WS-AUTH-AMT TO AUTHAMTO.
+        string authAmount = EditedNumeric.Format(detail.ApprovedAmt, "-zzzzzzz9.99"); // WS-AUTH-AMT
+        SetOut("AUTHAMT", authAmount);                        // MOVE WS-AUTH-AMT TO AUTHAMTO.
 
         // Response indicator. :311-317
-        if (pa.AuthRespCode == "00")
+        if (detail.AuthRespCode == "00")
         {
             SetOut("AUTHRSP", "A");                           // MOVE 'A' TO AUTHRSPO.
             _map.Field("AUTHRSP").ColorOverride = BmsColor.Green; // MOVE DFHGREEN TO AUTHRSPC.
@@ -406,12 +406,12 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
         }
 
         // Decline-reason text (SEARCH ALL binary search on DECL-CODE = PA-AUTH-RESP-REASON). :319-328
-        string reason = Fixed(pa.AuthRespReason, 4);
-        string authRsn = SearchDeclineReason(reason, out bool found);
+        string reason = Fixed(detail.AuthRespReason, 4);
+        string reasonText = SearchDeclineReason(reason, out bool found);
         if (found)
         {
             // WHEN found -> '<reason>-<desc>' in 20-char AUTHRSNO. :324-327
-            SetOut("AUTHRSN", BuildAuthRsn(reason, authRsn));
+            SetOut("AUTHRSN", BuildAuthRsn(reason, reasonText));
         }
         else
         {
@@ -419,36 +419,36 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
             SetOut("AUTHRSN", BuildAuthRsn("9999", "ERROR"));
         }
 
-        SetOut("AUTHCD", Fixed6Num(pa.ProcessingCode));      // MOVE PA-PROCESSING-CODE TO AUTHCDO. :331
-        SetOut("POSEMD", Fixed2Num(pa.PosEntryMode));        // MOVE PA-POS-ENTRY-MODE TO POSEMDO. :332
-        SetOut("AUTHSRC", Fixed(pa.MessageSource, 6));       // MOVE PA-MESSAGE-SOURCE TO AUTHSRCO. :333
-        SetOut("MCCCD", Fixed(pa.MerchantCatagoryCode, 4));  // MOVE PA-MERCHANT-CATAGORY-CODE TO MCCCDO. :334
+        SetOut("AUTHCD", Fixed6Num(detail.ProcessingCode));      // MOVE PA-PROCESSING-CODE TO AUTHCDO. :331
+        SetOut("POSEMD", Fixed2Num(detail.PosEntryMode));        // MOVE PA-POS-ENTRY-MODE TO POSEMDO. :332
+        SetOut("AUTHSRC", Fixed(detail.MessageSource, 6));       // MOVE PA-MESSAGE-SOURCE TO AUTHSRCO. :333
+        SetOut("MCCCD", Fixed(detail.MerchantCatagoryCode, 4));  // MOVE PA-MERCHANT-CATAGORY-CODE TO MCCCDO. :334
 
         // Card expiry MM/YY — positional slice of the raw 4 bytes 'xx/yy' (FB-4). :336-338
-        string ce = Fixed(pa.CardExpiryDate, 4);
-        SetOut("CRDEXP", ce.Substring(0, 2) + "/" + ce.Substring(2, 2));
+        string expiry = Fixed(detail.CardExpiryDate, 4);
+        SetOut("CRDEXP", expiry.Substring(0, 2) + "/" + expiry.Substring(2, 2));
 
-        SetOut("AUTHTYP", Fixed(pa.AuthType, 4));            // MOVE PA-AUTH-TYPE TO AUTHTYPO. :340
-        SetOut("TRNID", Fixed(pa.TransactionId, 15));        // MOVE PA-TRANSACTION-ID TO TRNIDO. :341
-        SetOut("AUTHMTC", Fixed(pa.MatchStatus, 1));         // MOVE PA-MATCH-STATUS TO AUTHMTCO. :342
+        SetOut("AUTHTYP", Fixed(detail.AuthType, 4));            // MOVE PA-AUTH-TYPE TO AUTHTYPO. :340
+        SetOut("TRNID", Fixed(detail.TransactionId, 15));        // MOVE PA-TRANSACTION-ID TO TRNIDO. :341
+        SetOut("AUTHMTC", Fixed(detail.MatchStatus, 1));         // MOVE PA-MATCH-STATUS TO AUTHMTCO. :342
 
         // Fraud status. :344-350
-        if (pa.AuthFraud == "F" || pa.AuthFraud == "R")
+        if (detail.AuthFraud == "F" || detail.AuthFraud == "R")
         {
             // '<F/R>-<rpt-date>' into 10-char AUTHFRDO. :345-347
-            string frd = Fixed(pa.AuthFraud, 1) + "-" + Fixed(pa.FraudRptDate, 8);
-            SetOut("AUTHFRD", Fixed(frd, 10));
+            string fraudDisplay = Fixed(detail.AuthFraud, 1) + "-" + Fixed(detail.FraudRptDate, 8);
+            SetOut("AUTHFRD", Fixed(fraudDisplay, 10));
         }
         else
         {
             SetOut("AUTHFRD", "-");                           // MOVE '-' TO AUTHFRDO. :349
         }
 
-        SetOut("MERNAME", Fixed(pa.MerchantName, 22));       // MOVE PA-MERCHANT-NAME TO MERNAMEO. :352
-        SetOut("MERID", Fixed(pa.MerchantId, 15));           // MOVE PA-MERCHANT-ID TO MERIDO. :353
-        SetOut("MERCITY", Fixed(pa.MerchantCity, 13));       // MOVE PA-MERCHANT-CITY TO MERCITYO. :354
-        SetOut("MERST", Fixed(pa.MerchantState, 2));         // MOVE PA-MERCHANT-STATE TO MERSTO. :355
-        SetOut("MERZIP", Fixed(pa.MerchantZip, 9));          // MOVE PA-MERCHANT-ZIP TO MERZIPO. :356
+        SetOut("MERNAME", Fixed(detail.MerchantName, 22));       // MOVE PA-MERCHANT-NAME TO MERNAMEO. :352
+        SetOut("MERID", Fixed(detail.MerchantId, 15));           // MOVE PA-MERCHANT-ID TO MERIDO. :353
+        SetOut("MERCITY", Fixed(detail.MerchantCity, 13));       // MOVE PA-MERCHANT-CITY TO MERCITYO. :354
+        SetOut("MERST", Fixed(detail.MerchantState, 2));         // MOVE PA-MERCHANT-STATE TO MERSTO. :355
+        SetOut("MERZIP", Fixed(detail.MerchantZip, 9));          // MOVE PA-MERCHANT-ZIP TO MERZIPO. :356
     }
 
     // =============================================================================================
@@ -456,8 +456,8 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     // =============================================================================================
     private void ReturnToPrevScreen(CicsContext ctx)
     {
-        _commArea.FromTranId = WS_CICS_TRANID;   // MOVE WS-CICS-TRANID TO CDEMO-FROM-TRANID. :362
-        _commArea.FromProgram = WS_PGM_AUTH_DTL; // MOVE WS-PGM-AUTH-DTL TO CDEMO-FROM-PROGRAM. :363
+        _commArea.FromTranId = CicsTranId;   // MOVE WS-CICS-TRANID TO CDEMO-FROM-TRANID. :362
+        _commArea.FromProgram = AuthDetailProgramId; // MOVE WS-PGM-AUTH-DTL TO CDEMO-FROM-PROGRAM. :363
         _commArea.SetFirstEntry();               // MOVE ZEROS TO CDEMO-PGM-CONTEXT. :364 / SET CDEMO-PGM-ENTER. :365
 
         // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). :367-370
@@ -472,7 +472,7 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     {
         PopulateHeaderInfo(ctx);                              // PERFORM POPULATE-HEADER-INFO. :375
 
-        _map.Field("ERRMSG").SetValue(_wsMessage, setMdt: false); // MOVE WS-MESSAGE TO ERRMSGO. :377
+        _map.Field("ERRMSG").SetValue(_message, setMdt: false); // MOVE WS-MESSAGE TO ERRMSGO. :377
         _map.Field("CARDNUM").CursorLength = -1;              // MOVE -1 TO CARDNUML (cursor to CARDNUM). :378
 
         // SEND ERASE when SEND-ERASE-YES, else SEND without ERASE (CURSOR only). :380-395
@@ -501,10 +501,10 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     {
         DateTime now = ctx.Clock.Now;                         // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. :411
 
-        SetOut("TITLE01", CCDA_TITLE01);                      // MOVE CCDA-TITLE01 TO TITLE01O. :413
-        SetOut("TITLE02", CCDA_TITLE02);                      // MOVE CCDA-TITLE02 TO TITLE02O. :414
-        SetOut("TRNNAME", WS_CICS_TRANID);                    // MOVE WS-CICS-TRANID TO TRNNAMEO. :415
-        SetOut("PGMNAME", WS_PGM_AUTH_DTL);                   // MOVE WS-PGM-AUTH-DTL TO PGMNAMEO. :416
+        SetOut("TITLE01", Title01);                      // MOVE CCDA-TITLE01 TO TITLE01O. :413
+        SetOut("TITLE02", Title02);                      // MOVE CCDA-TITLE02 TO TITLE02O. :414
+        SetOut("TRNNAME", CicsTranId);                    // MOVE WS-CICS-TRANID TO TRNNAMEO. :415
+        SetOut("PGMNAME", AuthDetailProgramId);                   // MOVE WS-PGM-AUTH-DTL TO PGMNAMEO. :416
 
         // CURDATE = MM/DD/YY (year = last two digits). :418-422
         SetOut("CURDATE", $"{now.Month:D2}/{now.Day:D2}/{(now.Year % 100):D2}");
@@ -519,12 +519,12 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     {
         SchedulePsb(ctx);                                     // PERFORM SCHEDULE-PSB. :433
 
-        _paAcctId = _wsAcctId;                                // MOVE WS-ACCT-ID TO PA-ACCT-ID. :436
-        _paAuthorizationKey = _wsAuthKey;                     // MOVE WS-AUTH-KEY TO PA-AUTHORIZATION-KEY. :437
+        _paAcctId = _acctId;                                // MOVE WS-ACCT-ID TO PA-ACCT-ID. :436
+        _paAuthorizationKey = _authKey;                     // MOVE WS-AUTH-KEY TO PA-AUTHORIZATION-KEY. :437
 
         // EXEC DLI GU SEGMENT(PAUTSUM0) INTO(PENDING-AUTH-SUMMARY) WHERE(ACCNTID = PA-ACCT-ID). :439-443
-        string st = _summaryRepo.ReadByKey(_paAcctId, out _summaryRec);
-        _imsReturnCode = DibstatFromStatus(st);               // MOVE DIBSTAT TO IMS-RETURN-CODE. :445
+        string summaryStatus = _summaryRepository.ReadByKey(_paAcctId, out _summaryRecord);
+        _imsReturnCode = DibstatFromStatus(summaryStatus);               // MOVE DIBSTAT TO IMS-RETURN-CODE. :445
 
         // EVALUATE TRUE. :446-462
         if (IsStatusOk(_imsReturnCode))
@@ -533,8 +533,8 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
             _authsEof = true;                                 // GE/GB -> SET AUTHS-EOF. :449-451
         else
         {
-            _errFlgOn = true;                                 // MOVE 'Y' TO WS-ERR-FLG. :453
-            _wsMessage = " System error while reading Auth Summary: Code:" + _imsReturnCode; // :455-460
+            _errorFlagOn = true;                                 // MOVE 'Y' TO WS-ERR-FLG. :453
+            _message = " System error while reading Auth Summary: Code:" + _imsReturnCode; // :455-460
             SendAuthviewScreen(ctx);                          // PERFORM SEND-AUTHVIEW-SCREEN (FB-3 inline). :461
         }
 
@@ -542,10 +542,10 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
         {
             // EXEC DLI GNP SEGMENT(PAUTDTL1) INTO(...) WHERE(PAUT9CTS = PA-AUTHORIZATION-KEY). :464-469
             // Qualified GNP = reposition at-or-after the key under this parent.
-            _detailRepo.StartParentScanAt(_paAcctId, _paAuthorizationKey);
-            string dst = _detailRepo.ReadNextInParent(out PautDetail? d);
-            if (dst == FileStatus.Ok && d is not null) _detailRec = d;
-            _imsReturnCode = DibstatFromStatus(dst);          // MOVE DIBSTAT TO IMS-RETURN-CODE. :471
+            _detailRepository.StartParentScanAt(_paAcctId, _paAuthorizationKey);
+            string detailStatus = _detailRepository.ReadNextInParent(out PautDetail? detailRow);
+            if (detailStatus == FileStatus.Ok && detailRow is not null) _detailRecord = detailRow;
+            _imsReturnCode = DibstatFromStatus(detailStatus);          // MOVE DIBSTAT TO IMS-RETURN-CODE. :471
 
             // EVALUATE TRUE. :472-488
             if (IsStatusOk(_imsReturnCode))
@@ -554,8 +554,8 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
                 _authsEof = true;                             // GE/GB -> SET AUTHS-EOF. :475-477
             else
             {
-                _errFlgOn = true;                             // MOVE 'Y' TO WS-ERR-FLG. :479
-                _wsMessage = " System error while reading Auth Details: Code:" + _imsReturnCode; // :481-486
+                _errorFlagOn = true;                             // MOVE 'Y' TO WS-ERR-FLG. :479
+                _message = " System error while reading Auth Details: Code:" + _imsReturnCode; // :481-486
                 SendAuthviewScreen(ctx);                      // PERFORM SEND-AUTHVIEW-SCREEN (FB-3 inline). :487
             }
         }
@@ -568,9 +568,9 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     {
         // EXEC DLI GNP SEGMENT(PAUTDTL1) INTO(PENDING-AUTH-DETAILS) (no WHERE — next child). :495-498
         // Advance the same parent-scoped cursor positioned by the prior READ-AUTH-RECORD.
-        string st = _detailRepo.ReadNextInParent(out PautDetail? d);
-        if (st == FileStatus.Ok && d is not null) _detailRec = d;
-        _imsReturnCode = DibstatFromStatus(st);               // MOVE DIBSTAT TO IMS-RETURN-CODE. :500
+        string nextStatus = _detailRepository.ReadNextInParent(out PautDetail? nextRow);
+        if (nextStatus == FileStatus.Ok && nextRow is not null) _detailRecord = nextRow;
+        _imsReturnCode = DibstatFromStatus(nextStatus);               // MOVE DIBSTAT TO IMS-RETURN-CODE. :500
 
         // EVALUATE TRUE. :501-517
         if (IsStatusOk(_imsReturnCode))
@@ -579,8 +579,8 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
             _authsEof = true;                                 // GE/GB -> SET AUTHS-EOF. :504-506
         else
         {
-            _errFlgOn = true;                                 // MOVE 'Y' TO WS-ERR-FLG. :508
-            _wsMessage = " System error while reading next Auth: Code:" + _imsReturnCode; // :510-515
+            _errorFlagOn = true;                                 // MOVE 'Y' TO WS-ERR-FLG. :508
+            _message = " System error while reading next Auth: Code:" + _imsReturnCode; // :510-515
             SendAuthviewScreen(ctx);                          // PERFORM SEND-AUTHVIEW-SCREEN (FB-3 inline). :516
         }
     }
@@ -591,27 +591,27 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     private void UpdateAuthDetails(CicsContext ctx)
     {
         // MOVE WS-FRAUD-AUTH-RECORD TO PENDING-AUTH-DETAILS (copy the fraud-stamped record back). :522
-        _detailRec = _fraudData.AuthRecord;
+        _detailRecord = _fraudData.AuthRecord;
 
-        _log("RPT DT: " + _detailRec.FraudRptDate);           // DISPLAY 'RPT DT: ' PA-FRAUD-RPT-DATE (FB-5). :523
+        _log("RPT DT: " + _detailRecord.FraudRptDate);           // DISPLAY 'RPT DT: ' PA-FRAUD-RPT-DATE (FB-5). :523
 
         // EXEC DLI REPL SEGMENT(PAUTDTL1) FROM(PENDING-AUTH-DETAILS). :525-528
-        string st = _detailRepo.Update(_detailRec);
-        _imsReturnCode = DibstatFromStatus(st);               // MOVE DIBSTAT TO IMS-RETURN-CODE. :530
+        string updateStatus = _detailRepository.Update(_detailRecord);
+        _imsReturnCode = DibstatFromStatus(updateStatus);               // MOVE DIBSTAT TO IMS-RETURN-CODE. :530
 
         // EVALUATE TRUE. :531-551
         if (IsStatusOk(_imsReturnCode))
         {
             TakeSyncpoint();                                  // PERFORM TAKE-SYNCPOINT. :533
-            _wsMessage = _detailRec.AuthFraud == "R"          // IF PA-FRAUD-REMOVED. :534
+            _message = _detailRecord.AuthFraud == "R"          // IF PA-FRAUD-REMOVED. :534
                 ? "AUTH FRAUD REMOVED..."                     // :535
                 : "AUTH MARKED FRAUD...";                     // :537
         }
         else
         {
             RollBack();                                       // PERFORM ROLL-BACK. :540
-            _errFlgOn = true;                                 // MOVE 'Y' TO WS-ERR-FLG. :542
-            _wsMessage = " System error while FRAUD Tagging, ROLLBACK||" + _imsReturnCode; // :544-549
+            _errorFlagOn = true;                                 // MOVE 'Y' TO WS-ERR-FLG. :542
+            _message = " System error while FRAUD Tagging, ROLLBACK||" + _imsReturnCode; // :544-549
             SendAuthviewScreen(ctx);                          // PERFORM SEND-AUTHVIEW-SCREEN (FB-3 inline). :550
         }
     }
@@ -622,11 +622,11 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     private void TakeSyncpoint()
     {
         // EXEC CICS SYNCPOINT -> COMMIT. :558-559
-        if (_uow is not null)
+        if (_unitOfWork is not null)
         {
-            _uow.Commit();
-            _uow.Dispose();
-            _uow = null;
+            _unitOfWork.Commit();
+            _unitOfWork.Dispose();
+            _unitOfWork = null;
         }
     }
 
@@ -636,11 +636,11 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     private void RollBack()
     {
         // EXEC CICS SYNCPOINT ROLLBACK -> ROLLBACK. :566-568
-        if (_uow is not null)
+        if (_unitOfWork is not null)
         {
-            _uow.Rollback();
-            _uow.Dispose();
-            _uow = null;
+            _unitOfWork.Rollback();
+            _unitOfWork.Dispose();
+            _unitOfWork = null;
         }
     }
 
@@ -661,12 +661,12 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
 
         if (IsStatusOk(_imsReturnCode))
         {
-            _imsPsbSchdFlg = "Y";                             // SET IMS-PSB-SCHD TO TRUE. :590-591
+            _imsPsbScheduledFlag = "Y";                             // SET IMS-PSB-SCHD TO TRUE. :590-591
         }
         else
         {
-            _errFlgOn = true;                                 // MOVE 'Y' TO WS-ERR-FLG. :593
-            _wsMessage = " System error while scheduling PSB: Code:" + _imsReturnCode; // :595-600
+            _errorFlagOn = true;                                 // MOVE 'Y' TO WS-ERR-FLG. :593
+            _message = " System error while scheduling PSB: Code:" + _imsReturnCode; // :595-600
             SendAuthviewScreen(ctx);                          // PERFORM SEND-AUTHVIEW-SCREEN (FB-3 inline). :601
         }
     }
@@ -674,11 +674,11 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     /// <summary>SCHD = open/ensure the unit of work. Returns the DIBSTAT-equivalent: '  ' on success, 'TC' if already scheduled.</summary>
     private string ScheduleUnitOfWork()
     {
-        if (_uow is not null) return "TC"; // PSB-SCHEDULED-MORE-THAN-ONCE.
+        if (_unitOfWork is not null) return "TC"; // PSB-SCHEDULED-MORE-THAN-ONCE.
         if (_db is null) return "  ";
         try
         {
-            _uow = _db.Connection.BeginTransaction();
+            _unitOfWork = _db.Connection.BeginTransaction();
             return "  ";                   // STATUS-OK.
         }
         catch
@@ -690,11 +690,11 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     /// <summary>TERM = close the unit of work (rollback any pending work) before re-SCHD. source: :581-582.</summary>
     private void TermUnitOfWork()
     {
-        if (_uow is not null)
+        if (_unitOfWork is not null)
         {
-            _uow.Rollback();
-            _uow.Dispose();
-            _uow = null;
+            _unitOfWork.Rollback();
+            _unitOfWork.Dispose();
+            _unitOfWork = null;
         }
     }
 
@@ -705,11 +705,11 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     // extension's CDEMO-CPVD-PAU-SELECTED. The CPVD extension is appended after COCOM01Y; since the typed
     // CardDemoCommArea models only the base 160 bytes, the program-private CPVD fields this program touches
     // (PAU-SEL-FLG + PAU-SELECTED) are packed into the customer-name slots so they round-trip each turn.
-    private string _cpvdFraudData = ""; // CDEMO-CPVD-FRAUD-DATA X(100) — cleared each turn, otherwise unused. :120,172
+    private string _fraudDataArea = ""; // CDEMO-CPVD-FRAUD-DATA X(100) — cleared each turn, otherwise unused. :120,172
 
     private void SaveCpvdInfo()
     {
-        string packed = Fixed(_cpvdPauSelFlg, 1) + Fixed(_cpvdPauSelected, 8);
+        string packed = Fixed(_selectedAuthFlag, 1) + Fixed(_selectedAuthKey, 8);
         packed = Fixed(packed, 75);
         _commArea.CustFName = packed.Substring(0, 25);
         _commArea.CustMName = packed.Substring(25, 25);
@@ -721,8 +721,8 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
         string packed = Fixed(_commArea.CustFName, 25) + Fixed(_commArea.CustMName, 25) + Fixed(_commArea.CustLName, 25);
         packed = Fixed(packed, 75);
         char sf = packed[0];
-        _cpvdPauSelFlg = sf == ' ' || sf == '\0' ? "" : sf.ToString();
-        _cpvdPauSelected = packed.Substring(1, 8).TrimEnd();
+        _selectedAuthFlag = sf == ' ' || sf == '\0' ? "" : sf.ToString();
+        _selectedAuthKey = packed.Substring(1, 8).TrimEnd();
     }
 
     /// <summary>INITIALIZE CARDDEMO-COMMAREA (cold start) — zero/space the base + CPVD fields. :166</summary>
@@ -734,7 +734,7 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
         _commArea.CustId = 0; _commArea.CustFName = ""; _commArea.CustMName = ""; _commArea.CustLName = "";
         _commArea.AcctId = 0; _commArea.AcctStatus = ""; _commArea.CardNum = 0;
         _commArea.LastMap = ""; _commArea.LastMapSet = "";
-        _cpvdPauSelFlg = ""; _cpvdPauSelected = ""; _cpvdFraudData = "";
+        _selectedAuthFlag = ""; _selectedAuthKey = ""; _fraudDataArea = "";
     }
 
     // =============================================================================================
@@ -847,35 +847,35 @@ public sealed class PendingAuthDetailProgram : ITransactionHandler
     /// <summary>Snapshots the working PA-detail io-area (PENDING-AUTH-DETAILS) into a fresh record (COBOL FROM/MOVE).</summary>
     private PautDetail ClonePaDetail() => new()
     {
-        AcctId = _detailRec.AcctId,
-        AuthKey = _detailRec.AuthKey,
-        AuthDate9c = _detailRec.AuthDate9c,
-        AuthTime9c = _detailRec.AuthTime9c,
-        AuthOrigDate = _detailRec.AuthOrigDate,
-        AuthOrigTime = _detailRec.AuthOrigTime,
-        CardNum = _detailRec.CardNum,
-        AuthType = _detailRec.AuthType,
-        CardExpiryDate = _detailRec.CardExpiryDate,
-        MessageType = _detailRec.MessageType,
-        MessageSource = _detailRec.MessageSource,
-        AuthIdCode = _detailRec.AuthIdCode,
-        AuthRespCode = _detailRec.AuthRespCode,
-        AuthRespReason = _detailRec.AuthRespReason,
-        ProcessingCode = _detailRec.ProcessingCode,
-        TransactionAmt = _detailRec.TransactionAmt,
-        ApprovedAmt = _detailRec.ApprovedAmt,
-        MerchantCatagoryCode = _detailRec.MerchantCatagoryCode,
-        AcqrCountryCode = _detailRec.AcqrCountryCode,
-        PosEntryMode = _detailRec.PosEntryMode,
-        MerchantId = _detailRec.MerchantId,
-        MerchantName = _detailRec.MerchantName,
-        MerchantCity = _detailRec.MerchantCity,
-        MerchantState = _detailRec.MerchantState,
-        MerchantZip = _detailRec.MerchantZip,
-        TransactionId = _detailRec.TransactionId,
-        MatchStatus = _detailRec.MatchStatus,
-        AuthFraud = _detailRec.AuthFraud,
-        FraudRptDate = _detailRec.FraudRptDate,
+        AcctId = _detailRecord.AcctId,
+        AuthKey = _detailRecord.AuthKey,
+        AuthDate9c = _detailRecord.AuthDate9c,
+        AuthTime9c = _detailRecord.AuthTime9c,
+        AuthOrigDate = _detailRecord.AuthOrigDate,
+        AuthOrigTime = _detailRecord.AuthOrigTime,
+        CardNum = _detailRecord.CardNum,
+        AuthType = _detailRecord.AuthType,
+        CardExpiryDate = _detailRecord.CardExpiryDate,
+        MessageType = _detailRecord.MessageType,
+        MessageSource = _detailRecord.MessageSource,
+        AuthIdCode = _detailRecord.AuthIdCode,
+        AuthRespCode = _detailRecord.AuthRespCode,
+        AuthRespReason = _detailRecord.AuthRespReason,
+        ProcessingCode = _detailRecord.ProcessingCode,
+        TransactionAmt = _detailRecord.TransactionAmt,
+        ApprovedAmt = _detailRecord.ApprovedAmt,
+        MerchantCatagoryCode = _detailRecord.MerchantCatagoryCode,
+        AcqrCountryCode = _detailRecord.AcqrCountryCode,
+        PosEntryMode = _detailRecord.PosEntryMode,
+        MerchantId = _detailRecord.MerchantId,
+        MerchantName = _detailRecord.MerchantName,
+        MerchantCity = _detailRecord.MerchantCity,
+        MerchantState = _detailRecord.MerchantState,
+        MerchantZip = _detailRecord.MerchantZip,
+        TransactionId = _detailRecord.TransactionId,
+        MatchStatus = _detailRecord.MatchStatus,
+        AuthFraud = _detailRecord.AuthFraud,
+        FraudRptDate = _detailRecord.FraudRptDate,
     };
 
     // ---- DIBSTAT <- repository FileStatus mapping (IMS_SCHEMA.md §3) ----

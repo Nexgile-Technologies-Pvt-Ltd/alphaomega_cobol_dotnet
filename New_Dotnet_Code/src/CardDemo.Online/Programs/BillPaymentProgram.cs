@@ -68,72 +68,72 @@ public sealed class BillPaymentProgram : ITransactionHandler
     // =============================================================================================
     //  WS-VARIABLES — source: COBIL00C.cbl:36-61
     // =============================================================================================
-    private const string WS_PGMNAME = "COBIL00C";       // 05 WS-PGMNAME PIC X(08) VALUE 'COBIL00C'. source: :37
-    private const string WS_TRANID = "CB00";            // 05 WS-TRANID  PIC X(04) VALUE 'CB00'.     source: :38
-    private const string WS_TRANSACT_FILE = "TRANSACT"; // 05 WS-TRANSACT-FILE PIC X(08) VALUE 'TRANSACT'. source: :40
-    private const string WS_ACCTDAT_FILE = "ACCTDAT ";  // 05 WS-ACCTDAT-FILE  PIC X(08) VALUE 'ACCTDAT '. source: :41
-    private const string WS_CXACAIX_FILE = "CXACAIX ";  // 05 WS-CXACAIX-FILE  PIC X(08) VALUE 'CXACAIX '. source: :42
+    private const string ProgramId = "COBIL00C";        // WS-PGMNAME. 05 WS-PGMNAME PIC X(08) VALUE 'COBIL00C'. source: :37
+    private const string TranId = "CB00";               // WS-TRANID. 05 WS-TRANID  PIC X(04) VALUE 'CB00'.     source: :38
+    private const string TransactFileName = "TRANSACT"; // WS-TRANSACT-FILE. 05 WS-TRANSACT-FILE PIC X(08) VALUE 'TRANSACT'. source: :40
+    private const string AcctdatFileName = "ACCTDAT ";  // WS-ACCTDAT-FILE. 05 WS-ACCTDAT-FILE  PIC X(08) VALUE 'ACCTDAT '. source: :41
+    private const string CxacaixFileName = "CXACAIX ";  // WS-CXACAIX-FILE. 05 WS-CXACAIX-FILE  PIC X(08) VALUE 'CXACAIX '. source: :42
 
-    private string _wsMessage = "";                     // 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :39
+    private string _message = "";                       // WS-MESSAGE. 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :39
 
     // 05 WS-ERR-FLG PIC X(01) VALUE 'N'. 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. source: :43-45
-    private bool _errFlgOn;
-    private bool ErrFlgOn => _errFlgOn;   // 88 ERR-FLG-ON
+    private bool _errorFlagOn;            // WS-ERR-FLG = 'Y'
+    private bool ErrorFlagOn => _errorFlagOn;   // 88 ERR-FLG-ON
 
     // 05 WS-RESP-CD / WS-REAS-CD PIC S9(09) COMP VALUE ZEROS. source: :46-47
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode;   // WS-RESP-CD
+    private int _reasonCode;      // WS-REAS-CD
 
     // 05 WS-USR-MODIFIED PIC X(01) VALUE 'N'. 88 USR-MODIFIED-YES='Y'/USR-MODIFIED-NO='N'.
     // SET at entry, never read elsewhere — dead working storage, reproduced. source: :48-50
-    private char _wsUsrModified = 'N';
-    private void SetUsrModifiedNo() => _wsUsrModified = 'N';
+    private char _userModified = 'N';   // WS-USR-MODIFIED
+    private void SetUserModifiedNo() => _userModified = 'N';   // SET USR-MODIFIED-NO TO TRUE
 
     // 05 WS-CONF-PAY-FLG PIC X(01) VALUE 'N'. 88 CONF-PAY-YES='Y'/CONF-PAY-NO='N'. source: :51-53
-    private bool _confPayYes;
-    private void SetConfPayNo() => _confPayYes = false;   // SET CONF-PAY-NO TO TRUE
-    private void SetConfPayYes() => _confPayYes = true;   // SET CONF-PAY-YES TO TRUE
+    private bool _confirmPayYes;   // WS-CONF-PAY-FLG, 88 CONF-PAY-YES
+    private void SetConfirmPayNo() => _confirmPayYes = false;   // SET CONF-PAY-NO TO TRUE
+    private void SetConfirmPayYes() => _confirmPayYes = true;   // SET CONF-PAY-YES TO TRUE
 
     // 05 WS-TRAN-AMT  PIC +99999999.99 (edited; declared, FB-6: unused). source: :55
     // 05 WS-CURR-BAL  PIC +9999999999.99 (edited; sign + 10 int digits + '.' + 2 dec, NOT zero-suppressed). source: :56
-    private string _wsCurrBal = "";
-    private decimal _wsTranIdNum;                        // 05 WS-TRAN-ID-NUM PIC 9(16) VALUE ZEROS. source: :57
+    private string _currentBalanceEdited = "";          // WS-CURR-BAL
+    private decimal _tranIdNumber;                       // WS-TRAN-ID-NUM. 05 WS-TRAN-ID-NUM PIC 9(16) VALUE ZEROS. source: :57
     // 05 WS-TRAN-DATE PIC X(08) VALUE '00/00/00' (declared, FB-6: unused). source: :58
     // 05 WS-ABS-TIME / WS-CUR-DATE-X10 / WS-CUR-TIME-X08 — timestamp work fields. source: :59-61
-    private string _wsCurDateX10 = "";
-    private string _wsCurTimeX08 = "";
-    private string _wsTimestamp = "";                   // WS-TIMESTAMP (CSDAT01Y) X(26).
+    private string _currentDate = "";                    // WS-CUR-DATE-X10
+    private string _currentTime = "";                    // WS-CUR-TIME-X08
+    private string _timestamp = "";                      // WS-TIMESTAMP (CSDAT01Y) X(26).
 
     // CCDA-* (COTTL01Y / CSMSG01Y) — shared header titles + the invalid-key message.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";  // COTTL01Y CCDA-TITLE01
-    private const string CCDA_TITLE02 = "              CardDemo                  ";  // COTTL01Y CCDA-TITLE02
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...";          // CSMSG01Y
+    private const string HeaderTitleLine1 = "      AWS Mainframe Modernization       ";  // CCDA-TITLE01. COTTL01Y CCDA-TITLE01
+    private const string HeaderTitleLine2 = "              CardDemo                  ";  // CCDA-TITLE02. COTTL01Y CCDA-TITLE02
+    private const string InvalidKeyMessage = "Invalid key pressed. Please see below...";          // CCDA-MSG-INVALID-KEY. CSMSG01Y
 
     // =============================================================================================
     //  COCOM01Y trailer — CDEMO-CB00-INFO (program-private state carried in the COMMAREA). source: :64-72
     // =============================================================================================
-    private string _cb00TrnidFirst = "";   // 10 CDEMO-CB00-TRNID-FIRST   PIC X(16). source: :65
-    private string _cb00TrnidLast = "";    // 10 CDEMO-CB00-TRNID-LAST    PIC X(16). source: :66
-    private int _cb00PageNum;              // 10 CDEMO-CB00-PAGE-NUM      PIC 9(08). source: :67
-    private char _cb00NextPageFlg = 'N';  // 10 CDEMO-CB00-NEXT-PAGE-FLG PIC X(01) VALUE 'N'. source: :68-70
-    private string _cb00TrnSelFlg = "";   // 10 CDEMO-CB00-TRN-SEL-FLG   PIC X(01). source: :71
-    private string _cb00TrnSelected = ""; // 10 CDEMO-CB00-TRN-SELECTED  PIC X(16). source: :72
+    private string _firstTranId = "";       // CDEMO-CB00-TRNID-FIRST. 10 CDEMO-CB00-TRNID-FIRST   PIC X(16). source: :65
+    private string _lastTranId = "";        // CDEMO-CB00-TRNID-LAST. 10 CDEMO-CB00-TRNID-LAST    PIC X(16). source: :66
+    private int _pageNumber;                // CDEMO-CB00-PAGE-NUM. 10 CDEMO-CB00-PAGE-NUM      PIC 9(08). source: :67
+    private char _nextPageFlag = 'N';       // CDEMO-CB00-NEXT-PAGE-FLG. 10 CDEMO-CB00-NEXT-PAGE-FLG PIC X(01) VALUE 'N'. source: :68-70
+    private string _tranSelectionFlag = ""; // CDEMO-CB00-TRN-SEL-FLG. 10 CDEMO-CB00-TRN-SEL-FLG   PIC X(01). source: :71
+    private string _selectedTranId = "";    // CDEMO-CB00-TRN-SELECTED. 10 CDEMO-CB00-TRN-SELECTED  PIC X(16). source: :72
 
     // =============================================================================================
     //  Record areas — ACCOUNT-RECORD (CVACT01Y), CARD-XREF-RECORD (CVACT03Y), TRAN-RECORD (CVTRA05Y).
     //  source: :80-82 (COPY CVACT01Y / CVACT03Y / CVTRA05Y)
     // =============================================================================================
     // ACCT-ID 9(11) (RIDFLD) + ACCOUNT-RECORD just read for UPDATE.
-    private long _acctId;
+    private long _accountId;   // ACCT-ID
     private Account? _accountRecord;
-    private decimal AcctCurrBal { get => _accountRecord?.CurrBal ?? 0m; set { if (_accountRecord is not null) _accountRecord.CurrBal = value; } }
+    private decimal AccountCurrentBalance { get => _accountRecord?.CurrBal ?? 0m; set { if (_accountRecord is not null) _accountRecord.CurrBal = value; } }  // ACCT-CURR-BAL
 
     // XREF-ACCT-ID 9(11) (RIDFLD) + XREF-CARD-NUM X(16) consumed into TRAN-CARD-NUM.
-    private long _xrefAcctId;
-    private string _xrefCardNum = "";
+    private long _xrefAccountId;   // XREF-ACCT-ID
+    private string _xrefCardNumber = "";   // XREF-CARD-NUM
 
     // TRAN-ID X(16) RIDFLD: "" = LOW-VALUES, HighValues16 = HIGH-VALUES.
-    private string _tranId = "";
+    private string _tranIdKey = "";   // TRAN-ID (RIDFLD browse key)
     private const string HighValues16 = "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
     private Transaction _tranRecord = new();   // TRAN-RECORD built for the bill-pay WRITE.
 
@@ -158,10 +158,10 @@ public sealed class BillPaymentProgram : ITransactionHandler
     public BillPaymentProgram() => _db = null!;
 
     /// <inheritdoc/>
-    public string ProgramName => WS_PGMNAME; // PROGRAM-ID. COBIL00C. source: :24
+    public string ProgramName => ProgramId; // PROGRAM-ID. COBIL00C. source: :24
 
     /// <inheritdoc/>
-    public string TransId => WS_TRANID;      // CSD: CB00 -> COBIL00C. source: CSD_TRANSACTIONS.md:73; cbl:38
+    public string TransId => TranId;      // CSD: CB00 -> COBIL00C. source: CSD_TRANSACTIONS.md:73; cbl:38
 
     // =============================================================================================
     //  MAIN-PARA — source: COBIL00C.cbl:99-149
@@ -178,10 +178,10 @@ public sealed class BillPaymentProgram : ITransactionHandler
             _transactions = new TransactionRepository(_db.Connection);
         }
 
-        _errFlgOn = false;          // SET ERR-FLG-OFF     TO TRUE. source: :101
-        SetUsrModifiedNo();         // SET USR-MODIFIED-NO TO TRUE. source: :102
+        _errorFlagOn = false;          // SET ERR-FLG-OFF     TO TRUE. source: :101
+        SetUserModifiedNo();        // SET USR-MODIFIED-NO TO TRUE. source: :102
 
-        _wsMessage = "";                                       // MOVE SPACES TO WS-MESSAGE. source: :104
+        _message = "";                                       // MOVE SPACES TO WS-MESSAGE. source: :104
         _map.Field("ERRMSG").SetValue("", setMdt: false);      //               ERRMSGO OF COBIL0AO. source: :105
 
         if (ctx.EibCalen == 0)
@@ -196,7 +196,7 @@ public sealed class BillPaymentProgram : ITransactionHandler
         {
             // MOVE DFHCOMMAREA(1:EIBCALEN) TO CARDDEMO-COMMAREA. source: :111
             _commArea = ctx.CommArea!;
-            RestoreCb00Info();
+            UnpackProgramState();
 
             if (!_commArea.IsReenter)
             {
@@ -206,10 +206,10 @@ public sealed class BillPaymentProgram : ITransactionHandler
                 _map.Field("ACTIDIN").CursorLength = -1; // MOVE -1 TO ACTIDINL OF COBIL0AI. source: :115
 
                 // IF CDEMO-CB00-TRN-SELECTED NOT = SPACES AND LOW-VALUES. source: :116-117
-                if (NotSpacesOrLow(_cb00TrnSelected))
+                if (NotSpacesOrLow(_selectedTranId))
                 {
                     // MOVE CDEMO-CB00-TRN-SELECTED TO ACTIDINI OF COBIL0AI. source: :118-119
-                    _map.Field("ACTIDIN").SetValue(_cb00TrnSelected, setMdt: false);
+                    _map.Field("ACTIDIN").SetValue(_selectedTranId, setMdt: false);
                     ProcessEnterKey(ctx);               // PERFORM PROCESS-ENTER-KEY. source: :120
                 }
                 SendBillpayScreen(ctx);                 // PERFORM SEND-BILLPAY-SCREEN. source: :122
@@ -236,8 +236,8 @@ public sealed class BillPaymentProgram : ITransactionHandler
                         break;
                     default:
                         // WHEN OTHER. source: :138-141
-                        _errFlgOn = true;                          // MOVE 'Y' TO WS-ERR-FLG. source: :139
-                        _wsMessage = CCDA_MSG_INVALID_KEY;         // MOVE CCDA-MSG-INVALID-KEY. source: :140
+                        _errorFlagOn = true;                          // MOVE 'Y' TO WS-ERR-FLG. source: :139
+                        _message = InvalidKeyMessage;         // MOVE CCDA-MSG-INVALID-KEY. source: :140
                         SendBillpayScreen(ctx);                    // PERFORM SEND-BILLPAY-SCREEN. source: :141
                         break;
                 }
@@ -245,8 +245,8 @@ public sealed class BillPaymentProgram : ITransactionHandler
         }
 
         // EXEC CICS RETURN TRANSID(WS-TRANID) COMMAREA(CARDDEMO-COMMAREA). source: :146-149
-        SaveCb00Info();
-        ctx.ReturnTransId(WS_TRANID, _commArea);
+        PackProgramState();
+        ctx.ReturnTransId(TranId, _commArea);
     }
 
     // =============================================================================================
@@ -254,121 +254,121 @@ public sealed class BillPaymentProgram : ITransactionHandler
     // =============================================================================================
     private void ProcessEnterKey(CicsContext ctx)
     {
-        SetConfPayNo();                                  // SET CONF-PAY-NO TO TRUE. source: :156
+        SetConfirmPayNo();                                  // SET CONF-PAY-NO TO TRUE. source: :156
 
         // EVALUATE TRUE — empty account-id check. source: :158-167
-        string actidin = _map.Field("ACTIDIN").Value;
-        if (IsSpacesOrLowValues(actidin))
+        string accountIdInput = _map.Field("ACTIDIN").Value;
+        if (IsSpacesOrLowValues(accountIdInput))
         {
             // WHEN ACTIDINI = SPACES OR LOW-VALUES. source: :159-164
-            _errFlgOn = true;                            // MOVE 'Y' TO WS-ERR-FLG. source: :160
-            _wsMessage = "Acct ID can NOT be empty...";  // source: :161-162
+            _errorFlagOn = true;                            // MOVE 'Y' TO WS-ERR-FLG. source: :160
+            _message = "Acct ID can NOT be empty...";  // source: :161-162
             _map.Field("ACTIDIN").CursorLength = -1;     // MOVE -1 TO ACTIDINL. source: :163
             SendBillpayScreen(ctx);                      // PERFORM SEND-BILLPAY-SCREEN. source: :164
         }
         // WHEN OTHER -> CONTINUE. source: :165-166
 
         // IF NOT ERR-FLG-ON. source: :169-195
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
             // MOVE ACTIDINI OF COBIL0AI TO ACCT-ID  XREF-ACCT-ID. source: :170-171
             // Alphanumeric X(11) -> numeric 9(11) de-edit: keep digits (map has no PICIN/MUSTFILL).
-            _acctId = (long)ParseDecimal(actidin);
-            _xrefAcctId = _acctId;
+            _accountId = (long)ParseDecimal(accountIdInput);
+            _xrefAccountId = _accountId;
 
             // EVALUATE CONFIRMI OF COBIL0AI. source: :173-191
-            string confirm = _map.Field("CONFIRM").Value;
-            string c1 = confirm.Length > 0 ? confirm.Substring(0, 1) : "";
-            if (c1 == "Y" || c1 == "y")
+            string confirmInput = _map.Field("CONFIRM").Value;
+            string firstConfirmChar = confirmInput.Length > 0 ? confirmInput.Substring(0, 1) : "";
+            if (firstConfirmChar == "Y" || firstConfirmChar == "y")
             {
                 // WHEN 'Y' / 'y' -> SET CONF-PAY-YES; PERFORM READ-ACCTDAT-FILE. source: :174-177
-                SetConfPayYes();
-                ReadAcctdatFile(ctx);
+                SetConfirmPayYes();
+                ReadAccountForUpdate(ctx);
             }
-            else if (c1 == "N" || c1 == "n")
+            else if (firstConfirmChar == "N" || firstConfirmChar == "n")
             {
                 // WHEN 'N' / 'n' -> PERFORM CLEAR-CURRENT-SCREEN; MOVE 'Y' TO WS-ERR-FLG. source: :178-181
                 ClearCurrentScreen(ctx);
-                _errFlgOn = true;
+                _errorFlagOn = true;
             }
-            else if (IsSpacesOrLowValues(confirm))
+            else if (IsSpacesOrLowValues(confirmInput))
             {
                 // WHEN SPACES / LOW-VALUES -> PERFORM READ-ACCTDAT-FILE (read but do not pay; FB-3). source: :182-184
-                ReadAcctdatFile(ctx);
+                ReadAccountForUpdate(ctx);
             }
             else
             {
                 // WHEN OTHER -> invalid Y/N. source: :185-190
-                _errFlgOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :186
-                _wsMessage = "Invalid value. Valid values are (Y/N)..."; // source: :187-188
+                _errorFlagOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :186
+                _message = "Invalid value. Valid values are (Y/N)..."; // source: :187-188
                 _map.Field("CONFIRM").CursorLength = -1;                 // MOVE -1 TO CONFIRML. source: :189
                 SendBillpayScreen(ctx);                                  // PERFORM SEND-BILLPAY-SCREEN. source: :190
             }
 
             // FB-2: these two MOVEs run UNCONDITIONALLY after the CONFIRM EVALUATE, re-touching CURBALI with
             // whatever ACCT-CURR-BAL currently holds (possibly uninitialised on a failed/skipped read). source: :193-194
-            _wsCurrBal = EditCurrBal(AcctCurrBal);                       // MOVE ACCT-CURR-BAL TO WS-CURR-BAL.
-            _map.Field("CURBAL").SetValue(_wsCurrBal, setMdt: false);    // MOVE WS-CURR-BAL TO CURBALI.
+            _currentBalanceEdited = EditCurrBal(AccountCurrentBalance);                       // MOVE ACCT-CURR-BAL TO WS-CURR-BAL.
+            _map.Field("CURBAL").SetValue(_currentBalanceEdited, setMdt: false);    // MOVE WS-CURR-BAL TO CURBALI.
         }
 
         // IF NOT ERR-FLG-ON. source: :197-206
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
             // IF ACCT-CURR-BAL <= ZEROS AND ACTIDINI NOT = SPACES AND LOW-VALUES (FB-4: only gate). source: :198-205
-            if (AcctCurrBal <= 0m && NotSpacesOrLow(_map.Field("ACTIDIN").Value))
+            if (AccountCurrentBalance <= 0m && NotSpacesOrLow(_map.Field("ACTIDIN").Value))
             {
-                _errFlgOn = true;                            // MOVE 'Y' TO WS-ERR-FLG. source: :200
-                _wsMessage = "You have nothing to pay...";   // source: :201-202
+                _errorFlagOn = true;                            // MOVE 'Y' TO WS-ERR-FLG. source: :200
+                _message = "You have nothing to pay...";   // source: :201-202
                 _map.Field("ACTIDIN").CursorLength = -1;     // MOVE -1 TO ACTIDINL. source: :203
                 SendBillpayScreen(ctx);                      // PERFORM SEND-BILLPAY-SCREEN. source: :204
             }
         }
 
         // IF NOT ERR-FLG-ON. source: :208-244
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
-            if (_confPayYes)
+            if (_confirmPayYes)
             {
                 // IF CONF-PAY-YES — the actual payment. source: :210-235
-                ReadCxacaixFile(ctx);                        // PERFORM READ-CXACAIX-FILE. source: :211
+                ReadCardCrossReference(ctx);                        // PERFORM READ-CXACAIX-FILE. source: :211
 
-                _tranId = HighValues16;                      // MOVE HIGH-VALUES TO TRAN-ID. source: :212
-                StartbrTransactFile(ctx);                    // PERFORM STARTBR-TRANSACT-FILE. source: :213
-                ReadprevTransactFile(ctx);                   // PERFORM READPREV-TRANSACT-FILE. source: :214
-                EndbrTransactFile();                         // PERFORM ENDBR-TRANSACT-FILE. source: :215
+                _tranIdKey = HighValues16;                   // MOVE HIGH-VALUES TO TRAN-ID. source: :212
+                StartBrowseTransactions(ctx);                    // PERFORM STARTBR-TRANSACT-FILE. source: :213
+                ReadPreviousTransaction(ctx);                   // PERFORM READPREV-TRANSACT-FILE. source: :214
+                EndBrowseTransactions();                         // PERFORM ENDBR-TRANSACT-FILE. source: :215
 
                 // MOVE TRAN-ID TO WS-TRAN-ID-NUM; ADD 1 TO WS-TRAN-ID-NUM (FB-1). source: :216-217
-                _wsTranIdNum = ParseDecimal(_tranId);
-                _wsTranIdNum += 1;
+                _tranIdNumber = ParseDecimal(_tranIdKey);
+                _tranIdNumber += 1;
 
                 // INITIALIZE TRAN-RECORD; build it. source: :218-229
                 _tranRecord = new Transaction();
-                _tranRecord.TranId = Zoned(_wsTranIdNum, 16);            // MOVE WS-TRAN-ID-NUM TO TRAN-ID. source: :219
+                _tranRecord.TranId = Zoned(_tranIdNumber, 16);            // MOVE WS-TRAN-ID-NUM TO TRAN-ID. source: :219
                 _tranRecord.TypeCd = "02";                               // MOVE '02' TO TRAN-TYPE-CD. source: :220
                 _tranRecord.CatCd = 2;                                   // MOVE 2 TO TRAN-CAT-CD. source: :221
                 _tranRecord.Source = PadX("POS TERM", 10);              // MOVE 'POS TERM' TO TRAN-SOURCE. source: :222
                 _tranRecord.Desc = PadX("BILL PAYMENT - ONLINE", 100); // MOVE 'BILL PAYMENT - ONLINE' TO TRAN-DESC. source: :223
-                _tranRecord.Amt = Decimals.Store(AcctCurrBal, 9, 2, true); // MOVE ACCT-CURR-BAL (S9(10)V99) TO TRAN-AMT (S9(9)V99) — high-order truncate int part to 9 digits (mod 10^9). source: :224
-                _tranRecord.CardNum = PadX(_xrefCardNum, 16);          // MOVE XREF-CARD-NUM TO TRAN-CARD-NUM. source: :225
+                _tranRecord.Amt = Decimals.Store(AccountCurrentBalance, 9, 2, true); // MOVE ACCT-CURR-BAL (S9(10)V99) TO TRAN-AMT (S9(9)V99) — high-order truncate int part to 9 digits (mod 10^9). source: :224
+                _tranRecord.CardNum = PadX(_xrefCardNumber, 16);          // MOVE XREF-CARD-NUM TO TRAN-CARD-NUM. source: :225
                 _tranRecord.MerchantId = 999999999;                     // MOVE 999999999 TO TRAN-MERCHANT-ID. source: :226
                 _tranRecord.MerchantName = PadX("BILL PAYMENT", 50);   // MOVE 'BILL PAYMENT' TO TRAN-MERCHANT-NAME. source: :227
                 _tranRecord.MerchantCity = PadX("N/A", 50);            // MOVE 'N/A' TO TRAN-MERCHANT-CITY. source: :228
                 _tranRecord.MerchantZip = PadX("N/A", 10);             // MOVE 'N/A' TO TRAN-MERCHANT-ZIP. source: :229
 
                 GetCurrentTimestamp(ctx);                               // PERFORM GET-CURRENT-TIMESTAMP. source: :230
-                _tranRecord.OrigTs = PadX(_wsTimestamp, 26);           // MOVE WS-TIMESTAMP TO TRAN-ORIG-TS. source: :231
-                _tranRecord.ProcTs = PadX(_wsTimestamp, 26);           //                     TRAN-PROC-TS. source: :232
+                _tranRecord.OrigTs = PadX(_timestamp, 26);           // MOVE WS-TIMESTAMP TO TRAN-ORIG-TS. source: :231
+                _tranRecord.ProcTs = PadX(_timestamp, 26);           //                     TRAN-PROC-TS. source: :232
 
-                WriteTransactFile(ctx);                                 // PERFORM WRITE-TRANSACT-FILE. source: :233
+                WriteTransaction(ctx);                                 // PERFORM WRITE-TRANSACT-FILE. source: :233
 
                 // COMPUTE ACCT-CURR-BAL = ACCT-CURR-BAL - TRAN-AMT (truncate toward zero, no rounding). source: :234
-                AcctCurrBal = TruncateToCents(AcctCurrBal - _tranRecord.Amt);
-                UpdateAcctdatFile(ctx);                                 // PERFORM UPDATE-ACCTDAT-FILE. source: :235
+                AccountCurrentBalance = TruncateToCents(AccountCurrentBalance - _tranRecord.Amt);
+                UpdateAccount(ctx);                                 // PERFORM UPDATE-ACCTDAT-FILE. source: :235
             }
             else
             {
                 // ELSE (not confirmed yet). source: :236-240
-                _wsMessage = "Confirm to make a bill payment..."; // source: :237-238
+                _message = "Confirm to make a bill payment..."; // source: :237-238
                 _map.Field("CONFIRM").CursorLength = -1;          // MOVE -1 TO CONFIRML. source: :239
             }
 
@@ -383,12 +383,12 @@ public sealed class BillPaymentProgram : ITransactionHandler
     {
         // EXEC CICS ASKTIME ABSTIME(WS-ABS-TIME) + FORMATTIME YYYYMMDD/DATESEP('-') TIME/TIMESEP(':'). source: :251-261
         DateTime now = ctx.Clock.Now;
-        _wsCurDateX10 = now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture); // WS-CUR-DATE-X10 (CCYY-MM-DD). source: :257-258
-        _wsCurTimeX08 = now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);   // WS-CUR-TIME-X08 (HH:MM:SS). source: :259-260
+        _currentDate = now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture); // WS-CUR-DATE-X10 (CCYY-MM-DD). source: :257-258
+        _currentTime = now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);   // WS-CUR-TIME-X08 (HH:MM:SS). source: :259-260
 
         // INITIALIZE WS-TIMESTAMP; (01:10)=date; (12:08)=time; WS-TIMESTAMP-TM-MS6 = ZEROS. source: :263-266
         // Result: 'CCYY-MM-DD HH:MM:SS.000000' (26 chars). Byte 11 is the space joining date and time.
-        _wsTimestamp = _wsCurDateX10 + " " + _wsCurTimeX08 + ".000000";
+        _timestamp = _currentDate + " " + _currentTime + ".000000";
     }
 
     // =============================================================================================
@@ -400,12 +400,12 @@ public sealed class BillPaymentProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_commArea.ToProgram))
             _commArea.ToProgram = "COSGN00C";
 
-        _commArea.FromTranId = WS_TRANID;       // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :278
-        _commArea.FromProgram = WS_PGMNAME;     // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :279
+        _commArea.FromTranId = TranId;       // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :278
+        _commArea.FromProgram = ProgramId;     // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :279
         _commArea.SetFirstEntry();              // MOVE ZEROS TO CDEMO-PGM-CONTEXT. source: :280
 
         // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :281-284
-        SaveCb00Info();
+        PackProgramState();
         ctx.Xctl(_commArea.ToProgram.TrimEnd(), _commArea);
     }
 
@@ -418,7 +418,7 @@ public sealed class BillPaymentProgram : ITransactionHandler
     {
         PopulateHeaderInfo(ctx);                                    // PERFORM POPULATE-HEADER-INFO. source: :291
 
-        _map.Field("ERRMSG").SetValue(_wsMessage, setMdt: false);  // MOVE WS-MESSAGE TO ERRMSGO. source: :293
+        _map.Field("ERRMSG").SetValue(_message, setMdt: false);  // MOVE WS-MESSAGE TO ERRMSGO. source: :293
 
         // EXEC CICS SEND MAP('COBIL0A') MAPSET('COBIL00') FROM(COBIL0AO) ERASE CURSOR. source: :295-301
         ctx.SendMap("COBIL0A", "COBIL00", _map, new SendMapOptions
@@ -436,8 +436,8 @@ public sealed class BillPaymentProgram : ITransactionHandler
     {
         // EXEC CICS RECEIVE MAP('COBIL0A') MAPSET('COBIL00') INTO(COBIL0AI) RESP/RESP2 (RESP not checked). source: :308-314
         ctx.ReceiveMap("COBIL0A", "COBIL00", _map);
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
     }
 
     // =============================================================================================
@@ -447,10 +447,10 @@ public sealed class BillPaymentProgram : ITransactionHandler
     {
         DateTime now = ctx.Clock.Now;                                 // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: :321
 
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01, setMdt: false);  // MOVE CCDA-TITLE01 TO TITLE01O. source: :323
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02, setMdt: false);  // MOVE CCDA-TITLE02 TO TITLE02O. source: :324
-        _map.Field("TRNNAME").SetValue(WS_TRANID, setMdt: false);     // MOVE WS-TRANID  TO TRNNAMEO. source: :325
-        _map.Field("PGMNAME").SetValue(WS_PGMNAME, setMdt: false);    // MOVE WS-PGMNAME TO PGMNAMEO. source: :326
+        _map.Field("TITLE01").SetValue(HeaderTitleLine1, setMdt: false);  // MOVE CCDA-TITLE01 TO TITLE01O. source: :323
+        _map.Field("TITLE02").SetValue(HeaderTitleLine2, setMdt: false);  // MOVE CCDA-TITLE02 TO TITLE02O. source: :324
+        _map.Field("TRNNAME").SetValue(TranId, setMdt: false);     // MOVE WS-TRANID  TO TRNNAMEO. source: :325
+        _map.Field("PGMNAME").SetValue(ProgramId, setMdt: false);    // MOVE WS-PGMNAME TO PGMNAMEO. source: :326
 
         // CURDATEO = mm/dd/yy (year = last two digits, WS-CURDATE-YEAR(3:2)). source: :328-332
         _map.Field("CURDATE").SetValue($"{Two(now.Month)}/{Two(now.Day)}/{Four(now.Year).Substring(2, 2)}", setMdt: false);
@@ -461,28 +461,28 @@ public sealed class BillPaymentProgram : ITransactionHandler
     // =============================================================================================
     //  READ-ACCTDAT-FILE — READ ACCTDAT … UPDATE by ACCT-ID. source: COBIL00C.cbl:343-372
     // =============================================================================================
-    private void ReadAcctdatFile(CicsContext ctx)
+    private void ReadAccountForUpdate(CicsContext ctx)   // COBOL paragraph: READ-ACCTDAT-FILE
     {
         // EXEC CICS READ DATASET(WS-ACCTDAT-FILE) INTO(ACCOUNT-RECORD) RIDFLD(ACCT-ID) UPDATE RESP. source: :345-354
         // READ … UPDATE collapses to a keyed SELECT here; the matching REWRITE happens in the same task (FB-3).
-        string fileStatus = _accounts.ReadByKey(_acctId, out _accountRecord);
+        string fileStatus = _accounts.ReadByKey(_accountId, out _accountRecord);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :356-372
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal:                                       // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :357-358
                 break;
             case Resp.NotFnd:                                       // WHEN DFHRESP(NOTFND). source: :359-364
-                _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :360
-                _wsMessage = "Account ID NOT found...";            // source: :361-362
+                _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :360
+                _message = "Account ID NOT found...";            // source: :361-362
                 _map.Field("ACTIDIN").CursorLength = -1;           // MOVE -1 TO ACTIDINL. source: :363
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :364
                 break;
             default:                                               // WHEN OTHER. source: :365-371
                 // DISPLAY 'RESP:' ... 'REAS:' ... (operator console trace). source: :366
-                _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :367
-                _wsMessage = "Unable to lookup Account...";        // source: :368-369
+                _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :367
+                _message = "Unable to lookup Account...";        // source: :368-369
                 _map.Field("ACTIDIN").CursorLength = -1;           // MOVE -1 TO ACTIDINL. source: :370
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :371
                 break;
@@ -492,27 +492,27 @@ public sealed class BillPaymentProgram : ITransactionHandler
     // =============================================================================================
     //  UPDATE-ACCTDAT-FILE — REWRITE ACCTDAT. source: COBIL00C.cbl:377-403
     // =============================================================================================
-    private void UpdateAcctdatFile(CicsContext ctx)
+    private void UpdateAccount(CicsContext ctx)   // COBOL paragraph: UPDATE-ACCTDAT-FILE
     {
         // EXEC CICS REWRITE DATASET(WS-ACCTDAT-FILE) FROM(ACCOUNT-RECORD) RESP. source: :379-385
         string fileStatus = _accountRecord is null ? FileStatus.RecordNotFound : _accounts.Update(_accountRecord);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :387-403
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal:                                       // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :388-389
                 break;
             case Resp.NotFnd:                                       // WHEN DFHRESP(NOTFND). source: :390-395
-                _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :391
-                _wsMessage = "Account ID NOT found...";            // source: :392-393
+                _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :391
+                _message = "Account ID NOT found...";            // source: :392-393
                 _map.Field("ACTIDIN").CursorLength = -1;           // MOVE -1 TO ACTIDINL. source: :394
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :395
                 break;
             default:                                               // WHEN OTHER. source: :396-402
                 // DISPLAY 'RESP:' ... 'REAS:' ... (operator console trace). source: :397
-                _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :398
-                _wsMessage = "Unable to Update Account...";        // source: :399-400
+                _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :398
+                _message = "Unable to Update Account...";        // source: :399-400
                 _map.Field("ACTIDIN").CursorLength = -1;           // MOVE -1 TO ACTIDINL. source: :401
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :402
                 break;
@@ -522,32 +522,32 @@ public sealed class BillPaymentProgram : ITransactionHandler
     // =============================================================================================
     //  READ-CXACAIX-FILE — READ CXACAIX (alt index by acct id). source: COBIL00C.cbl:408-436
     // =============================================================================================
-    private void ReadCxacaixFile(CicsContext ctx)
+    private void ReadCardCrossReference(CicsContext ctx)   // COBOL paragraph: READ-CXACAIX-FILE
     {
         // EXEC CICS READ DATASET(WS-CXACAIX-FILE) INTO(CARD-XREF-RECORD) RIDFLD(XREF-ACCT-ID) RESP. source: :410-418
-        string fileStatus = _cardXref.ReadByAltKey(_xrefAcctId, out CardXref? xref);
+        string fileStatus = _cardXref.ReadByAltKey(_xrefAccountId, out CardXref? xref);
         if (fileStatus == FileStatus.Ok && xref is not null)
         {
-            _xrefCardNum = xref.XrefCardNum;
-            _xrefAcctId = xref.AcctId;
+            _xrefCardNumber = xref.XrefCardNum;
+            _xrefAccountId = xref.AcctId;
         }
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :420-436
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal:                                       // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :421-422
                 break;
             case Resp.NotFnd:                                       // WHEN DFHRESP(NOTFND). FB-5 (wrong noun). source: :423-428
-                _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :424
-                _wsMessage = "Account ID NOT found...";            // source: :425-426
+                _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :424
+                _message = "Account ID NOT found...";            // source: :425-426
                 _map.Field("ACTIDIN").CursorLength = -1;           // MOVE -1 TO ACTIDINL. source: :427
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :428
                 break;
             default:                                               // WHEN OTHER. source: :429-435
                 // DISPLAY 'RESP:' ... 'REAS:' ... (operator console trace). source: :430
-                _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :431
-                _wsMessage = "Unable to lookup XREF AIX file...";  // source: :432-433
+                _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :431
+                _message = "Unable to lookup XREF AIX file...";  // source: :432-433
                 _map.Field("ACTIDIN").CursorLength = -1;           // MOVE -1 TO ACTIDINL. source: :434
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :435
                 break;
@@ -557,7 +557,7 @@ public sealed class BillPaymentProgram : ITransactionHandler
     // =============================================================================================
     //  STARTBR-TRANSACT-FILE — position the browse at-or-after TRAN-ID. source: COBIL00C.cbl:441-467
     // =============================================================================================
-    private void StartbrTransactFile(CicsContext ctx)
+    private void StartBrowseTransactions(CicsContext ctx)   // COBOL paragraph: STARTBR-TRANSACT-FILE
     {
         // EXEC CICS STARTBR DATASET(WS-TRANSACT-FILE) RIDFLD(TRAN-ID) RESP. source: :443-449
         // With TRAN-ID = HIGH-VALUES the browse is positioned past the last key; READPREV then returns the
@@ -567,20 +567,20 @@ public sealed class BillPaymentProgram : ITransactionHandler
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :451-467
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal:                                       // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :452-453
                 break;
             case Resp.NotFnd:                                       // WHEN DFHRESP(NOTFND). source: :454-459
-                _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :455
-                _wsMessage = "Transaction ID NOT found...";        // source: :456-457
+                _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :455
+                _message = "Transaction ID NOT found...";        // source: :456-457
                 _map.Field("ACTIDIN").CursorLength = -1;           // MOVE -1 TO ACTIDINL. source: :458
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :459
                 break;
             default:                                               // WHEN OTHER. source: :460-466
                 // DISPLAY 'RESP:' ... 'REAS:' ... (operator console trace). source: :461
-                _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :462
-                _wsMessage = "Unable to lookup Transaction...";    // source: :463-464
+                _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :462
+                _message = "Unable to lookup Transaction...";    // source: :463-464
                 _map.Field("ACTIDIN").CursorLength = -1;           // MOVE -1 TO ACTIDINL. source: :465
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :466
                 break;
@@ -590,29 +590,29 @@ public sealed class BillPaymentProgram : ITransactionHandler
     // =============================================================================================
     //  READPREV-TRANSACT-FILE — read the prior record (the highest key). source: COBIL00C.cbl:472-496
     // =============================================================================================
-    private void ReadprevTransactFile(CicsContext ctx)
+    private void ReadPreviousTransaction(CicsContext ctx)   // COBOL paragraph: READPREV-TRANSACT-FILE
     {
         // EXEC CICS READPREV DATASET(WS-TRANSACT-FILE) INTO(TRAN-RECORD) RIDFLD(TRAN-ID) RESP. source: :474-482
         string fileStatus = _transactions.ReadPrevious(out Transaction? prev);
         if (fileStatus == FileStatus.Ok && prev is not null)
         {
             _tranRecord = prev;
-            _tranId = prev.TranId;        // RIDFLD updated with the key just read.
+            _tranIdKey = prev.TranId;     // RIDFLD updated with the key just read.
         }
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :484-496
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal:                                       // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :485-486
                 break;
             case Resp.EndFile:                                     // WHEN DFHRESP(ENDFILE) -> MOVE ZEROS TO TRAN-ID. source: :487-488
-                _tranId = Zoned(0, 16);
+                _tranIdKey = Zoned(0, 16);
                 break;
             default:                                               // WHEN OTHER. source: :489-495
                 // DISPLAY 'RESP:' ... 'REAS:' ... (operator console trace). source: :490
-                _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :491
-                _wsMessage = "Unable to lookup Transaction...";    // source: :492-493
+                _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :491
+                _message = "Unable to lookup Transaction...";    // source: :492-493
                 _map.Field("ACTIDIN").CursorLength = -1;           // MOVE -1 TO ACTIDINL. source: :494
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :495
                 break;
@@ -622,43 +622,43 @@ public sealed class BillPaymentProgram : ITransactionHandler
     // =============================================================================================
     //  ENDBR-TRANSACT-FILE — source: COBIL00C.cbl:501-505
     // =============================================================================================
-    private void EndbrTransactFile() => _transactions.EndBrowse(); // EXEC CICS ENDBR DATASET(WS-TRANSACT-FILE). source: :503-505
+    private void EndBrowseTransactions() => _transactions.EndBrowse(); // COBOL paragraph: ENDBR-TRANSACT-FILE. EXEC CICS ENDBR DATASET(WS-TRANSACT-FILE). source: :503-505
 
     // =============================================================================================
     //  WRITE-TRANSACT-FILE — keyed WRITE of the new bill-pay record. source: COBIL00C.cbl:510-547
     // =============================================================================================
-    private void WriteTransactFile(CicsContext ctx)
+    private void WriteTransaction(CicsContext ctx)   // COBOL paragraph: WRITE-TRANSACT-FILE
     {
         // EXEC CICS WRITE DATASET(WS-TRANSACT-FILE) FROM(TRAN-RECORD) RIDFLD(TRAN-ID) RESP. source: :512-520
         string fileStatus = _transactions.Insert(_tranRecord);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :522-547
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal:                                       // WHEN DFHRESP(NORMAL). source: :523-532
                 InitializeAllFields();                             // PERFORM INITIALIZE-ALL-FIELDS. source: :524
-                _wsMessage = "";                                   // MOVE SPACES TO WS-MESSAGE. source: :525
+                _message = "";                                   // MOVE SPACES TO WS-MESSAGE. source: :525
                 // MOVE DFHGREEN TO ERRMSGC OF COBIL0AO — colour the message line green. source: :526
                 _map.Field("ERRMSG").ColorOverride = BmsColor.Green;
                 // STRING 'Payment successful. ' ' Your Transaction ID is ' TRAN-ID(DELIM SPACE) '.'. source: :527-531
                 // 'Payment successful. ' has a trailing space and the next literal a leading space -> TWO spaces.
                 // TRAN-ID DELIMITED BY SPACE -> the digits up to the first space (none, so all 16). source: §9.
-                _wsMessage = "Payment successful. " + " Your Transaction ID is "
+                _message = "Payment successful. " + " Your Transaction ID is "
                              + DelimBySpace(_tranRecord.TranId) + ".";
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :532
                 break;
             case Resp.DupKey:                                      // WHEN DFHRESP(DUPKEY). source: :533
             case Resp.DupRec:                                      // WHEN DFHRESP(DUPREC). source: :534-539
-                _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :535
-                _wsMessage = "Tran ID already exist...";           // source: :536-537
+                _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :535
+                _message = "Tran ID already exist...";           // source: :536-537
                 _map.Field("ACTIDIN").CursorLength = -1;           // MOVE -1 TO ACTIDINL. source: :538
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :539
                 break;
             default:                                               // WHEN OTHER. source: :540-546
                 // DISPLAY 'RESP:' ... 'REAS:' ... (operator console trace). source: :541
-                _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :542
-                _wsMessage = "Unable to Add Bill pay Transaction..."; // source: :543-544
+                _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :542
+                _message = "Unable to Add Bill pay Transaction..."; // source: :543-544
                 _map.Field("ACTIDIN").CursorLength = -1;           // MOVE -1 TO ACTIDINL. source: :545
                 SendBillpayScreen(ctx);                            // PERFORM SEND-BILLPAY-SCREEN. source: :546
                 break;
@@ -684,7 +684,7 @@ public sealed class BillPaymentProgram : ITransactionHandler
         _map.Field("ACTIDIN").SetValue("", setMdt: false);
         _map.Field("CURBAL").SetValue("", setMdt: false);
         _map.Field("CONFIRM").SetValue("", setMdt: false);
-        _wsMessage = "";
+        _message = "";
     }
 
     // =============================================================================================
@@ -692,7 +692,7 @@ public sealed class BillPaymentProgram : ITransactionHandler
     // =============================================================================================
     private void SetResp(string fileStatus)
     {
-        _wsRespCd = fileStatus switch
+        _responseCode = fileStatus switch
         {
             FileStatus.Ok => (int)Resp.Normal,                 // '00' -> DFHRESP(NORMAL)
             FileStatus.EndOfFile => (int)Resp.EndFile,         // '10' -> DFHRESP(ENDFILE)
@@ -701,7 +701,7 @@ public sealed class BillPaymentProgram : ITransactionHandler
             FileStatus.DuplicateKeyError => (int)Resp.DupRec,  // '22' (insert PK conflict) -> DFHRESP(DUPREC)
             _ => (int)Resp.Error,                              // any other -> WHEN OTHER (file error)
         };
-        _wsReasCd = 0; // RESP2 unavailable from the relational repo; 0 for parity.
+        _reasonCode = 0; // RESP2 unavailable from the relational repo; 0 for parity.
     }
 
     /// <summary>
@@ -733,33 +733,33 @@ public sealed class BillPaymentProgram : ITransactionHandler
     // customer name slots (CustFName(25)+CustMName(25)+CustLName(25) = 75 bytes) so it round-trips losslessly
     // each turn (only CDEMO-CB00-TRN-SELECTED is read by this program; the rest are carried but unused):
     //   TRNID-FIRST X(16) | TRNID-LAST X(16) | PAGE-NUM 9(8) | NEXT X(1) | SEL-FLG X(1) | TRN-SELECTED X(16).
-    private void SaveCb00Info()
+    private void PackProgramState()   // serializes CDEMO-CB00-INFO
     {
         string packed =
-            PadX(_cb00TrnidFirst, 16) +
-            PadX(_cb00TrnidLast, 16) +
-            Zoned(_cb00PageNum, 8) +
-            (_cb00NextPageFlg == '\0' ? 'N' : _cb00NextPageFlg) +
-            (_cb00TrnSelFlg.Length > 0 ? _cb00TrnSelFlg.Substring(0, 1) : " ") +
-            PadX(_cb00TrnSelected, 16);
+            PadX(_firstTranId, 16) +
+            PadX(_lastTranId, 16) +
+            Zoned(_pageNumber, 8) +
+            (_nextPageFlag == '\0' ? 'N' : _nextPageFlag) +
+            (_tranSelectionFlag.Length > 0 ? _tranSelectionFlag.Substring(0, 1) : " ") +
+            PadX(_selectedTranId, 16);
         packed = PadX(packed, 75);
         _commArea.CustFName = packed.Substring(0, 25);
         _commArea.CustMName = packed.Substring(25, 25);
         _commArea.CustLName = packed.Substring(50, 25);
     }
 
-    private void RestoreCb00Info()
+    private void UnpackProgramState()   // deserializes CDEMO-CB00-INFO
     {
         string packed = PadX(_commArea.CustFName, 25) + PadX(_commArea.CustMName, 25) + PadX(_commArea.CustLName, 25);
         packed = PadX(packed, 75);
-        _cb00TrnidFirst = packed.Substring(0, 16).TrimEnd();
-        _cb00TrnidLast = packed.Substring(16, 16).TrimEnd();
-        _cb00PageNum = (int)ParseLong(packed.Substring(32, 8));
+        _firstTranId = packed.Substring(0, 16).TrimEnd();
+        _lastTranId = packed.Substring(16, 16).TrimEnd();
+        _pageNumber = (int)ParseLong(packed.Substring(32, 8));
         char nx = packed[40];
-        _cb00NextPageFlg = nx == 'Y' ? 'Y' : 'N';
+        _nextPageFlag = nx == 'Y' ? 'Y' : 'N';
         char sf = packed[41];
-        _cb00TrnSelFlg = sf == ' ' || sf == '\0' ? "" : sf.ToString();
-        _cb00TrnSelected = packed.Substring(42, 16).TrimEnd();
+        _tranSelectionFlag = sf == ' ' || sf == '\0' ? "" : sf.ToString();
+        _selectedTranId = packed.Substring(42, 16).TrimEnd();
     }
 
     // =============================================================================================

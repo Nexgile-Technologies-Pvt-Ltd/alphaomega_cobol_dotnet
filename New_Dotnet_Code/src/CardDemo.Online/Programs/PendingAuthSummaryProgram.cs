@@ -86,46 +86,46 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     // =============================================================================================
     //  WS-VARIABLES — source: COPAUS0C.cbl:32-60
     // =============================================================================================
-    private const string WS_PGM_AUTH_SMRY = "COPAUS0C"; // 05 WS-PGM-AUTH-SMRY PIC X(08) VALUE 'COPAUS0C'. :33
-    private const string WS_PGM_AUTH_DTL = "COPAUS1C";  // 05 WS-PGM-AUTH-DTL  PIC X(08) VALUE 'COPAUS1C'. :34
-    private const string WS_PGM_MENU = "COMEN01C";      // 05 WS-PGM-MENU      PIC X(08) VALUE 'COMEN01C'. :35
-    private const string WS_CICS_TRANID = "CPVS";       // 05 WS-CICS-TRANID   PIC X(04) VALUE 'CPVS'.     :36
+    private const string AuthSummaryProgramId = "COPAUS0C"; // WS-PGM-AUTH-SMRY PIC X(08) VALUE 'COPAUS0C'. :33
+    private const string AuthDetailProgramId = "COPAUS1C";  // WS-PGM-AUTH-DTL  PIC X(08) VALUE 'COPAUS1C'. :34
+    private const string MenuProgramId = "COMEN01C";        // WS-PGM-MENU      PIC X(08) VALUE 'COMEN01C'. :35
+    private const string CicsTranId = "CPVS";               // WS-CICS-TRANID   PIC X(04) VALUE 'CPVS'.     :36
 
     // 05 WS-ACCTFILENAME / WS-CUSTFILENAME / WS-CARDXREFNAME-ACCT-PATH (DDnames). :38-41
-    private const string WS_ACCTFILENAME = "ACCTDAT ";
-    private const string WS_CUSTFILENAME = "CUSTDAT ";
-    private const string WS_CARDXREFNAME_ACCT_PATH = "CXACAIX ";
+    private const string AccountFileName = "ACCTDAT ";      // WS-ACCTFILENAME PIC X(08)
+    private const string CustomerFileName = "CUSTDAT ";     // WS-CUSTFILENAME PIC X(08)
+    private const string CardXrefAcctPathName = "CXACAIX "; // WS-CARDXREFNAME-ACCT-PATH PIC X(08)
     // WS-CARDFILENAME 'CARDDAT' and WS-CCXREF-FILE 'CCXREF' are declared but NEVER used. :40,42
 
-    private string _wsMessage = "";          // 05 WS-MESSAGE PIC X(80) VALUE SPACES. :37
+    private string _message = "";          // WS-MESSAGE PIC X(80) VALUE SPACES. :37
 
     // 05 WS-ACCT-ID PIC X(11). LOW-VALUES sentinel modeled as null. :44
-    private string? _wsAcctId = "";
+    private string? _acctId = "";              // WS-ACCT-ID
     // 05 WS-AUTH-KEY-SAVE PIC X(08). LOW-VALUES modeled as "". :45
-    private string _wsAuthKeySave = "";
+    private string _authKeySave = "";          // WS-AUTH-KEY-SAVE
     // 05 WS-AUTH-APRV-STAT PIC X(01). :46
-    private string _wsAuthAprvStat = "";
+    private string _authApprovalStatus = "";   // WS-AUTH-APRV-STAT
 
     // 05 WS-RESP-CD / WS-REAS-CD PIC S9(09) COMP. :47-48 ; WS-RESP-CD-DIS / WS-REAS-CD-DIS PIC 9(09). :49-50
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode;                 // WS-RESP-CD
+    private int _reasonCode;                   // WS-REAS-CD
 
     // 05 WS-IDX PIC S9(04) COMP. :52 (WS-REC-COUNT/WS-PAGE-NUM declared but unused.)
-    private int _wsIdx;
+    private int _rowIndex;                      // WS-IDX
 
     // 05 WS-AUTH-DATE PIC X(08) VALUE '00/00/00'. :59 ; WS-AUTH-TIME PIC X(08) VALUE '00:00:00'. :60
-    private string _wsAuthDate = "00/00/00";
-    private string _wsAuthTime = "00:00:00";
+    private string _authDate = "00/00/00";      // WS-AUTH-DATE
+    private string _authTime = "00:00:00";      // WS-AUTH-TIME
 
     // Shared CSDAT01Y date work-fields (WS-CURDATE-YY/-MM/-DD). FB-5: reused by header AND grid. :531-534,736-740
-    private string _wsCurdateYy = "";
-    private string _wsCurdateMm = "";
-    private string _wsCurdateDd = "";
+    private string _currentDateYy = "";         // WS-CURDATE-YY
+    private string _currentDateMm = "";         // WS-CURDATE-MM
+    private string _currentDateDd = "";         // WS-CURDATE-DD
 
     // CCDA-TITLE01/02 (COTTL01Y) + CCDA-MSG-INVALID-KEY (CSMSG01Y) — shared header / messages.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...         ";
+    private const string Title01 = "      AWS Mainframe Modernization       ";          // CCDA-TITLE01 PIC X(40)
+    private const string Title02 = "              CardDemo                  ";          // CCDA-TITLE02 PIC X(40)
+    private const string InvalidKeyMessage = "Invalid key pressed. Please see below...         "; // CCDA-MSG-INVALID-KEY PIC X(49)
 
     // =============================================================================================
     //  WS-IMS-VARIABLES — source: COPAUS0C.cbl:74-90
@@ -154,9 +154,9 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     private void SetNfoundPautSmrySeg() => _pautSmrySegFlg = 'N';
 
     // 05 WS-ERR-FLG PIC X(1) VALUE 'N': 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. :106-108
-    private bool _errFlgOn;
-    private bool ErrFlgOn => _errFlgOn;   // 88 ERR-FLG-ON
-    private bool ErrFlgOff => !_errFlgOn; // 88 ERR-FLG-OFF
+    private bool _errorFlagOn;             // WS-ERR-FLG = 'Y'
+    private bool ErrFlgOn => _errorFlagOn;   // 88 ERR-FLG-ON
+    private bool ErrFlgOff => !_errorFlagOn; // 88 ERR-FLG-OFF
 
     // 05 WS-AUTHS-EOF PIC X(1) VALUE 'N': 88 AUTHS-EOF='Y' / AUTHS-NOT-EOF='N'. :109-111
     private bool _authsEof;
@@ -228,10 +228,10 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     public PendingAuthSummaryProgram() => _db = null!;
 
     /// <inheritdoc/>
-    public string ProgramName => WS_PGM_AUTH_SMRY; // PROGRAM-ID. COPAUS0C. source: :23
+    public string ProgramName => AuthSummaryProgramId; // PROGRAM-ID. COPAUS0C. source: :23
 
     /// <inheritdoc/>
-    public string TransId => WS_CICS_TRANID;       // CSD: CPVS -> COPAUS0C. source: :36
+    public string TransId => CicsTranId;       // CSD: CPVS -> COPAUS0C. source: :36
 
     // =============================================================================================
     //  MAIN-PARA — source: COPAUS0C.cbl:178-257
@@ -251,13 +251,13 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         }
 
         // SET ERR-FLG-OFF / AUTHS-NOT-EOF / NEXT-PAGE-NO / SEND-ERASE-YES TO TRUE. source: :181-184
-        _errFlgOn = false;
+        _errorFlagOn = false;
         SetAuthsNotEof();
         SetNextPageNo();
         SetSendEraseYes();
 
         // MOVE SPACES TO WS-MESSAGE ERRMSGO OF COPAU0AO. source: :186
-        _wsMessage = "";
+        _message = "";
         _map.Field("ERRMSG").SetValue("", setMdt: false);
 
         // MOVE -1 TO ACCTIDL OF COPAU0AI. source: :188 (cursor -> ACCTID field)
@@ -267,7 +267,7 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         {
             // IF EIBCALEN = 0 — first entry, no commarea. source: :190-198
             _commArea = new CardDemoCommArea(); // INITIALIZE CARDDEMO-COMMAREA. :191
-            _commArea.ToProgram = WS_PGM_AUTH_SMRY; // MOVE WS-PGM-AUTH-SMRY TO CDEMO-TO-PROGRAM. :192
+            _commArea.ToProgram = AuthSummaryProgramId; // MOVE WS-PGM-AUTH-SMRY TO CDEMO-TO-PROGRAM. :192
             _commArea.SetReenter();                 // SET CDEMO-PGM-REENTER TO TRUE. :194
             MoveLowValuesToMapOut();                // MOVE LOW-VALUES TO COPAU0AO. :195
             _map.Field("ACCTID").CursorLength = -1; // MOVE -1 TO ACCTIDL. :196
@@ -289,13 +289,13 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
                 // IF CDEMO-ACCT-ID IS NUMERIC -> move to WS-ACCT-ID + ACCTIDO; ELSE blank. source: :207-213
                 if (CdemoAcctIdIsNumeric())
                 {
-                    _wsAcctId = Zoned(_commArea.AcctId, 11);              // MOVE CDEMO-ACCT-ID TO WS-ACCT-ID. :208
-                    _map.Field("ACCTID").SetValue(_wsAcctId, setMdt: false); // ... ACCTIDO. :209
+                    _acctId = Zoned(_commArea.AcctId, 11);              // MOVE CDEMO-ACCT-ID TO WS-ACCT-ID. :208
+                    _map.Field("ACCTID").SetValue(_acctId, setMdt: false); // ... ACCTIDO. :209
                 }
                 else
                 {
                     _map.Field("ACCTID").SetValue(" ", setMdt: false);   // MOVE SPACE TO ACCTIDO. :211
-                    _wsAcctId = null;                                     // MOVE LOW-VALUES TO WS-ACCT-ID. :212
+                    _acctId = null;                                     // MOVE LOW-VALUES TO WS-ACCT-ID. :212
                 }
 
                 GatherDetails(ctx);       // PERFORM GATHER-DETAILS. :215
@@ -315,16 +315,16 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
                         if (ctx.Outcome is not null) break; // XCTL to COPAUS1C taken inside PROCESS-ENTER-KEY.
 
                         // IF WS-ACCT-ID = LOW-VALUES -> SPACE else show it. source: :228-232
-                        if (_wsAcctId is null)
+                        if (_acctId is null)
                             _map.Field("ACCTID").SetValue(" ", setMdt: false);
                         else
-                            _map.Field("ACCTID").SetValue(_wsAcctId, setMdt: false);
+                            _map.Field("ACCTID").SetValue(_acctId, setMdt: false);
 
                         SendPaulstScreen(ctx); // PERFORM SEND-PAULST-SCREEN. :234
                         break;
 
                     case AidKey.Pf3:
-                        _commArea.ToProgram = WS_PGM_MENU; // MOVE WS-PGM-MENU TO CDEMO-TO-PROGRAM. :236
+                        _commArea.ToProgram = MenuProgramId; // MOVE WS-PGM-MENU TO CDEMO-TO-PROGRAM. :236
                         ReturnToPrevScreen(ctx);           // PERFORM RETURN-TO-PREV-SCREEN (XCTL). :237
                         // FB-1: PERFORM SEND-PAULST-SCREEN is dead after the unconditional XCTL. :238
                         if (ctx.Outcome is null) SendPaulstScreen(ctx);
@@ -342,9 +342,9 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
 
                     default:
                         // WHEN OTHER. source: :245-249
-                        _errFlgOn = true;                          // MOVE 'Y' TO WS-ERR-FLG. :246
+                        _errorFlagOn = true;                          // MOVE 'Y' TO WS-ERR-FLG. :246
                         _map.Field("ACCTID").CursorLength = -1;    // MOVE -1 TO ACCTIDL. :247
-                        _wsMessage = CCDA_MSG_INVALID_KEY;         // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. :248
+                        _message = InvalidKeyMessage;         // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. :248
                         SendPaulstScreen(ctx);                     // PERFORM SEND-PAULST-SCREEN. :249
                         break;
                 }
@@ -355,7 +355,7 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         if (ctx.Outcome is null)
         {
             SaveCpvsInfo(ctx);
-            ctx.ReturnTransId(WS_CICS_TRANID, _commArea);
+            ctx.ReturnTransId(CicsTranId, _commArea);
         }
     }
 
@@ -364,31 +364,31 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     // =============================================================================================
     private void ProcessEnterKey(CicsContext ctx)
     {
-        string acctidi = _map.Field("ACCTID").Value; // ACCTIDI OF COPAU0AI (raw keyed value)
+        string acctIdInput = _map.Field("ACCTID").Value; // ACCTIDI OF COPAU0AI (raw keyed value)
 
         // IF ACCTIDI = SPACES OR LOW-VALUES. source: :264-271
-        if (IsSpacesOrLowValues(acctidi))
+        if (IsSpacesOrLowValues(acctIdInput))
         {
-            _wsAcctId = null;                              // MOVE LOW-VALUES TO WS-ACCT-ID. :265
-            _errFlgOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. :267
-            _wsMessage = "Please enter Acct Id...";        // source: :268-269
+            _acctId = null;                              // MOVE LOW-VALUES TO WS-ACCT-ID. :265
+            _errorFlagOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. :267
+            _message = "Please enter Acct Id...";        // source: :268-269
             _map.Field("ACCTID").CursorLength = -1;        // MOVE -1 TO ACCTIDL. :271
         }
         else
         {
             // IF ACCTIDI IS NOT NUMERIC. source: :273-281
-            if (!IsNumericX(acctidi, 11))
+            if (!IsNumericX(acctIdInput, 11))
             {
-                _wsAcctId = null;                          // MOVE LOW-VALUES TO WS-ACCT-ID. :274
-                _errFlgOn = true;                          // MOVE 'Y' TO WS-ERR-FLG. :276
-                _wsMessage = "Acct Id must be Numeric ..."; // source: :277-278
+                _acctId = null;                          // MOVE LOW-VALUES TO WS-ACCT-ID. :274
+                _errorFlagOn = true;                          // MOVE 'Y' TO WS-ERR-FLG. :276
+                _message = "Acct Id must be Numeric ..."; // source: :277-278
                 _map.Field("ACCTID").CursorLength = -1;    // MOVE -1 TO ACCTIDL. :280
             }
             else
             {
                 // MOVE ACCTIDI TO WS-ACCT-ID CDEMO-ACCT-ID. source: :283-284
-                _wsAcctId = PadX(acctidi, 11);
-                _commArea.AcctId = ParseLong(_wsAcctId);
+                _acctId = PadX(acctIdInput, 11);
+                _commArea.AcctId = ParseLong(_acctId);
 
                 // EVALUATE TRUE — first non-blank/non-low selection row wins. source: :285-309
                 if (NotSpacesOrLow(SelIn(1)))
@@ -421,24 +421,24 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
                 if (NotSpacesOrLow(_cpvsPauSelFlg) && NotSpacesOrLow(_cpvsPauSelected))
                 {
                     // EVALUATE CDEMO-CPVS-PAU-SEL-FLG. source: :313-331
-                    string flg = _cpvsPauSelFlg.Length > 0 ? _cpvsPauSelFlg.Substring(0, 1) : "";
-                    if (flg == "S" || flg == "s")
+                    string selectionFlag = _cpvsPauSelFlg.Length > 0 ? _cpvsPauSelFlg.Substring(0, 1) : "";
+                    if (selectionFlag == "S" || selectionFlag == "s")
                     {
                         // WHEN 'S'/'s' — XCTL to the detail program. source: :314-325
-                        _commArea.ToProgram = WS_PGM_AUTH_DTL; // MOVE WS-PGM-AUTH-DTL  TO CDEMO-TO-PROGRAM. :316
-                        _commArea.FromTranId = WS_CICS_TRANID; // MOVE WS-CICS-TRANID   TO CDEMO-FROM-TRANID. :317
-                        _commArea.FromProgram = WS_PGM_AUTH_SMRY; // MOVE WS-PGM-AUTH-SMRY TO CDEMO-FROM-PROGRAM. :318
+                        _commArea.ToProgram = AuthDetailProgramId; // MOVE WS-PGM-AUTH-DTL  TO CDEMO-TO-PROGRAM. :316
+                        _commArea.FromTranId = CicsTranId; // MOVE WS-CICS-TRANID   TO CDEMO-FROM-TRANID. :317
+                        _commArea.FromProgram = AuthSummaryProgramId; // MOVE WS-PGM-AUTH-SMRY TO CDEMO-FROM-PROGRAM. :318
                         _commArea.PgmContext = 0;              // MOVE 0 TO CDEMO-PGM-CONTEXT. :319
                         _commArea.SetFirstEntry();             // SET CDEMO-PGM-ENTER TO TRUE. :320
                         // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). :322-325
                         SaveCpvsInfo(ctx);
-                        ctx.Xctl(WS_PGM_AUTH_DTL, _commArea);
+                        ctx.Xctl(AuthDetailProgramId, _commArea);
                         return;
                     }
                     else
                     {
                         // WHEN OTHER. source: :326-330
-                        _wsMessage = "Invalid selection. Valid value is S"; // :327-329
+                        _message = "Invalid selection. Valid value is S"; // :327-329
                         _map.Field("ACCTID").CursorLength = -1;            // MOVE -1 TO ACCTIDL. :330
                     }
                 }
@@ -458,7 +458,7 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         _cpvsPageNum = 0;                        // MOVE 0 TO CDEMO-CPVS-PAGE-NUM. :347
 
         // IF WS-ACCT-ID NOT = LOW-VALUES. source: :349-357
-        if (_wsAcctId is not null)
+        if (_acctId is not null)
         {
             GatherAccountDetails(ctx);          // PERFORM GATHER-ACCOUNT-DETAILS. :350
             InitializeAuthData();               // PERFORM INITIALIZE-AUTH-DATA. :352
@@ -479,7 +479,7 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
             _cpvsPageNum = _cpvsPageNum - 1; // COMPUTE CDEMO-CPVS-PAGE-NUM = CDEMO-CPVS-PAGE-NUM - 1. :366
 
             // MOVE CDEMO-CPVS-PAUKEY-PREV-PG(CDEMO-CPVS-PAGE-NUM) TO WS-AUTH-KEY-SAVE. :368
-            _wsAuthKeySave = PrevPg(_cpvsPageNum);
+            _authKeySave = PrevPg(_cpvsPageNum);
             GetAuthSummary(ctx);             // PERFORM GET-AUTH-SUMMARY. :370
             if (ctx.Outcome is not null) return;
 
@@ -492,7 +492,7 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         }
         else
         {
-            _wsMessage = "You are already at the top of the page..."; // :381-382
+            _message = "You are already at the top of the page..."; // :381-382
             SetSendEraseNo();                // SET SEND-ERASE-NO TO TRUE. :383
         }
     }
@@ -505,11 +505,11 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         // IF CDEMO-CPVS-PAUKEY-LAST = SPACES OR LOW-VALUES. source: :391-398
         if (IsSpacesOrLowValues(_cpvsPaukeyLast))
         {
-            _wsAuthKeySave = ""; // MOVE LOW-VALUES TO WS-AUTH-KEY-SAVE. :392
+            _authKeySave = ""; // MOVE LOW-VALUES TO WS-AUTH-KEY-SAVE. :392
         }
         else
         {
-            _wsAuthKeySave = _cpvsPaukeyLast; // MOVE CDEMO-CPVS-PAUKEY-LAST TO WS-AUTH-KEY-SAVE. :394
+            _authKeySave = _cpvsPaukeyLast; // MOVE CDEMO-CPVS-PAUKEY-LAST TO WS-AUTH-KEY-SAVE. :394
             GetAuthSummary(ctx);              // PERFORM GET-AUTH-SUMMARY. :396
             if (ctx.Outcome is not null) return;
             RepositionAuthorizations(ctx);    // PERFORM REPOSITION-AUTHORIZATIONS. :397
@@ -527,7 +527,7 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         }
         else
         {
-            _wsMessage = "You are already at the bottom of the page..."; // :409-410
+            _message = "You are already at the bottom of the page..."; // :409-410
         }
     }
 
@@ -539,14 +539,14 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         // IF ERR-FLG-OFF. source: :418
         if (ErrFlgOff)
         {
-            _wsIdx = 1;                 // MOVE 1 TO WS-IDX. :420
+            _rowIndex = 1;                 // MOVE 1 TO WS-IDX. :420
             _cpvsPaukeyLast = "";       // MOVE LOW-VALUES TO CDEMO-CPVS-PAUKEY-LAST. :422
 
             // PERFORM UNTIL WS-IDX > 5 OR AUTHS-EOF OR ERR-FLG-ON. source: :424-443
-            while (!(_wsIdx > 5 || AuthsEof || ErrFlgOn))
+            while (!(_rowIndex > 5 || AuthsEof || ErrFlgOn))
             {
                 // IF EIBAID = DFHPF7 AND WS-IDX = 1 -> REPOSITION else GET-AUTHORIZATIONS. source: :425-429
-                if (ctx.EibAid == AidKey.Pf7 && _wsIdx == 1)
+                if (ctx.EibAid == AidKey.Pf7 && _rowIndex == 1)
                     RepositionAuthorizations(ctx);
                 else
                     GetAuthorizations(ctx);
@@ -556,12 +556,12 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
                 if (AuthsNotEof && ErrFlgOff)
                 {
                     PopulateAuthList();          // PERFORM POPULATE-AUTH-LIST. :431
-                    _wsIdx = _wsIdx + 1;         // COMPUTE WS-IDX = WS-IDX + 1. :432
+                    _rowIndex = _rowIndex + 1;         // COMPUTE WS-IDX = WS-IDX + 1. :432
 
                     // MOVE PA-AUTHORIZATION-KEY TO CDEMO-CPVS-PAUKEY-LAST. :434-435
                     _cpvsPaukeyLast = PaAuthorizationKey();
 
-                    if (_wsIdx == 2)             // IF WS-IDX = 2. :436
+                    if (_rowIndex == 2)             // IF WS-IDX = 2. :436
                     {
                         _cpvsPageNum = _cpvsPageNum + 1; // COMPUTE CDEMO-CPVS-PAGE-NUM = + 1. :437-438
                         // MOVE PA-AUTHORIZATION-KEY TO CDEMO-CPVS-PAUKEY-PREV-PG(CDEMO-CPVS-PAGE-NUM). :439-440
@@ -604,9 +604,9 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         else
         {
             // WHEN OTHER. source: :473-483
-            _errFlgOn = true;    // MOVE 'Y' TO WS-ERR-FLG. :474
+            _errorFlagOn = true;    // MOVE 'Y' TO WS-ERR-FLG. :474
             // FB-6: leading space + verbatim text. :476-481
-            _wsMessage = " System error while reading AUTH Details: Code:" + _imsReturnCode;
+            _message = " System error while reading AUTH Details: Code:" + _imsReturnCode;
             _map.Field("ACCTID").CursorLength = -1; // MOVE -1 TO ACCTIDL. :482
             SendPaulstScreen(ctx);                  // PERFORM SEND-PAULST-SCREEN. :483
         }
@@ -620,7 +620,7 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         // MOVE WS-AUTH-KEY-SAVE TO PA-AUTHORIZATION-KEY. :491
         // EXEC DLI GNP ... SEGMENT(PAUTDTL1) WHERE(PAUT9CTS = PA-AUTHORIZATION-KEY). :493-497
         // Reposition the parent-scoped GNP cursor at-or-after the saved 8-byte key, then read it.
-        _pautDetails.StartParentScanAt(_pautParentAcctId, PadX(_wsAuthKeySave, 8));
+        _pautDetails.StartParentScanAt(_pautParentAcctId, PadX(_authKeySave, 8));
         string st = _pautDetails.ReadNextInParent(out _detail);
         _imsReturnCode = DliStatus(st); // MOVE DIBSTAT TO IMS-RETURN-CODE. :499
 
@@ -636,9 +636,9 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         else
         {
             // WHEN OTHER. source: :506-516
-            _errFlgOn = true;    // MOVE 'Y' TO WS-ERR-FLG. :507
+            _errorFlagOn = true;    // MOVE 'Y' TO WS-ERR-FLG. :507
             // FB-6: leading space + the misspelling 'repos.'. :509-514
-            _wsMessage = " System error while repos. AUTH Details: Code:" + _imsReturnCode;
+            _message = " System error while repos. AUTH Details: Code:" + _imsReturnCode;
             _map.Field("ACCTID").CursorLength = -1; // MOVE -1 TO ACCTIDL. :515
             SendPaulstScreen(ctx);                  // PERFORM SEND-PAULST-SCREEN. :516
         }
@@ -652,34 +652,34 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         PautDetail d = _detail ?? new PautDetail();
 
         // MOVE PA-APPROVED-AMT TO WS-AUTH-AMT (edited -zzzzzzz9.99). :525
-        string wsAuthAmt = EditAmt(d.ApprovedAmt, "-ZZZZZZZ9.99");
+        string authAmount = EditAmt(d.ApprovedAmt, "-ZZZZZZZ9.99"); // WS-AUTH-AMT
 
         // Build WS-AUTH-TIME hh:mm:ss from PA-AUTH-ORIG-TIME(1:2)(3:2)(5:2) (the ':' are the field's VALUE). :527-529
         string origTime = PadX(d.AuthOrigTime, 6);
-        _wsAuthTime = origTime.Substring(0, 2) + ":" + origTime.Substring(2, 2) + ":" + origTime.Substring(4, 2);
+        _authTime = origTime.Substring(0, 2) + ":" + origTime.Substring(2, 2) + ":" + origTime.Substring(4, 2);
 
         // Build date: PA-AUTH-ORIG-DATE(1:2/3:2/5:2) -> WS-CURDATE-YY/-MM/-DD; WS-AUTH-DATE = mm/dd/yy. :531-534
         string origDate = PadX(d.AuthOrigDate, 6);
-        _wsCurdateYy = origDate.Substring(0, 2); // MOVE PA-AUTH-ORIG-DATE(1:2) TO WS-CURDATE-YY. :531
-        _wsCurdateMm = origDate.Substring(2, 2); // MOVE (3:2) TO WS-CURDATE-MM. :532
-        _wsCurdateDd = origDate.Substring(4, 2); // MOVE (5:2) TO WS-CURDATE-DD. :533
-        _wsAuthDate = $"{_wsCurdateMm}/{_wsCurdateDd}/{_wsCurdateYy}"; // MOVE WS-CURDATE-MM-DD-YY TO WS-AUTH-DATE. :534
+        _currentDateYy = origDate.Substring(0, 2); // MOVE PA-AUTH-ORIG-DATE(1:2) TO WS-CURDATE-YY. :531
+        _currentDateMm = origDate.Substring(2, 2); // MOVE (3:2) TO WS-CURDATE-MM. :532
+        _currentDateDd = origDate.Substring(4, 2); // MOVE (5:2) TO WS-CURDATE-DD. :533
+        _authDate = $"{_currentDateMm}/{_currentDateDd}/{_currentDateYy}"; // MOVE WS-CURDATE-MM-DD-YY TO WS-AUTH-DATE. :534
 
         // IF PA-AUTH-RESP-CODE = '00' -> 'A' else 'D'. source: :536-540
-        _wsAuthAprvStat = PadX(d.AuthRespCode, 2) == "00" ? "A" : "D";
+        _authApprovalStatus = PadX(d.AuthRespCode, 2) == "00" ? "A" : "D";
 
         // EVALUATE WS-IDX (1..5) — stamp the row's fields and save the auth key. source: :542-605
-        int n = _wsIdx;
+        int n = _rowIndex;
         if (n is < 1 or > 5) return; // WHEN OTHER -> CONTINUE. :603-604
 
         SetAuthKey(n, PaAuthorizationKey());                                  // CDEMO-CPVS-AUTH-KEYS(n). :544-545,...
         _map.Field($"TRNID{n:D2}").SetValue(PadX(d.TransactionId, 15), setMdt: false); // PA-TRANSACTION-ID -> TRNIDnnI. :547
-        _map.Field($"PDATE{n:D2}").SetValue(_wsAuthDate, setMdt: false);      // WS-AUTH-DATE -> PDATEnnI. :548
-        _map.Field($"PTIME{n:D2}").SetValue(_wsAuthTime, setMdt: false);      // WS-AUTH-TIME -> PTIMEnnI. :549
+        _map.Field($"PDATE{n:D2}").SetValue(_authDate, setMdt: false);      // WS-AUTH-DATE -> PDATEnnI. :548
+        _map.Field($"PTIME{n:D2}").SetValue(_authTime, setMdt: false);      // WS-AUTH-TIME -> PTIMEnnI. :549
         _map.Field($"PTYPE{n:D2}").SetValue(PadX(d.AuthType, 4), setMdt: false); // PA-AUTH-TYPE -> PTYPEnnI. :550
-        _map.Field($"PAPRV{n:D2}").SetValue(_wsAuthAprvStat, setMdt: false);  // WS-AUTH-APRV-STAT -> PAPRVnnI. :551
+        _map.Field($"PAPRV{n:D2}").SetValue(_authApprovalStatus, setMdt: false);  // WS-AUTH-APRV-STAT -> PAPRVnnI. :551
         _map.Field($"PSTAT{n:D2}").SetValue(PadX(d.MatchStatus, 1), setMdt: false); // PA-MATCH-STATUS -> PSTATnnI. :552
-        _map.Field($"PAMT00{n}").SetValue(wsAuthAmt, setMdt: false);          // WS-AUTH-AMT -> PAMT00nI. :553
+        _map.Field($"PAMT00{n}").SetValue(authAmount, setMdt: false);          // WS-AUTH-AMT -> PAMT00nI. :553
         // MOVE DFHBMUNP TO SELnnnnA — unprotect the (populated) selection field. :554
         SetSelAttribute(n, unprotect: true);
     }
@@ -690,9 +690,9 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     private void InitializeAuthData()
     {
         // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL WS-IDX > 5. source: :611-661
-        for (_wsIdx = 1; _wsIdx <= 5; _wsIdx++)
+        for (_rowIndex = 1; _rowIndex <= 5; _rowIndex++)
         {
-            int n = _wsIdx;
+            int n = _rowIndex;
             // MOVE DFHBMPRO TO SELnnnnA — protect the (empty) selection field. :614,623,...
             SetSelAttribute(n, unprotect: false);
             // MOVE SPACES TO the row's seven data fields. :615-621,...
@@ -715,8 +715,8 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_commArea.ToProgram))
             _commArea.ToProgram = "COSGN00C";
 
-        _commArea.FromTranId = WS_CICS_TRANID;    // MOVE WS-CICS-TRANID  TO CDEMO-FROM-TRANID. :671
-        _commArea.FromProgram = WS_PGM_AUTH_SMRY;  // MOVE WS-PGM-AUTH-SMRY TO CDEMO-FROM-PROGRAM. :672
+        _commArea.FromTranId = CicsTranId;    // MOVE WS-CICS-TRANID  TO CDEMO-FROM-TRANID. :671
+        _commArea.FromProgram = AuthSummaryProgramId;  // MOVE WS-PGM-AUTH-SMRY TO CDEMO-FROM-PROGRAM. :672
         _commArea.PgmContext = 0;                  // MOVE ZEROS TO CDEMO-PGM-CONTEXT. :673
 
         // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :674-677
@@ -739,7 +739,7 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         }
 
         PopulateHeaderInfo(ctx);                                  // PERFORM POPULATE-HEADER-INFO. :690
-        _map.Field("ERRMSG").SetValue(_wsMessage, setMdt: false); // MOVE WS-MESSAGE TO ERRMSGO. :692
+        _map.Field("ERRMSG").SetValue(_message, setMdt: false); // MOVE WS-MESSAGE TO ERRMSGO. :692
 
         // IF SEND-ERASE-YES -> SEND ... ERASE CURSOR; ELSE SEND ... CURSOR (no erase). source: :694-708
         ctx.SendMap("COPAU0A", "COPAU00", _map, new SendMapOptions
@@ -756,8 +756,8 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     {
         // EXEC CICS RECEIVE MAP('COPAU0A') MAPSET('COPAU00') INTO(COPAU0AI) RESP RESP2. source: :715-721
         ctx.ReceiveMap("COPAU0A", "COPAU00", _map);
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
     }
 
     // =============================================================================================
@@ -768,18 +768,18 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: :729
         DateTime now = ctx.Clock.Now;
 
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. :731
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. :732
-        _map.Field("TRNNAME").SetValue(WS_CICS_TRANID, setMdt: false);     // MOVE WS-CICS-TRANID   TO TRNNAMEO. :733
-        _map.Field("PGMNAME").SetValue(WS_PGM_AUTH_SMRY, setMdt: false);   // MOVE WS-PGM-AUTH-SMRY TO PGMNAMEO. :734
+        _map.Field("TITLE01").SetValue(Title01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. :731
+        _map.Field("TITLE02").SetValue(Title02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. :732
+        _map.Field("TRNNAME").SetValue(CicsTranId, setMdt: false);     // MOVE WS-CICS-TRANID   TO TRNNAMEO. :733
+        _map.Field("PGMNAME").SetValue(AuthSummaryProgramId, setMdt: false);   // MOVE WS-PGM-AUTH-SMRY TO PGMNAMEO. :734
 
         // FB-5: recompute the shared WS-CURDATE work-fields from the current date (overwriting any row values). :736-738
-        _wsCurdateMm = Two(now.Month);                 // MOVE WS-CURDATE-MONTH TO WS-CURDATE-MM. :736
-        _wsCurdateDd = Two(now.Day);                   // MOVE WS-CURDATE-DAY   TO WS-CURDATE-DD. :737
-        _wsCurdateYy = Four(now.Year).Substring(2, 2); // MOVE WS-CURDATE-YEAR(3:2) TO WS-CURDATE-YY. :738
+        _currentDateMm = Two(now.Month);                 // MOVE WS-CURDATE-MONTH TO WS-CURDATE-MM. :736
+        _currentDateDd = Two(now.Day);                   // MOVE WS-CURDATE-DAY   TO WS-CURDATE-DD. :737
+        _currentDateYy = Four(now.Year).Substring(2, 2); // MOVE WS-CURDATE-YEAR(3:2) TO WS-CURDATE-YY. :738
 
         // MOVE WS-CURDATE-MM-DD-YY TO CURDATEO. source: :740
-        _map.Field("CURDATE").SetValue($"{_wsCurdateMm}/{_wsCurdateDd}/{_wsCurdateYy}", setMdt: false);
+        _map.Field("CURDATE").SetValue($"{_currentDateMm}/{_currentDateDd}/{_currentDateYy}", setMdt: false);
 
         // CURTIMEO = hh:mm:ss. source: :742-746
         _map.Field("CURTIME").SetValue($"{Two(now.Hour)}:{Two(now.Minute)}:{Two(now.Second)}", setMdt: false);
@@ -790,11 +790,11 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     // =============================================================================================
     private void GatherAccountDetails(CicsContext ctx)
     {
-        GetCardXrefByAcct(ctx);   // PERFORM GETCARDXREF-BYACCT. :753
+        ReadCardXrefByAccount(ctx);   // PERFORM GETCARDXREF-BYACCT. :753
         if (ctx.Outcome is not null) return;
-        GetAcctDataByAcct(ctx);   // PERFORM GETACCTDATA-BYACCT. :754
+        ReadAccountData(ctx);   // PERFORM GETACCTDATA-BYACCT. :754
         if (ctx.Outcome is not null) return;
-        GetCustDataByCust(ctx);   // PERFORM GETCUSTDATA-BYCUST. :755
+        ReadCustomerData(ctx);   // PERFORM GETCUSTDATA-BYCUST. :755
         if (ctx.Outcome is not null) return;
 
         Customer c = _customer ?? new Customer();
@@ -855,43 +855,43 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     // =============================================================================================
     //  GETCARDXREF-BYACCT — READ CXACAIX (CARD_XREF by acct id alt index). source: COPAUS0C.cbl:812-862
     // =============================================================================================
-    private void GetCardXrefByAcct(CicsContext ctx)
+    private void ReadCardXrefByAccount(CicsContext ctx) // COBOL paragraph: GETCARDXREF-BYACCT
     {
         // MOVE WS-ACCT-ID TO WS-CARD-RID-ACCT-ID-X. :817
         // EXEC CICS READ DATASET(CXACAIX) RIDFLD(WS-CARD-RID-ACCT-ID-X) INTO(CARD-XREF-RECORD) RESP. :818-826
-        long acctIdKey = ParseLong(_wsAcctId ?? "");
+        long acctIdKey = ParseLong(_acctId ?? "");
         string fileStatus = _xrefs.ReadByAltKey(acctIdKey, out _cardXref);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :828-861
-        if (_wsRespCd == (int)Resp.Normal)
+        if (_responseCode == (int)Resp.Normal)
         {
             // WHEN NORMAL -> MOVE XREF-CUST-ID / XREF-CARD-NUM TO CDEMO-CUST-ID / CDEMO-CARD-NUM. :829-831
             _commArea.CustId = _cardXref?.CustId ?? 0;
             _commArea.CardNum = ParseLong(_cardXref?.XrefCardNum ?? "0");
         }
-        else if (_wsRespCd == (int)Resp.NotFnd)
+        else if (_responseCode == (int)Resp.NotFnd)
         {
             // WHEN NOTFND. source: :832-845 — FB-3: does NOT set WS-ERR-FLG.
-            _wsRespCdDis = _wsRespCd;  // MOVE WS-RESP-CD TO WS-RESP-CD-DIS. :833
-            _wsReasCdDis = _wsReasCd;  // MOVE WS-REAS-CD TO WS-REAS-CD-DIS. :834
+            _responseCodeDisplay = _responseCode;  // MOVE WS-RESP-CD TO WS-RESP-CD-DIS. :833
+            _reasonCodeDisplay = _reasonCode;  // MOVE WS-REAS-CD TO WS-REAS-CD-DIS. :834
             // STRING 'Account:' WS-ACCT-ID ' not found in XREF file. Resp:' resp ' Reas:' reas. :836-843
-            _wsMessage = Truncate80(
-                "Account:" + PadX(_wsAcctId, 11) + " not found in XREF file. Resp:" + Disp9(_wsRespCdDis) +
-                " Reas:" + Disp9(_wsReasCdDis));
+            _message = Truncate80(
+                "Account:" + PadX(_acctId, 11) + " not found in XREF file. Resp:" + Disp9(_responseCodeDisplay) +
+                " Reas:" + Disp9(_reasonCodeDisplay));
             _map.Field("ACCTID").CursorLength = -1; // MOVE -1 TO ACCTIDL. :844
             SendPaulstScreen(ctx);                  // PERFORM SEND-PAULST-SCREEN. :845
         }
         else
         {
             // WHEN OTHER. source: :846-861
-            _errFlgOn = true;          // MOVE 'Y' TO WS-ERR-FLG. :847
-            _wsRespCdDis = _wsRespCd;  // :848
-            _wsReasCdDis = _wsReasCd;  // :849
+            _errorFlagOn = true;          // MOVE 'Y' TO WS-ERR-FLG. :847
+            _responseCodeDisplay = _responseCode;  // :848
+            _reasonCodeDisplay = _reasonCode;  // :849
             // STRING 'Account:' WS-CARD-RID-ACCT-ID-X ' System error while reading XREF file. Resp:' ... ' Reas:' ... :851-858
-            _wsMessage = Truncate80(
+            _message = Truncate80(
                 "Account:" + Zoned(acctIdKey, 11) + " System error while reading XREF file. Resp:" +
-                Disp9(_wsRespCdDis) + " Reas:" + Disp9(_wsReasCdDis));
+                Disp9(_responseCodeDisplay) + " Reas:" + Disp9(_reasonCodeDisplay));
             _map.Field("ACCTID").CursorLength = -1; // MOVE -1 TO ACCTIDL. :859
             SendPaulstScreen(ctx);                  // PERFORM SEND-PAULST-SCREEN. :860
         }
@@ -900,7 +900,7 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     // =============================================================================================
     //  GETACCTDATA-BYACCT — READ ACCTDAT (ACCOUNT by acct id). source: COPAUS0C.cbl:865-912
     // =============================================================================================
-    private void GetAcctDataByAcct(CicsContext ctx)
+    private void ReadAccountData(CicsContext ctx) // COBOL paragraph: GETACCTDATA-BYACCT
     {
         // MOVE XREF-ACCT-ID TO WS-CARD-RID-ACCT-ID (numeric redefine); READ uses the -X form over the same
         // bytes, so the key is the cross-ref acct id. FB-3: on a prior XREF NOTFND, XREF-ACCT-ID is stale. :868
@@ -910,31 +910,31 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :879-911
-        if (_wsRespCd == (int)Resp.Normal)
+        if (_responseCode == (int)Resp.Normal)
         {
             // WHEN NORMAL -> CONTINUE. :880-881
         }
-        else if (_wsRespCd == (int)Resp.NotFnd)
+        else if (_responseCode == (int)Resp.NotFnd)
         {
             // WHEN NOTFND. source: :882-895 — FB-3: does NOT set WS-ERR-FLG.
-            _wsRespCdDis = _wsRespCd;  // :883
-            _wsReasCdDis = _wsReasCd;  // :884
+            _responseCodeDisplay = _responseCode;  // :883
+            _reasonCodeDisplay = _reasonCode;  // :884
             // STRING 'Account:' WS-CARD-RID-ACCT-ID-X ' not found in ACCT file. Resp:' ... ' Reas:' ... :886-893
-            _wsMessage = Truncate80(
-                "Account:" + Zoned(acctIdKey, 11) + " not found in ACCT file. Resp:" + Disp9(_wsRespCdDis) +
-                " Reas:" + Disp9(_wsReasCdDis));
+            _message = Truncate80(
+                "Account:" + Zoned(acctIdKey, 11) + " not found in ACCT file. Resp:" + Disp9(_responseCodeDisplay) +
+                " Reas:" + Disp9(_reasonCodeDisplay));
             _map.Field("ACCTID").CursorLength = -1; // MOVE -1 TO ACCTIDL. :894
             SendPaulstScreen(ctx);                  // PERFORM SEND-PAULST-SCREEN. :895
         }
         else
         {
             // WHEN OTHER. source: :896-911
-            _errFlgOn = true;          // MOVE 'Y' TO WS-ERR-FLG. :897
-            _wsRespCdDis = _wsRespCd;  // :898
-            _wsReasCdDis = _wsReasCd;  // :899
-            _wsMessage = Truncate80(
+            _errorFlagOn = true;          // MOVE 'Y' TO WS-ERR-FLG. :897
+            _responseCodeDisplay = _responseCode;  // :898
+            _reasonCodeDisplay = _reasonCode;  // :899
+            _message = Truncate80(
                 "Account:" + Zoned(acctIdKey, 11) + " System error while reading ACCT file. Resp:" +
-                Disp9(_wsRespCdDis) + " Reas:" + Disp9(_wsReasCdDis));
+                Disp9(_responseCodeDisplay) + " Reas:" + Disp9(_reasonCodeDisplay));
             _map.Field("ACCTID").CursorLength = -1; // MOVE -1 TO ACCTIDL. :909
             SendPaulstScreen(ctx);                  // PERFORM SEND-PAULST-SCREEN. :910
         }
@@ -943,7 +943,7 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     // =============================================================================================
     //  GETCUSTDATA-BYCUST — READ CUSTDAT (CUSTOMER by cust id). source: COPAUS0C.cbl:915-963
     // =============================================================================================
-    private void GetCustDataByCust(CicsContext ctx)
+    private void ReadCustomerData(CicsContext ctx) // COBOL paragraph: GETCUSTDATA-BYCUST
     {
         // MOVE XREF-CUST-ID TO WS-CARD-RID-CUST-ID. :918
         long custIdKey = _cardXref?.CustId ?? 0;
@@ -952,31 +952,31 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :930-962
-        if (_wsRespCd == (int)Resp.Normal)
+        if (_responseCode == (int)Resp.Normal)
         {
             // WHEN NORMAL -> CONTINUE. :931-932
         }
-        else if (_wsRespCd == (int)Resp.NotFnd)
+        else if (_responseCode == (int)Resp.NotFnd)
         {
             // WHEN NOTFND. source: :933-946 — FB-3: does NOT set WS-ERR-FLG.
-            _wsRespCdDis = _wsRespCd;  // :934
-            _wsReasCdDis = _wsReasCd;  // :935
+            _responseCodeDisplay = _responseCode;  // :934
+            _reasonCodeDisplay = _reasonCode;  // :935
             // STRING 'Customer:' WS-CARD-RID-CUST-ID-X ' not found in CUST file. Resp:' ... ' Reas:' ... :937-944
-            _wsMessage = Truncate80(
-                "Customer:" + Zoned(custIdKey, 9) + " not found in CUST file. Resp:" + Disp9(_wsRespCdDis) +
-                " Reas:" + Disp9(_wsReasCdDis));
+            _message = Truncate80(
+                "Customer:" + Zoned(custIdKey, 9) + " not found in CUST file. Resp:" + Disp9(_responseCodeDisplay) +
+                " Reas:" + Disp9(_reasonCodeDisplay));
             _map.Field("ACCTID").CursorLength = -1; // MOVE -1 TO ACCTIDL. :945
             SendPaulstScreen(ctx);                  // PERFORM SEND-PAULST-SCREEN. :946
         }
         else
         {
             // WHEN OTHER. source: :947-962
-            _errFlgOn = true;          // MOVE 'Y' TO WS-ERR-FLG. :948
-            _wsRespCdDis = _wsRespCd;  // :949
-            _wsReasCdDis = _wsReasCd;  // :950
-            _wsMessage = Truncate80(
+            _errorFlagOn = true;          // MOVE 'Y' TO WS-ERR-FLG. :948
+            _responseCodeDisplay = _responseCode;  // :949
+            _reasonCodeDisplay = _reasonCode;  // :950
+            _message = Truncate80(
                 "Customer:" + Zoned(custIdKey, 9) + " System error while reading CUST file. Resp:" +
-                Disp9(_wsRespCdDis) + " Reas:" + Disp9(_wsReasCdDis));
+                Disp9(_responseCodeDisplay) + " Reas:" + Disp9(_reasonCodeDisplay));
             _map.Field("ACCTID").CursorLength = -1; // MOVE -1 TO ACCTIDL. :960
             SendPaulstScreen(ctx);                  // PERFORM SEND-PAULST-SCREEN. :961
         }
@@ -1015,9 +1015,9 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         else
         {
             // WHEN OTHER. source: :985-996
-            _errFlgOn = true;        // MOVE 'Y' TO WS-ERR-FLG. :986
+            _errorFlagOn = true;        // MOVE 'Y' TO WS-ERR-FLG. :986
             // FB-6: leading space + verbatim text. :988-993
-            _wsMessage = " System error while reading AUTH Summary: Code:" + _imsReturnCode;
+            _message = " System error while reading AUTH Summary: Code:" + _imsReturnCode;
             _map.Field("ACCTID").CursorLength = -1; // MOVE -1 TO ACCTIDL. :994
             SendPaulstScreen(ctx);                  // PERFORM SEND-PAULST-SCREEN. :995
         }
@@ -1048,9 +1048,9 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
         }
         else
         {
-            _errFlgOn = true; // MOVE 'Y' TO WS-ERR-FLG. :1020
+            _errorFlagOn = true; // MOVE 'Y' TO WS-ERR-FLG. :1020
             // FB-6: leading space + verbatim text. :1022-1027
-            _wsMessage = " System error while scheduling PSB: Code:" + _imsReturnCode;
+            _message = " System error while scheduling PSB: Code:" + _imsReturnCode;
             _map.Field("ACCTID").CursorLength = -1; // MOVE -1 TO ACCTIDL. :1028
             SendPaulstScreen(ctx);                  // PERFORM SEND-PAULST-SCREEN. :1029
         }
@@ -1059,8 +1059,8 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     // =============================================================================================
     //  WS-RESP-CD-DIS / WS-REAS-CD-DIS — PIC 9(09) display copies for the messages. source: :49-50
     // =============================================================================================
-    private int _wsRespCdDis;
-    private int _wsReasCdDis;
+    private int _responseCodeDisplay; // WS-RESP-CD-DIS
+    private int _reasonCodeDisplay;   // WS-REAS-CD-DIS
 
     // =============================================================================================
     //  Symbolic-map input readers + per-row helpers.
@@ -1136,13 +1136,13 @@ public sealed class PendingAuthSummaryProgram : ITransactionHandler
     // =============================================================================================
     private void SetResp(string fileStatus)
     {
-        _wsRespCd = fileStatus switch
+        _responseCode = fileStatus switch
         {
             FileStatus.Ok => (int)Resp.Normal,             // '00' -> DFHRESP(NORMAL)
             FileStatus.RecordNotFound => (int)Resp.NotFnd, // '23' -> DFHRESP(NOTFND)
             _ => (int)Resp.Error,                          // any other -> WHEN OTHER (file error)
         };
-        _wsReasCd = 0; // RESP2 unavailable from the relational repo; 0 for parity.
+        _reasonCode = 0; // RESP2 unavailable from the relational repo; 0 for parity.
     }
 
     // =============================================================================================

@@ -74,10 +74,10 @@ public sealed class TransactionTypeMaintenanceBatch
     private readonly List<string> _sysout = [];
 
     // WORKING-STORAGE.
-    private string _lastrec = " ";                          // 01 FLAGS / LASTREC PIC X(1) VALUE SPACES
-    private string _wsReturnMsg = new(' ', 80);             // WS-RETURN-MSG PIC X(80) VALUE SPACES
-    private int _wsVarSqlcode;                              // WS-VAR-SQLCODE (edited PIC ----9)
-    private string _wsInfStatus = "  ";                    // WS-INF-STATUS (file status)
+    private string _lastRecord = " ";                       // LASTREC PIC X(1) VALUE SPACES
+    private string _returnMsg = new(' ', 80);              // WS-RETURN-MSG PIC X(80) VALUE SPACES
+    private int _sqlcodeDisplay;                            // WS-VAR-SQLCODE (edited PIC ----9)
+    private string _fileStatus = "  ";                     // WS-INF-STATUS (file status)
     private int _returnCode;                               // RETURN-CODE (job-step return code)
 
     // 01 WS-INPUT-REC (the READ ... INTO target). Initialized to spaces (VALUE SPACES on each field).
@@ -155,8 +155,8 @@ public sealed class TransactionTypeMaintenanceBatch
         // committed after STOP RUN (the read loop returns normally even when records "abend").
         using SqliteTransaction tx = _db.BeginTransaction();
 
-        Open0001Files();          // 0001-OPEN-FILES   // source: COBTUPDT.cbl:82-89
-        ReadNext1001Records();    // falls through into 1001-READ-NEXT-RECORDS // source: COBTUPDT.cbl:91-99
+        OpenFiles();          // 0001-OPEN-FILES   // source: COBTUPDT.cbl:82-89
+        ReadNextRecords();    // falls through into 1001-READ-NEXT-RECORDS // source: COBTUPDT.cbl:91-99
 
         tx.Commit();              // implicit commit at normal end (STOP RUN). // source: COBTUPDT.cbl:99
     }
@@ -165,14 +165,14 @@ public sealed class TransactionTypeMaintenanceBatch
     // 0001-OPEN-FILES // source: COBTUPDT.cbl:82-89
     // OPEN INPUT TR-RECORD; DISPLAY 'OPEN FILE OK' / 'OPEN FILE NOT OK' on the file status. No abend on a
     // bad open — it falls through into the read loop regardless (faithful bug #3).
-    private void Open0001Files()
+    private void OpenFiles()  // COBOL paragraph: 0001-OPEN-FILES
     {
         // OPEN INPUT TR-RECORD. A present input dataset opens '00'; an absent one would be non-'00'.
         _fileOpen = true;
         _readIndex = 0;
-        _wsInfStatus = FileStatus.Ok;                 // '00' for a normally-opened input file.
+        _fileStatus = FileStatus.Ok;                 // '00' for a normally-opened input file.
 
-        if (_wsInfStatus == FileStatus.Ok)            // IF WS-INF-STATUS = '00' THEN // source: COBTUPDT.cbl:84
+        if (_fileStatus == FileStatus.Ok)            // IF WS-INF-STATUS = '00' THEN // source: COBTUPDT.cbl:84
             _sysout.Add("OPEN FILE OK");              // source: COBTUPDT.cbl:85
         else
             _sysout.Add("OPEN FILE NOT OK");          // source: COBTUPDT.cbl:87
@@ -182,15 +182,15 @@ public sealed class TransactionTypeMaintenanceBatch
     // -------------------------------------------------------------------------------------------------
     // 1001-READ-NEXT-RECORDS // source: COBTUPDT.cbl:91-99
     // Priming read, then PERFORM UNTIL LASTREC = 'Y': treat + read. After the loop: close, then STOP RUN.
-    private void ReadNext1001Records()
+    private void ReadNextRecords()  // COBOL paragraph: 1001-READ-NEXT-RECORDS
     {
-        Read1002Records();                            // PERFORM 1002-READ-RECORDS (priming) // source: COBTUPDT.cbl:92
-        while (_lastrec != "Y")                        // PERFORM UNTIL LASTREC = 'Y' // source: COBTUPDT.cbl:93
+        ReadRecords();                            // PERFORM 1002-READ-RECORDS (priming) // source: COBTUPDT.cbl:92
+        while (_lastRecord != "Y")                        // PERFORM UNTIL LASTREC = 'Y' // source: COBTUPDT.cbl:93
         {
-            Treat1003Record();                        // PERFORM 1003-TREAT-RECORD // source: COBTUPDT.cbl:94
-            Read1002Records();                        // PERFORM 1002-READ-RECORDS // source: COBTUPDT.cbl:95
+            TreatRecord();                        // PERFORM 1003-TREAT-RECORD // source: COBTUPDT.cbl:94
+            ReadRecords();                        // PERFORM 1002-READ-RECORDS // source: COBTUPDT.cbl:95
         }                                              // END-PERFORM // source: COBTUPDT.cbl:96
-        CloseStop2001();                              // PERFORM 2001-CLOSE-STOP // source: COBTUPDT.cbl:97
+        CloseStop();                              // PERFORM 2001-CLOSE-STOP // source: COBTUPDT.cbl:97
         // EXIT. (no-op) then STOP RUN. — the run terminates here. // source: COBTUPDT.cbl:98-99
     }
 
@@ -198,7 +198,7 @@ public sealed class TransactionTypeMaintenanceBatch
     // 1002-READ-RECORDS // source: COBTUPDT.cbl:100-107
     // READ TR-RECORD NEXT RECORD INTO WS-INPUT-REC; AT END MOVE 'Y' TO LASTREC. If not EOF, DISPLAY
     // 'PROCESSING   ' followed by the 53-byte WS-INPUT-REC.
-    private void Read1002Records()
+    private void ReadRecords()  // COBOL paragraph: 1002-READ-RECORDS
     {
         if (_readIndex < _inputRecords.Count)         // READ ... NEXT RECORD INTO WS-INPUT-REC // source: COBTUPDT.cbl:101
         {
@@ -208,10 +208,10 @@ public sealed class TransactionTypeMaintenanceBatch
         }
         else
         {
-            _lastrec = "Y";                            // AT END MOVE 'Y' TO LASTREC // source: COBTUPDT.cbl:102
+            _lastRecord = "Y";                            // AT END MOVE 'Y' TO LASTREC // source: COBTUPDT.cbl:102
         }
 
-        if (_lastrec != "Y")                           // IF LASTREC NOT EQUAL TO 'Y' THEN // source: COBTUPDT.cbl:104
+        if (_lastRecord != "Y")                           // IF LASTREC NOT EQUAL TO 'Y' THEN // source: COBTUPDT.cbl:104
         {
             // DISPLAY 'PROCESSING   ' WS-INPUT-REC (three trailing spaces + the 53-byte record image).
             _sysout.Add("PROCESSING   " + InputRecImage()); // source: COBTUPDT.cbl:105
@@ -222,21 +222,21 @@ public sealed class TransactionTypeMaintenanceBatch
     // -------------------------------------------------------------------------------------------------
     // 1003-TREAT-RECORD // source: COBTUPDT.cbl:109-130
     // EVALUATE INPUT-REC-TYPE (the action byte). Case-sensitive uppercase only (faithful bug #5).
-    private void Treat1003Record()
+    private void TreatRecord()  // COBOL paragraph: 1003-TREAT-RECORD
     {
         switch (_inputRecType)                         // EVALUATE INPUT-REC-TYPE // source: COBTUPDT.cbl:110
         {
             case "A":                                  // WHEN 'A' // source: COBTUPDT.cbl:111
                 _sysout.Add("ADDING RECORD");          // source: COBTUPDT.cbl:112
-                Insert10031Db();                       // PERFORM 10031-INSERT-DB // source: COBTUPDT.cbl:113
+                InsertDb();                       // PERFORM 10031-INSERT-DB // source: COBTUPDT.cbl:113
                 break;
             case "U":                                  // WHEN 'U' // source: COBTUPDT.cbl:114
                 _sysout.Add("UPDATING RECORD");        // source: COBTUPDT.cbl:115
-                Update10032Db();                       // PERFORM 10032-UPDATE-DB // source: COBTUPDT.cbl:116
+                UpdateDb();                       // PERFORM 10032-UPDATE-DB // source: COBTUPDT.cbl:116
                 break;
             case "D":                                  // WHEN 'D' // source: COBTUPDT.cbl:117
                 _sysout.Add("DELETING RECORD");        // source: COBTUPDT.cbl:118
-                Delete10033Db();                       // PERFORM 10033-DELETE-DB // source: COBTUPDT.cbl:119
+                DeleteDb();                       // PERFORM 10033-DELETE-DB // source: COBTUPDT.cbl:119
                 break;
             case "*":                                  // WHEN '*' // source: COBTUPDT.cbl:120
                 _sysout.Add("IGNORING COMMENTED LINE");// source: COBTUPDT.cbl:121 (no DB action)
@@ -244,7 +244,7 @@ public sealed class TransactionTypeMaintenanceBatch
             default:                                   // WHEN OTHER // source: COBTUPDT.cbl:122
                 // STRING 'ERROR: TYPE NOT VALID' DELIMITED BY SIZE INTO WS-RETURN-MSG.
                 StringIntoReturnMsg("ERROR: TYPE NOT VALID"); // source: COBTUPDT.cbl:123-127
-                Abend9999();                           // PERFORM 9999-ABEND // source: COBTUPDT.cbl:128
+                Abend();                           // PERFORM 9999-ABEND // source: COBTUPDT.cbl:128
                 break;
         }
         // END-EVALUATE. EXIT. // source: COBTUPDT.cbl:129-130
@@ -254,10 +254,10 @@ public sealed class TransactionTypeMaintenanceBatch
     // 10031-INSERT-DB // source: COBTUPDT.cbl:132-164
     // EXEC SQL INSERT INTO CARDDEMO.TRANSACTION_TYPE (TR_TYPE, TR_DESCRIPTION)
     //          VALUES (:INPUT-REC-NUMBER, :INPUT-REC-DESC) END-EXEC.
-    private void Insert10031Db()
+    private void InsertDb()  // COBOL paragraph: 10031-INSERT-DB
     {
         int sqlcode = ExecInsert(_inputRecNumber, _inputRecDesc); // host vars bound verbatim (full widths)
-        _wsVarSqlcode = sqlcode;                                  // MOVE SQLCODE TO WS-VAR-SQLCODE // source: COBTUPDT.cbl:149
+        _sqlcodeDisplay = sqlcode;                                  // MOVE SQLCODE TO WS-VAR-SQLCODE // source: COBTUPDT.cbl:149
 
         // EVALUATE TRUE // source: COBTUPDT.cbl:151
         if (sqlcode == SqlcodeOk)                                  // WHEN SQLCODE = ZERO // source: COBTUPDT.cbl:152
@@ -269,8 +269,8 @@ public sealed class TransactionTypeMaintenanceBatch
             // STRING 'Error accessing:' ' TRANSACTION_TYPE table. SQLCODE:' WS-VAR-SQLCODE
             //   DELIMITED BY SIZE INTO WS-RETURN-MSG. // source: COBTUPDT.cbl:155-161
             StringIntoReturnMsg(
-                "Error accessing:" + " TRANSACTION_TYPE table. SQLCODE:" + EditSqlcode(_wsVarSqlcode));
-            Abend9999();                                          // PERFORM 9999-ABEND // source: COBTUPDT.cbl:162
+                "Error accessing:" + " TRANSACTION_TYPE table. SQLCODE:" + EditSqlcode(_sqlcodeDisplay));
+            Abend();                                          // PERFORM 9999-ABEND // source: COBTUPDT.cbl:162
         }
         // END-EVALUATE. EXIT. (INSERT has NO +100 branch.) // source: COBTUPDT.cbl:163-164
     }
@@ -279,10 +279,10 @@ public sealed class TransactionTypeMaintenanceBatch
     // 10032-UPDATE-DB // source: COBTUPDT.cbl:166-195
     // EXEC SQL UPDATE CARDDEMO.TRANSACTION_TYPE SET TR_DESCRIPTION = :INPUT-REC-DESC
     //          WHERE TR_TYPE = :INPUT-REC-NUMBER END-EXEC. (Only TR_DESCRIPTION is updated.)
-    private void Update10032Db()
+    private void UpdateDb()  // COBOL paragraph: 10032-UPDATE-DB
     {
         int sqlcode = ExecUpdate(_inputRecNumber, _inputRecDesc);
-        _wsVarSqlcode = sqlcode;                                  // MOVE SQLCODE TO WS-VAR-SQLCODE // source: COBTUPDT.cbl:176
+        _sqlcodeDisplay = sqlcode;                                  // MOVE SQLCODE TO WS-VAR-SQLCODE // source: COBTUPDT.cbl:176
 
         // EVALUATE TRUE // source: COBTUPDT.cbl:177
         if (sqlcode == SqlcodeOk)                                  // WHEN SQLCODE = ZERO // source: COBTUPDT.cbl:178
@@ -293,14 +293,14 @@ public sealed class TransactionTypeMaintenanceBatch
         {
             // STRING 'No records found.' DELIMITED BY SIZE INTO WS-RETURN-MSG. // source: COBTUPDT.cbl:181-183
             StringIntoReturnMsg("No records found.");
-            Abend9999();                                          // PERFORM 9999-ABEND // source: COBTUPDT.cbl:184
+            Abend();                                          // PERFORM 9999-ABEND // source: COBTUPDT.cbl:184
         }
         else if (sqlcode < 0)                                     // WHEN SQLCODE < 0 // source: COBTUPDT.cbl:185
         {
             // STRING error message (same literals as INSERT) INTO WS-RETURN-MSG. // source: COBTUPDT.cbl:186-192
             StringIntoReturnMsg(
-                "Error accessing:" + " TRANSACTION_TYPE table. SQLCODE:" + EditSqlcode(_wsVarSqlcode));
-            Abend9999();                                          // PERFORM 9999-ABEND // source: COBTUPDT.cbl:193
+                "Error accessing:" + " TRANSACTION_TYPE table. SQLCODE:" + EditSqlcode(_sqlcodeDisplay));
+            Abend();                                          // PERFORM 9999-ABEND // source: COBTUPDT.cbl:193
         }
         // END-EVALUATE. EXIT. // source: COBTUPDT.cbl:194-195
     }
@@ -308,10 +308,10 @@ public sealed class TransactionTypeMaintenanceBatch
     // -------------------------------------------------------------------------------------------------
     // 10033-DELETE-DB // source: COBTUPDT.cbl:196-226
     // EXEC SQL DELETE FROM CARDDEMO.TRANSACTION_TYPE WHERE TR_TYPE = :INPUT-REC-NUMBER END-EXEC.
-    private void Delete10033Db()
+    private void DeleteDb()  // COBOL paragraph: 10033-DELETE-DB
     {
         int sqlcode = ExecDelete(_inputRecNumber);
-        _wsVarSqlcode = sqlcode;                                  // MOVE SQLCODE TO WS-VAR-SQLCODE // source: COBTUPDT.cbl:205
+        _sqlcodeDisplay = sqlcode;                                  // MOVE SQLCODE TO WS-VAR-SQLCODE // source: COBTUPDT.cbl:205
 
         // EVALUATE TRUE // source: COBTUPDT.cbl:207
         if (sqlcode == SqlcodeOk)                                  // WHEN SQLCODE = ZERO // source: COBTUPDT.cbl:208
@@ -322,14 +322,14 @@ public sealed class TransactionTypeMaintenanceBatch
         {
             // STRING 'No records found.' DELIMITED BY SIZE INTO WS-RETURN-MSG. // source: COBTUPDT.cbl:211-213
             StringIntoReturnMsg("No records found.");
-            Abend9999();                                          // PERFORM 9999-ABEND // source: COBTUPDT.cbl:214
+            Abend();                                          // PERFORM 9999-ABEND // source: COBTUPDT.cbl:214
         }
         else if (sqlcode < 0)                                     // WHEN SQLCODE < 0 // source: COBTUPDT.cbl:216
         {
             // STRING error message INTO WS-RETURN-MSG. // source: COBTUPDT.cbl:217-223
             StringIntoReturnMsg(
-                "Error accessing:" + " TRANSACTION_TYPE table. SQLCODE:" + EditSqlcode(_wsVarSqlcode));
-            Abend9999();                                          // PERFORM 9999-ABEND // source: COBTUPDT.cbl:224
+                "Error accessing:" + " TRANSACTION_TYPE table. SQLCODE:" + EditSqlcode(_sqlcodeDisplay));
+            Abend();                                          // PERFORM 9999-ABEND // source: COBTUPDT.cbl:224
         }
         // END-EVALUATE. EXIT. // source: COBTUPDT.cbl:225-226
     }
@@ -339,9 +339,9 @@ public sealed class TransactionTypeMaintenanceBatch
     // DISPLAY WS-RETURN-MSG; MOVE 4 TO RETURN-CODE; EXIT.
     // FAITHFUL BUG #1: this does NOT stop the run — it sets RC=4 and RETURNS; processing continues with
     // the next record.
-    private void Abend9999()
+    private void Abend()  // COBOL paragraph: 9999-ABEND
     {
-        _sysout.Add(_wsReturnMsg);                    // DISPLAY WS-RETURN-MSG // source: COBTUPDT.cbl:231
+        _sysout.Add(_returnMsg);                    // DISPLAY WS-RETURN-MSG // source: COBTUPDT.cbl:231
         _returnCode = 4;                              // MOVE 4 TO RETURN-CODE // source: COBTUPDT.cbl:232
         // EXIT. (returns to caller — no STOP/abend) // source: COBTUPDT.cbl:233
     }
@@ -350,7 +350,7 @@ public sealed class TransactionTypeMaintenanceBatch
     // 2001-CLOSE-STOP // source: COBTUPDT.cbl:234-236
     // CLOSE TR-RECORD; EXIT. (Despite the name it does NOT itself STOP RUN — the STOP RUN is in
     // 1001-READ-NEXT-RECORDS after the close.)
-    private void CloseStop2001()
+    private void CloseStop()  // COBOL paragraph: 2001-CLOSE-STOP
     {
         _fileOpen = false;                            // CLOSE TR-RECORD // source: COBTUPDT.cbl:235
         // EXIT. // source: COBTUPDT.cbl:236
@@ -448,12 +448,12 @@ public sealed class TransactionTypeMaintenanceBatch
     {
         if (text.Length >= 80)
         {
-            _wsReturnMsg = text[..80];                 // STRING stops at the field width (X(80)).
+            _returnMsg = text[..80];                 // STRING stops at the field width (X(80)).
         }
         else
         {
             // Overwrite positions 1..text.Length; keep the residual tail (faithful, no clear-to-spaces).
-            _wsReturnMsg = text + _wsReturnMsg[text.Length..];
+            _returnMsg = text + _returnMsg[text.Length..];
         }
     }
 

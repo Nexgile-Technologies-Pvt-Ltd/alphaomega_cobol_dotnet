@@ -196,7 +196,7 @@ public sealed class CustomerDataExportProgram
                 customer, account, xref, transaction, card, writer,
                 variants.Customer, variants.Account, variants.Xref, variants.Transaction, variants.Card,
                 clock, host);
-            program.MainProcessing0000();
+            program.MainProcessing();
             return program.Sysout;
         }
     }
@@ -204,27 +204,27 @@ public sealed class CustomerDataExportProgram
     // =================================================================================================
     // 0000-MAIN-PROCESSING // source: CBEXPORT.cbl:149-158
     // =================================================================================================
-    private void MainProcessing0000()
+    private void MainProcessing()  // COBOL paragraph: 0000-MAIN-PROCESSING
     {
-        Initialize1000();          // source: CBEXPORT.cbl:151
-        ExportCustomers2000();     // source: CBEXPORT.cbl:152
-        ExportAccounts3000();      // source: CBEXPORT.cbl:153
-        ExportXrefs4000();         // source: CBEXPORT.cbl:154
-        ExportTransactions5000();  // source: CBEXPORT.cbl:155
-        ExportCards5500();         // source: CBEXPORT.cbl:156
-        Finalize6000();            // source: CBEXPORT.cbl:157
+        Initialize();              // source: CBEXPORT.cbl:151
+        ExportCustomers();         // source: CBEXPORT.cbl:152
+        ExportAccounts();          // source: CBEXPORT.cbl:153
+        ExportXrefs();             // source: CBEXPORT.cbl:154
+        ExportTransactions();      // source: CBEXPORT.cbl:155
+        ExportCards();             // source: CBEXPORT.cbl:156
+        FinalizeExport();          // source: CBEXPORT.cbl:157
         // GOBACK // source: CBEXPORT.cbl:158
     }
 
     // =================================================================================================
     // 1000-INITIALIZE // source: CBEXPORT.cbl:161-169
     // =================================================================================================
-    private void Initialize1000()
+    private void Initialize()  // COBOL paragraph: 1000-INITIALIZE
     {
         _sysout.Add("CBEXPORT: Starting Customer Data Export");          // source: CBEXPORT.cbl:163
 
         // 1050-GENERATE-TIMESTAMP already ran in the constructor (one capture per run). // source: CBEXPORT.cbl:165
-        OpenFiles1100();                                                 // source: CBEXPORT.cbl:166
+        OpenFiles();                                                     // source: CBEXPORT.cbl:166
 
         _sysout.Add("CBEXPORT: Export Date: " + _exportDate);           // source: CBEXPORT.cbl:168
         _sysout.Add("CBEXPORT: Export Time: " + _exportTime);          // source: CBEXPORT.cbl:169
@@ -237,24 +237,24 @@ public sealed class CustomerDataExportProgram
     // phase; the export output writer is already open (created in Run with OPEN OUTPUT semantics). No input
     // open can fail here, so no per-file open ABEND fires (the abend wiring lives at the cursor/write
     // sites). // source: CBEXPORT.cbl:200-240
-    private static void OpenFiles1100()
+    private static void OpenFiles()  // COBOL paragraph: 1100-OPEN-FILES
     {
     }
 
     // =================================================================================================
     // 2000-EXPORT-CUSTOMERS // source: CBEXPORT.cbl:243-255
     // =================================================================================================
-    private void ExportCustomers2000()
+    private void ExportCustomers()  // COBOL paragraph: 2000-EXPORT-CUSTOMERS
     {
         _sysout.Add("CBEXPORT: Processing customer records");           // source: CBEXPORT.cbl:245
 
         _customer.StartBrowse();
-        string status = ReadCustomerRecord2100(out Customer? cust);     // priming read // source: CBEXPORT.cbl:247
+        string status = ReadCustomerRecord(out Customer? cust);         // priming read // source: CBEXPORT.cbl:247
 
         while (status == FileStatus.Ok)                                 // PERFORM UNTIL WS-CUSTOMER-EOF // source: CBEXPORT.cbl:249
         {
-            CreateCustomerExpRec2200(cust!);                            // source: CBEXPORT.cbl:250
-            status = ReadCustomerRecord2100(out cust);                  // source: CBEXPORT.cbl:251
+            CreateCustomerExportRecord(cust!);                         // source: CBEXPORT.cbl:250
+            status = ReadCustomerRecord(out cust);                     // source: CBEXPORT.cbl:251
         }
         _customer.EndBrowse();
 
@@ -263,20 +263,20 @@ public sealed class CustomerDataExportProgram
     }
 
     // 2100-READ-CUSTOMER-RECORD // source: CBEXPORT.cbl:258-266
-    private string ReadCustomerRecord2100(out Customer? cust)
+    private string ReadCustomerRecord(out Customer? cust)  // COBOL paragraph: 2100-READ-CUSTOMER-RECORD
     {
         string status = _customer.ReadNext(out cust);
         // IF NOT WS-CUSTOMER-OK AND NOT WS-CUSTOMER-EOF -> error + ABEND. Cursor returns only '00'/'10'.
         if (status != FileStatus.Ok && status != FileStatus.EndOfFile) // source: CBEXPORT.cbl:262
         {
             _sysout.Add("ERROR: Reading CUSTOMER-INPUT, Status: " + status); // source: CBEXPORT.cbl:263-264
-            AbendProgram9999();                                        // source: CBEXPORT.cbl:265
+            AbendProgram();                                            // source: CBEXPORT.cbl:265
         }
         return status;
     }
 
     // 2200-CREATE-CUSTOMER-EXP-REC // source: CBEXPORT.cbl:269-310
-    private void CreateCustomerExpRec2200(Customer c)
+    private void CreateCustomerExportRecord(Customer c)  // COBOL paragraph: 2200-CREATE-CUSTOMER-EXP-REC
     {
         FixedRecord exp = NewExportRecord(_customerVariant, "C");        // INITIALIZE + header // source: CBEXPORT.cbl:271-279
 
@@ -309,17 +309,17 @@ public sealed class CustomerDataExportProgram
     // =================================================================================================
     // 3000-EXPORT-ACCOUNTS // source: CBEXPORT.cbl:312-324
     // =================================================================================================
-    private void ExportAccounts3000()
+    private void ExportAccounts()  // COBOL paragraph: 3000-EXPORT-ACCOUNTS
     {
         _sysout.Add("CBEXPORT: Processing account records");            // source: CBEXPORT.cbl:314
 
         _account.StartBrowse();
-        string status = ReadAccountRecord3100(out Account? acct);       // source: CBEXPORT.cbl:316
+        string status = ReadAccountRecord(out Account? acct);           // source: CBEXPORT.cbl:316
 
         while (status == FileStatus.Ok)                                 // source: CBEXPORT.cbl:318
         {
-            CreateAccountExpRec3200(acct!);                            // source: CBEXPORT.cbl:319
-            status = ReadAccountRecord3100(out acct);                  // source: CBEXPORT.cbl:320
+            CreateAccountExportRecord(acct!);                         // source: CBEXPORT.cbl:319
+            status = ReadAccountRecord(out acct);                     // source: CBEXPORT.cbl:320
         }
         _account.EndBrowse();
 
@@ -328,19 +328,19 @@ public sealed class CustomerDataExportProgram
     }
 
     // 3100-READ-ACCOUNT-RECORD // source: CBEXPORT.cbl:327-335
-    private string ReadAccountRecord3100(out Account? acct)
+    private string ReadAccountRecord(out Account? acct)  // COBOL paragraph: 3100-READ-ACCOUNT-RECORD
     {
         string status = _account.ReadNext(out acct);
         if (status != FileStatus.Ok && status != FileStatus.EndOfFile) // source: CBEXPORT.cbl:331
         {
             _sysout.Add("ERROR: Reading ACCOUNT-INPUT, Status: " + status); // source: CBEXPORT.cbl:332-333
-            AbendProgram9999();                                        // source: CBEXPORT.cbl:334
+            AbendProgram();                                            // source: CBEXPORT.cbl:334
         }
         return status;
     }
 
     // 3200-CREATE-ACCOUNT-EXP-REC // source: CBEXPORT.cbl:338-373
-    private void CreateAccountExpRec3200(Account a)
+    private void CreateAccountExportRecord(Account a)  // COBOL paragraph: 3200-CREATE-ACCOUNT-EXP-REC
     {
         FixedRecord exp = NewExportRecord(_accountVariant, "A");        // INITIALIZE + header // source: CBEXPORT.cbl:340-348
 
@@ -367,17 +367,17 @@ public sealed class CustomerDataExportProgram
     // =================================================================================================
     // 4000-EXPORT-XREFS // source: CBEXPORT.cbl:376-388
     // =================================================================================================
-    private void ExportXrefs4000()
+    private void ExportXrefs()  // COBOL paragraph: 4000-EXPORT-XREFS
     {
         _sysout.Add("CBEXPORT: Processing cross-reference records");    // source: CBEXPORT.cbl:378
 
         _xref.StartBrowse();
-        string status = ReadXrefRecord4100(out CardXref? xref);         // source: CBEXPORT.cbl:380
+        string status = ReadXrefRecord(out CardXref? xref);             // source: CBEXPORT.cbl:380
 
         while (status == FileStatus.Ok)                                 // source: CBEXPORT.cbl:382
         {
-            CreateXrefExportRecord4200(xref!);                         // source: CBEXPORT.cbl:383
-            status = ReadXrefRecord4100(out xref);                     // source: CBEXPORT.cbl:384
+            CreateXrefExportRecord(xref!);                            // source: CBEXPORT.cbl:383
+            status = ReadXrefRecord(out xref);                        // source: CBEXPORT.cbl:384
         }
         _xref.EndBrowse();
 
@@ -386,19 +386,19 @@ public sealed class CustomerDataExportProgram
     }
 
     // 4100-READ-XREF-RECORD // source: CBEXPORT.cbl:391-399
-    private string ReadXrefRecord4100(out CardXref? xref)
+    private string ReadXrefRecord(out CardXref? xref)  // COBOL paragraph: 4100-READ-XREF-RECORD
     {
         string status = _xref.ReadNext(out xref);
         if (status != FileStatus.Ok && status != FileStatus.EndOfFile) // source: CBEXPORT.cbl:395
         {
             _sysout.Add("ERROR: Reading XREF-INPUT, Status: " + status); // source: CBEXPORT.cbl:396-397
-            AbendProgram9999();                                        // source: CBEXPORT.cbl:398
+            AbendProgram();                                            // source: CBEXPORT.cbl:398
         }
         return status;
     }
 
     // 4200-CREATE-XREF-EXPORT-RECORD // source: CBEXPORT.cbl:402-428
-    private void CreateXrefExportRecord4200(CardXref x)
+    private void CreateXrefExportRecord(CardXref x)  // COBOL paragraph: 4200-CREATE-XREF-EXPORT-RECORD
     {
         FixedRecord exp = NewExportRecord(_xrefVariant, "X");           // INITIALIZE + header // source: CBEXPORT.cbl:404-412
 
@@ -416,17 +416,17 @@ public sealed class CustomerDataExportProgram
     // =================================================================================================
     // 5000-EXPORT-TRANSACTIONS // source: CBEXPORT.cbl:431-443
     // =================================================================================================
-    private void ExportTransactions5000()
+    private void ExportTransactions()  // COBOL paragraph: 5000-EXPORT-TRANSACTIONS
     {
         _sysout.Add("CBEXPORT: Processing transaction records");        // source: CBEXPORT.cbl:433
 
         _transaction.StartBrowse();
-        string status = ReadTransactionRecord5100(out Transaction? tran); // source: CBEXPORT.cbl:435
+        string status = ReadTransactionRecord(out Transaction? tran);   // source: CBEXPORT.cbl:435
 
         while (status == FileStatus.Ok)                                 // source: CBEXPORT.cbl:437
         {
-            CreateTranExpRec5200(tran!);                               // source: CBEXPORT.cbl:438
-            status = ReadTransactionRecord5100(out tran);             // source: CBEXPORT.cbl:439
+            CreateTransactionExportRecord(tran!);                     // source: CBEXPORT.cbl:438
+            status = ReadTransactionRecord(out tran);                 // source: CBEXPORT.cbl:439
         }
         _transaction.EndBrowse();
 
@@ -435,19 +435,19 @@ public sealed class CustomerDataExportProgram
     }
 
     // 5100-READ-TRANSACTION-RECORD // source: CBEXPORT.cbl:446-454
-    private string ReadTransactionRecord5100(out Transaction? tran)
+    private string ReadTransactionRecord(out Transaction? tran)  // COBOL paragraph: 5100-READ-TRANSACTION-RECORD
     {
         string status = _transaction.ReadNext(out tran);
         if (status != FileStatus.Ok && status != FileStatus.EndOfFile) // source: CBEXPORT.cbl:450
         {
             _sysout.Add("ERROR: Reading TRANSACTION-INPUT, Status: " + status); // source: CBEXPORT.cbl:451-452
-            AbendProgram9999();                                        // source: CBEXPORT.cbl:453
+            AbendProgram();                                            // source: CBEXPORT.cbl:453
         }
         return status;
     }
 
     // 5200-CREATE-TRAN-EXP-REC // source: CBEXPORT.cbl:457-493
-    private void CreateTranExpRec5200(Transaction t)
+    private void CreateTransactionExportRecord(Transaction t)  // COBOL paragraph: 5200-CREATE-TRAN-EXP-REC
     {
         FixedRecord exp = NewExportRecord(_transactionVariant, "T");    // INITIALIZE + header // source: CBEXPORT.cbl:459-467
 
@@ -475,17 +475,17 @@ public sealed class CustomerDataExportProgram
     // =================================================================================================
     // 5500-EXPORT-CARDS // source: CBEXPORT.cbl:496-508
     // =================================================================================================
-    private void ExportCards5500()
+    private void ExportCards()  // COBOL paragraph: 5500-EXPORT-CARDS
     {
         _sysout.Add("CBEXPORT: Processing card records");               // source: CBEXPORT.cbl:498
 
         _card.StartBrowse();
-        string status = ReadCardRecord5600(out Card? card);             // source: CBEXPORT.cbl:500
+        string status = ReadCardRecord(out Card? card);                 // source: CBEXPORT.cbl:500
 
         while (status == FileStatus.Ok)                                 // source: CBEXPORT.cbl:502
         {
-            CreateCardExportRecord5700(card!);                        // source: CBEXPORT.cbl:503
-            status = ReadCardRecord5600(out card);                    // source: CBEXPORT.cbl:504
+            CreateCardExportRecord(card!);                            // source: CBEXPORT.cbl:503
+            status = ReadCardRecord(out card);                        // source: CBEXPORT.cbl:504
         }
         _card.EndBrowse();
 
@@ -494,19 +494,19 @@ public sealed class CustomerDataExportProgram
     }
 
     // 5600-READ-CARD-RECORD // source: CBEXPORT.cbl:511-519
-    private string ReadCardRecord5600(out Card? card)
+    private string ReadCardRecord(out Card? card)  // COBOL paragraph: 5600-READ-CARD-RECORD
     {
         string status = _card.ReadNext(out card);
         if (status != FileStatus.Ok && status != FileStatus.EndOfFile) // source: CBEXPORT.cbl:515
         {
             _sysout.Add("ERROR: Reading CARD-INPUT, Status: " + status); // source: CBEXPORT.cbl:516-517
-            AbendProgram9999();                                        // source: CBEXPORT.cbl:518
+            AbendProgram();                                            // source: CBEXPORT.cbl:518
         }
         return status;
     }
 
     // 5700-CREATE-CARD-EXPORT-RECORD // source: CBEXPORT.cbl:522-551
-    private void CreateCardExportRecord5700(Card d)
+    private void CreateCardExportRecord(Card d)  // COBOL paragraph: 5700-CREATE-CARD-EXPORT-RECORD
     {
         FixedRecord exp = NewExportRecord(_cardVariant, "D");           // INITIALIZE + header // source: CBEXPORT.cbl:524-532
 
@@ -527,7 +527,7 @@ public sealed class CustomerDataExportProgram
     // =================================================================================================
     // 6000-FINALIZE // source: CBEXPORT.cbl:554-573
     // =================================================================================================
-    private void Finalize6000()
+    private void FinalizeExport()  // COBOL paragraph: 6000-FINALIZE
     {
         // CLOSE all six files (CUSTOMER, ACCOUNT, XREF, TRANSACTION, CARD, EXPORT) — no status checks on
         // CLOSE (bug #4). The input cursors are already ended; the export writer is closed by the caller's
@@ -545,7 +545,7 @@ public sealed class CustomerDataExportProgram
     // =================================================================================================
     // 9999-ABEND-PROGRAM // source: CBEXPORT.cbl:576-579
     // =================================================================================================
-    private void AbendProgram9999()
+    private void AbendProgram()  // COBOL paragraph: 9999-ABEND-PROGRAM
     {
         _sysout.Add("CBEXPORT: ABENDING PROGRAM");                      // source: CBEXPORT.cbl:578
         // CALL 'CEE3ABD' (no arguments) -> immediate abnormal termination (bug #3). // source: CBEXPORT.cbl:579
@@ -590,7 +590,7 @@ public sealed class CustomerDataExportProgram
         {
             // source: CBEXPORT.cbl:303-307, 366-370, 421-425, 486-490, 544-548
             _sysout.Add("ERROR: Writing export record, Status: " + FileStatus.PermanentError);
-            AbendProgram9999();
+            AbendProgram();
         }
     }
 

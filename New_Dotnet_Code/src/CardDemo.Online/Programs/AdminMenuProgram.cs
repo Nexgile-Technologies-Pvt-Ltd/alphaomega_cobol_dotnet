@@ -23,7 +23,7 @@ namespace CardDemo.Online.Programs;
 /// <para>
 /// <c>EXEC CICS HANDLE CONDITION PGMIDERR(PGMIDERR-ERR-PARA)</c> is modelled as a try/catch around the
 /// option XCTL dispatch: when the target program is not installed (the registry cannot resolve it), the
-/// <see cref="PgmidErrErrPara"/> body runs — a green "not installed" message, a re-SEND, and the
+/// <see cref="HandleProgramNotInstalled"/> body runs — a green "not installed" message, a re-SEND, and the
 /// paragraph's own RETURN — matching the mainframe's PGMIDERR branch. source: COADM01C.cbl:77-79, 270-283.
 /// </para>
 /// <para><b>Faithful bugs reproduced (do NOT fix):</b></para>
@@ -57,15 +57,15 @@ public sealed class AdminMenuProgram : ITransactionHandler
 {
     // === WS-VARIABLES (WORKING-STORAGE) — COBOL VALUE clauses. source: COADM01C.cbl:35-48 ===
 
-    private const string WS_PGMNAME = "COADM01C"; // WS-PGMNAME PIC X(08). source: COADM01C.cbl:36
-    private const string WS_TRANID = "CA00";      // WS-TRANID  PIC X(04). source: COADM01C.cbl:37
+    private const string ProgramId = "COADM01C"; // WS-PGMNAME PIC X(08). source: COADM01C.cbl:36
+    private const string TranId = "CA00";        // WS-TRANID  PIC X(04). source: COADM01C.cbl:37
 
     // WS-ERR-FLG PIC X(01): 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. source: COADM01C.cbl:40-42
-    private string _wsErrFlg = "N";
-    private bool ErrFlgOn => _wsErrFlg == "Y"; // 88 ERR-FLG-ON
+    private string _errorFlag = "N"; // WS-ERR-FLG
+    private bool ErrorFlagOn => _errorFlag == "Y"; // 88 ERR-FLG-ON
 
-    private string _wsMessage = ""; // WS-MESSAGE PIC X(80). source: COADM01C.cbl:38
-    private int _wsOption;          // WS-OPTION  PIC 9(02) VALUE 0. source: COADM01C.cbl:46
+    private string _message = ""; // WS-MESSAGE PIC X(80). source: COADM01C.cbl:38
+    private int _option;          // WS-OPTION  PIC 9(02) VALUE 0. source: COADM01C.cbl:46
 
     // True once PROCESS-ENTER-KEY has done MOVE WS-OPTION TO OPTIONO (:129). On the first display
     // (:93 MOVE LOW-VALUES TO COADM1AO) and any non-ENTER SEND, OPTIONO stays LOW-VALUES and renders
@@ -79,23 +79,23 @@ public sealed class AdminMenuProgram : ITransactionHandler
     // === Constants from the copybooks referenced by the program ===
 
     /// <summary>CCDA-TITLE01 PIC X(40). source: COTTL01Y.cpy:18-20.</summary>
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
+    private const string Title01 = "      AWS Mainframe Modernization       ";
 
     /// <summary>CCDA-TITLE02 PIC X(40). source: COTTL01Y.cpy:21-23.</summary>
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
+    private const string Title02 = "              CardDemo                  ";
 
     /// <summary>CCDA-MSG-INVALID-KEY PIC X(50). source: CSMSG01Y.cpy:20-21.</summary>
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...         ";
+    private const string InvalidKeyMessage = "Invalid key pressed. Please see below...         ";
 
     /// <summary>CDEMO-ADMIN-OPT-COUNT PIC 9(02) VALUE 6 — only 6 options populated. source: COADM02Y.cpy:22.</summary>
-    private const int CDEMO_ADMIN_OPT_COUNT = 6;
+    private const int AdminOptionCount = 6;
 
     // === The CARDDEMO-ADMIN-MENU-OPTIONS table (copybook COADM02Y, REDEFINES gives 9 OCCURS slots) ===
     // 6 populated rows + 3 empty slots (FB-5). Each entry = NUM 9(02) + NAME X(35) + PGMNAME X(08).
     // source: COADM02Y.cpy:26-59.
     private readonly record struct AdminOpt(int Num, string Name, string PgmName);
 
-    private static readonly AdminOpt[] CdemoAdminOpt =
+    private static readonly AdminOpt[] AdminOptions =
     {
         new(1, "User List (Security)               ", "COUSR00C"), // source: COADM02Y.cpy:26-29
         new(2, "User Add (Security)                ", "COUSR01C"), // source: COADM02Y.cpy:31-34
@@ -109,16 +109,16 @@ public sealed class AdminMenuProgram : ITransactionHandler
     };
 
     /// <summary>
-    /// 1-based subscript into <see cref="CdemoAdminOpt"/> matching COBOL <c>CDEMO-ADMIN-OPT(idx)</c>.
+    /// 1-based subscript into <see cref="AdminOptions"/> matching COBOL <c>CDEMO-ADMIN-OPT(idx)</c>.
     /// A subscript of 0 or beyond the 9-slot table resolves to an empty record — the deterministic
     /// stand-in for COBOL's undefined subscript-0 / past-end storage. The CDEMO-ADMIN-OPT-COUNT=6
     /// range guard normally keeps callers in 1..6, so this only matters on the FB-1 fall-through.
     /// </summary>
     private static AdminOpt OptionAt(int idx) =>
-        idx >= 1 && idx <= CdemoAdminOpt.Length ? CdemoAdminOpt[idx - 1] : EmptyOpt;
+        idx >= 1 && idx <= AdminOptions.Length ? AdminOptions[idx - 1] : EmptyOption;
 
     /// <summary>The empty record returned for a 0 / out-of-range subscript (non-null fields).</summary>
-    private static readonly AdminOpt EmptyOpt = new(0, "", "");
+    private static readonly AdminOpt EmptyOption = new(0, "", "");
 
     // === CARDDEMO-COMMAREA (typed view) restored each turn; mirrors COCOM01Y. ===
     private CardDemoCommArea _commArea = new();
@@ -144,7 +144,7 @@ public sealed class AdminMenuProgram : ITransactionHandler
     /// The <c>HANDLE CONDITION PGMIDERR</c> probe: "is the XCTL target program installed?" Defaults to
     /// the program registry on the context (<see cref="CicsContext"/> has none of its own here, so the
     /// dispatcher injects this). When the registry cannot resolve the target the XCTL raises PGMIDERR
-    /// and <see cref="PgmidErrErrPara"/> runs. Overridable so the not-installed branch stays testable.
+    /// and <see cref="HandleProgramNotInstalled"/> runs. Overridable so the not-installed branch stays testable.
     /// source: COADM01C.cbl:77-79, 145-148, 270-283.
     /// </summary>
     public Func<string, bool>? IsProgramInstalled { get; set; }
@@ -152,19 +152,19 @@ public sealed class AdminMenuProgram : ITransactionHandler
     // === MAIN-PARA. source: COADM01C.cbl:75-114 ===
     public void Handle(CicsContext ctx)
     {
-        MainPara(ctx);
+        RunMainLogic(ctx);
     }
 
-    private void MainPara(CicsContext ctx)
+    private void RunMainLogic(CicsContext ctx) // COBOL paragraph: MAIN-PARA
     {
         // EXEC CICS HANDLE CONDITION PGMIDERR(PGMIDERR-ERR-PARA) — registered for the task; the XCTL in
         // PROCESS-ENTER-KEY is wrapped in a try/catch on PgmidErrCondition below. source: COADM01C.cbl:77-79
 
         // SET ERR-FLG-OFF TO TRUE. source: COADM01C.cbl:81
-        _wsErrFlg = "N";
+        _errorFlag = "N";
 
         // MOVE SPACES TO WS-MESSAGE, ERRMSGO OF COADM1AO. source: COADM01C.cbl:83-84
-        _wsMessage = "";
+        _message = "";
         _errMsgColor = null;
 
         if (ctx.EibCalen == 0) // IF EIBCALEN = 0. source: COADM01C.cbl:86
@@ -203,8 +203,8 @@ public sealed class AdminMenuProgram : ITransactionHandler
                         break;
 
                     default:                  // WHEN OTHER. source: COADM01C.cbl:103
-                        _wsErrFlg = "Y";                   // MOVE 'Y' TO WS-ERR-FLG. source: :104
-                        _wsMessage = CCDA_MSG_INVALID_KEY; // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. source: :105
+                        _errorFlag = "Y";                   // MOVE 'Y' TO WS-ERR-FLG. source: :104
+                        _message = InvalidKeyMessage; // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. source: :105
                         SendMenuScreen(ctx);               // PERFORM SEND-MENU-SCREEN. source: :106
                         break;
                 }
@@ -216,52 +216,52 @@ public sealed class AdminMenuProgram : ITransactionHandler
         // CICS would never reach the MAIN-PARA RETURN after an XCTL; mirror that by not overwriting an
         // existing outcome.
         if (ctx.Outcome is null)
-            ctx.ReturnTransId(WS_TRANID, _commArea);
+            ctx.ReturnTransId(TranId, _commArea);
     }
 
     // === PROCESS-ENTER-KEY. source: COADM01C.cbl:119-158 ===
     private void ProcessEnterKey(CicsContext ctx)
     {
         // OPTIONI OF COADM1AI — the 2-char keyed option field, as received (not trimmed).
-        string optionI = OptionInput();
+        string optionInput = OptionInput();
 
         // PERFORM VARYING WS-IDX FROM LENGTH OF OPTIONI BY -1 UNTIL
         //   OPTIONI(WS-IDX:1) NOT = SPACES OR WS-IDX = 1. source: COADM01C.cbl:121-125
-        int wsIdx = optionI.Length; // LENGTH OF OPTIONI = 2
-        while (!(CharAt(optionI, wsIdx) != ' ' || wsIdx == 1))
-            wsIdx--;
+        int index = optionInput.Length; // LENGTH OF OPTIONI = 2  // WS-IDX
+        while (!(CharAt(optionInput, index) != ' ' || index == 1))
+            index--;
 
         // MOVE OPTIONI(1:WS-IDX) TO WS-OPTION-X (PIC X(02) JUST RIGHT). source: COADM01C.cbl:126
-        string wsOptionX = JustRight(Substr(optionI, 1, wsIdx), 2);
+        string optionText = JustRight(Substr(optionInput, 1, index), 2); // WS-OPTION-X
         // INSPECT WS-OPTION-X REPLACING ALL ' ' BY '0'. source: COADM01C.cbl:127
-        wsOptionX = wsOptionX.Replace(' ', '0');
+        optionText = optionText.Replace(' ', '0');
         // MOVE WS-OPTION-X TO WS-OPTION (alphanumeric -> PIC 9(02)). source: COADM01C.cbl:128
-        _wsOption = ToNumeric2(wsOptionX);
+        _option = ToNumeric2(optionText);
         // MOVE WS-OPTION TO OPTIONO OF COADM1AO (echo, zero-padded). source: COADM01C.cbl:129
         _optionEchoed = true; // OPTIONO is now set; SEND-MENU-SCREEN will paint the echo (applied via OptionEcho).
 
         // IF WS-OPTION IS NOT NUMERIC OR WS-OPTION > CDEMO-ADMIN-OPT-COUNT OR WS-OPTION = ZEROS.
         // FB-6: the IS NOT NUMERIC disjunct is always false after the MOVE; kept verbatim.
         // source: COADM01C.cbl:131-138
-        if (IsNotNumeric(_wsOption) || _wsOption > CDEMO_ADMIN_OPT_COUNT || _wsOption == 0)
+        if (IsNotNumeric(_option) || _option > AdminOptionCount || _option == 0)
         {
-            _wsErrFlg = "Y";                                        // MOVE 'Y' TO WS-ERR-FLG. source: :134
-            _wsMessage = "Please enter a valid option number...";   // source: :135-136 (three dots, no trailing space)
+            _errorFlag = "Y";                                        // MOVE 'Y' TO WS-ERR-FLG. source: :134
+            _message = "Please enter a valid option number...";   // source: :135-136 (three dots, no trailing space)
             SendMenuScreen(ctx);                                    // PERFORM SEND-MENU-SCREEN. source: :137
             // FB-1: NO early exit — fall through to the IF NOT ERR-FLG-ON guard below.
         }
 
         // IF NOT ERR-FLG-ON. source: COADM01C.cbl:140
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
-            AdminOpt opt = OptionAt(_wsOption);
+            AdminOpt opt = OptionAt(_option);
 
             // IF CDEMO-ADMIN-OPT-PGMNAME(WS-OPTION)(1:5) NOT = 'DUMMY'. source: COADM01C.cbl:141
             // FB-8: no shipped entry begins with 'DUMMY', so the XCTL branch always runs for a valid option.
             if (Substr(opt.PgmName, 1, 5) != "DUMMY")
             {
-                _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :142
-                _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :143
+                _commArea.FromTranId = TranId;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :142
+                _commArea.FromProgram = ProgramId; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :143
                 _commArea.PgmContext = 0;           // MOVE ZEROS     TO CDEMO-PGM-CONTEXT. source: :144
 
                 // EXEC CICS XCTL PROGRAM(CDEMO-ADMIN-OPT-PGMNAME(WS-OPTION)) COMMAREA(CARDDEMO-COMMAREA).
@@ -274,19 +274,19 @@ public sealed class AdminMenuProgram : ITransactionHandler
                 }
 
                 // PGMIDERR raised: branch to PGMIDERR-ERR-PARA, which issues its OWN RETURN.
-                PgmidErrErrPara(ctx);
+                HandleProgramNotInstalled(ctx);
                 return;
             }
 
             // FB-1 fall-through (still inside IF NOT ERR-FLG-ON): for a 'DUMMY' (skipped) option this is
             // the intended green "not installed" info message; for a real, installed option the XCTL
             // above already left the program so this is dead code. source: COADM01C.cbl:150-157.
-            _wsMessage = "";               // MOVE SPACES   TO WS-MESSAGE. source: :150
+            _message = "";               // MOVE SPACES   TO WS-MESSAGE. source: :150
             _errMsgColor = BmsColor.Green; // MOVE DFHGREEN TO ERRMSGC OF COADM1AO (FB-3). source: :151
             // STRING 'This option ' DELIMITED BY SIZE, 'is not installed ...' DELIMITED BY SIZE INTO
             // WS-MESSAGE. FB-2: CDEMO-ADMIN-OPT-NAME(WS-OPTION) is commented out -> name omitted.
             // source: COADM01C.cbl:152-156.
-            _wsMessage = StringInto("This option ", "is not installed ...");
+            _message = StringInto("This option ", "is not installed ...");
 
             SendMenuScreen(ctx); // PERFORM SEND-MENU-SCREEN. source: :157
         }
@@ -319,7 +319,7 @@ public sealed class AdminMenuProgram : ITransactionHandler
             map.Field("OPTION").SetValue(OptionEcho());
 
         // MOVE WS-MESSAGE TO ERRMSGO OF COADM1AO. source: COADM01C.cbl:180
-        SetErrMsg(map, _wsMessage); // FB-4: clamps the X(80) message to the X(78) ERRMSGO field.
+        SetErrMsg(map, _message); // FB-4: clamps the X(80) message to the X(78) ERRMSGO field.
         if (_errMsgColor is { } c)  // ERRMSGC override (DFHGREEN on the not-installed path, FB-3). source: :151
             map.Field("ERRMSG").ColorOverride = c;
 
@@ -342,10 +342,10 @@ public sealed class AdminMenuProgram : ITransactionHandler
         // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: COADM01C.cbl:207
         DateTime now = ctx.Clock.Now;
 
-        map.Field("TITLE01").SetValue(CCDA_TITLE01); // MOVE CCDA-TITLE01 TO TITLE01O. source: :209
-        map.Field("TITLE02").SetValue(CCDA_TITLE02); // MOVE CCDA-TITLE02 TO TITLE02O. source: :210
-        map.Field("TRNNAME").SetValue(WS_TRANID);    // MOVE WS-TRANID    TO TRNNAMEO. source: :211
-        map.Field("PGMNAME").SetValue(WS_PGMNAME);   // MOVE WS-PGMNAME   TO PGMNAMEO. source: :212
+        map.Field("TITLE01").SetValue(Title01); // MOVE CCDA-TITLE01 TO TITLE01O. source: :209
+        map.Field("TITLE02").SetValue(Title02); // MOVE CCDA-TITLE02 TO TITLE02O. source: :210
+        map.Field("TRNNAME").SetValue(TranId);    // MOVE WS-TRANID    TO TRNNAMEO. source: :211
+        map.Field("PGMNAME").SetValue(ProgramId);   // MOVE WS-PGMNAME   TO PGMNAMEO. source: :212
 
         // Build mm/dd/yy from WS-CURDATE-MM/DD + WS-CURDATE-YEAR(3:2) (last 2 digits). source: :214-218
         map.Field("CURDATE").SetValue(now.ToString("MM/dd/yy"));
@@ -357,18 +357,18 @@ public sealed class AdminMenuProgram : ITransactionHandler
     private void BuildMenuOptions(BmsMap map)
     {
         // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL WS-IDX > CDEMO-ADMIN-OPT-COUNT (1..6). source: :231-232
-        for (int wsIdx = 1; !(wsIdx > CDEMO_ADMIN_OPT_COUNT); wsIdx++)
+        for (int index = 1; !(index > AdminOptionCount); index++) // WS-IDX
         {
-            AdminOpt opt = OptionAt(wsIdx);
+            AdminOpt opt = OptionAt(index);
 
             // MOVE SPACES TO WS-ADMIN-OPT-TXT (PIC X(40)). source: :234
             // STRING CDEMO-ADMIN-OPT-NUM(WS-IDX) || '. ' || CDEMO-ADMIN-OPT-NAME(WS-IDX). source: :236-239
             // All DELIMITED BY SIZE: num is PIC 9(02) (zero-padded), name is X(35) (full width).
-            string wsAdminOptTxt = Pic2(opt.Num) + ". " + opt.Name;
-            wsAdminOptTxt = ClampOrPad(wsAdminOptTxt, 40); // WS-ADMIN-OPT-TXT is X(40)
+            string optionText = Pic2(opt.Num) + ". " + opt.Name; // WS-ADMIN-OPT-TXT
+            optionText = ClampOrPad(optionText, 40); // WS-ADMIN-OPT-TXT is X(40)
 
             // EVALUATE WS-IDX -> OPTNnnnO (1..10; WHEN OTHER -> CONTINUE). source: :241-264
-            string field = wsIdx switch
+            string field = index switch
             {
                 1 => "OPTN001",
                 2 => "OPTN002",
@@ -383,29 +383,29 @@ public sealed class AdminMenuProgram : ITransactionHandler
                 _ => "", // WHEN OTHER -> CONTINUE (OPTN011/OPTN012 never populated). source: :262-263
             };
             if (field.Length > 0)
-                map.Field(field).SetValue(wsAdminOptTxt);
+                map.Field(field).SetValue(optionText);
         }
     }
 
     // === PGMIDERR-ERR-PARA. source: COADM01C.cbl:270-284 ===
     // HANDLE CONDITION target: an XCTL to a real-but-not-installed program. Issues its OWN RETURN.
-    private void PgmidErrErrPara(CicsContext ctx)
+    private void HandleProgramNotInstalled(CicsContext ctx) // COBOL paragraph: PGMIDERR-ERR-PARA
     {
         // MOVE SPACES   TO WS-MESSAGE. source: COADM01C.cbl:271
-        _wsMessage = "";
+        _message = "";
         // MOVE DFHGREEN TO ERRMSGC OF COADM1AO (FB-3). source: COADM01C.cbl:272
         _errMsgColor = BmsColor.Green;
         // STRING 'This option ' DELIMITED BY SIZE, 'is not installed ...' DELIMITED BY SIZE INTO
         // WS-MESSAGE. FB-2: CDEMO-ADMIN-OPT-NAME(WS-OPTION) commented out -> name omitted.
         // source: COADM01C.cbl:273-277.
-        _wsMessage = StringInto("This option ", "is not installed ...");
+        _message = StringInto("This option ", "is not installed ...");
 
         // PERFORM SEND-MENU-SCREEN. source: COADM01C.cbl:279
         SendMenuScreen(ctx);
 
         // EXEC CICS RETURN TRANSID(WS-TRANID) COMMAREA(CARDDEMO-COMMAREA). source: COADM01C.cbl:280-283
         // This paragraph's own RETURN — it does NOT fall back into MAIN-PARA's RETURN.
-        ctx.ReturnTransId(WS_TRANID, _commArea);
+        ctx.ReturnTransId(TranId, _commArea);
     }
 
     /// <summary>
@@ -436,7 +436,7 @@ public sealed class AdminMenuProgram : ITransactionHandler
     }
 
     /// <summary>MOVE WS-OPTION TO OPTIONO — the zero-padded 2-digit echo (PIC 9(02)). source: :129.</summary>
-    private string OptionEcho() => Pic2(_wsOption);
+    private string OptionEcho() => Pic2(_option);
 
     /// <summary>
     /// MOVE WS-MESSAGE TO ERRMSGO OF COADM1AO with the FB-4 clamp: ERRMSGO is X(78) but WS-MESSAGE is

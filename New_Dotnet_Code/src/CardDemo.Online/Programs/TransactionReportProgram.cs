@@ -68,68 +68,68 @@ public sealed class TransactionReportProgram : ITransactionHandler
     // =============================================================================================
     //  WS-VARIABLES — source: CORPT00C.cbl:36-79
     // =============================================================================================
-    private const string WS_PGMNAME = "CORPT00C";       // 05 WS-PGMNAME PIC X(08) VALUE 'CORPT00C'. source: :37
-    private const string WS_TRANID = "CR00";            // 05 WS-TRANID  PIC X(04) VALUE 'CR00'.     source: :38
-    private const string WS_TRANSACT_FILE = "TRANSACT"; // 05 WS-TRANSACT-FILE PIC X(08) VALUE 'TRANSACT' (dead, FB-6). source: :40
+    private const string ProgramId = "CORPT00C";       // WS-PGMNAME: 05 WS-PGMNAME PIC X(08) VALUE 'CORPT00C'. source: :37
+    private const string TransactionId = "CR00";       // WS-TRANID: 05 WS-TRANID  PIC X(04) VALUE 'CR00'.     source: :38
+    private const string TransactFileName = "TRANSACT"; // WS-TRANSACT-FILE: 05 WS-TRANSACT-FILE PIC X(08) VALUE 'TRANSACT' (dead, FB-6). source: :40
 
-    private string _wsMessage = "";                     // 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :39
+    private string _message = "";                     // 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :39
 
     // 05 WS-ERR-FLG PIC X(01) VALUE 'N'. 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. source: :41-43
-    private bool _errFlgOn;
-    private bool ErrFlgOn => _errFlgOn;
+    private bool _errorFlagOn;
+    private bool ErrorFlagOn => _errorFlagOn;
 
     // 05 WS-TRANSACT-EOF PIC X(01) VALUE 'N'. 88 TRANSACT-EOF='Y'/TRANSACT-NOT-EOF='N' (dead, FB-6). source: :44-46
-    private char _wsTransactEof = 'N';
+    private char _transactEof = 'N';
 
     // 05 WS-SEND-ERASE-FLG PIC X(01) VALUE 'Y'. 88 SEND-ERASE-YES='Y'/SEND-ERASE-NO='N'. source: :47-49
     // Set to Y once at :167 and never changed -> SEND always ERASEs; the no-ERASE arm is dead (FB-6).
-    private char _wsSendEraseFlg = 'Y';
-    private bool SendEraseYes => _wsSendEraseFlg == 'Y';
+    private char _sendEraseFlag = 'Y';
+    private bool SendEraseYes => _sendEraseFlag == 'Y';
 
     // 05 WS-END-LOOP PIC X(01) VALUE 'N'. 88 END-LOOP-YES='Y'/END-LOOP-NO='N'. source: :50-52
     private bool _endLoopYes;
 
     // 05 WS-RESP-CD / WS-REAS-CD PIC S9(09) COMP VALUE ZEROS. source: :54-55
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode;
+    private int _reasonCode;
 
     // 05 WS-REC-COUNT PIC S9(04) COMP (declared, dead, FB-6). source: :56
-    private int _wsRecCount;
+    private int _recordCount;
     // 05 WS-IDX PIC S9(04) COMP — JCL-line loop subscript. source: :57
-    private int _wsIdx;
+    private int _index;
     // 05 WS-REPORT-NAME PIC X(10) VALUE SPACES — 'Monthly'/'Yearly'/'Custom'. source: :58
-    private string _wsReportName = "";
+    private string _reportName = "";
 
     // 05 WS-START-DATE group = YYYY '-' MM '-' DD (10 chars, ISO). source: :60-65
-    private string _wsStartDateYyyy = "    ";
-    private string _wsStartDateMm = "  ";
-    private string _wsStartDateDd = "  ";
-    private string WsStartDate => _wsStartDateYyyy + "-" + _wsStartDateMm + "-" + _wsStartDateDd;
+    private string _startDateYear = "    ";
+    private string _startDateMonth = "  ";
+    private string _startDateDay = "  ";
+    private string StartDate => _startDateYear + "-" + _startDateMonth + "-" + _startDateDay;
     // 05 WS-END-DATE group = YYYY '-' MM '-' DD (10 chars). source: :66-71
-    private string _wsEndDateYyyy = "    ";
-    private string _wsEndDateMm = "  ";
-    private string _wsEndDateDd = "  ";
-    private string WsEndDate => _wsEndDateYyyy + "-" + _wsEndDateMm + "-" + _wsEndDateDd;
+    private string _endDateYear = "    ";
+    private string _endDateMonth = "  ";
+    private string _endDateDay = "  ";
+    private string EndDate => _endDateYear + "-" + _endDateMonth + "-" + _endDateDay;
 
     // 05 WS-DATE-FORMAT PIC X(10) VALUE 'YYYY-MM-DD' — mask passed to CSUTLDTC. source: :72
-    private const string WS_DATE_FORMAT = "YYYY-MM-DD";
+    private const string DateFormat = "YYYY-MM-DD"; // WS-DATE-FORMAT
 
     // 05 WS-NUM-99 PIC 99 VALUE 0, WS-NUM-9999 PIC 9999 VALUE 0 — NUMVAL-C scratch. source: :74-75
-    private int _wsNum99;
-    private int _wsNum9999;
+    private int _num99;
+    private int _num9999;
 
     // 05 WS-TRAN-AMT PIC +99999999.99 / WS-TRAN-DATE PIC X(08) VALUE '00/00/00' (dead, FB-6). source: :77-78
-    private string _wsTranDate = "00/00/00";
+    private string _tranDate = "00/00/00";
     // 05 JCL-RECORD PIC X(80) VALUE ' ' — one 80-byte JCL line buffer written to TDQ. source: :79
     private string _jclRecord = new string(' ', 80);
 
     // CSUTLDTC-PARM (call-area for the date validator). source: :129-136
-    private string _csutldtcResult = new string(' ', 80);
+    private string _dateValidationResult = new string(' ', 80);
 
     // CCDA-* (COTTL01Y / CSMSG01Y) — shared header titles + the invalid-key message.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";  // COTTL01Y CCDA-TITLE01
-    private const string CCDA_TITLE02 = "              CardDemo                  ";  // COTTL01Y CCDA-TITLE02
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...";          // CSMSG01Y
+    private const string Title01 = "      AWS Mainframe Modernization       ";  // COTTL01Y CCDA-TITLE01
+    private const string Title02 = "              CardDemo                  ";  // COTTL01Y CCDA-TITLE02
+    private const string InvalidKeyMessage = "Invalid key pressed. Please see below...";          // CSMSG01Y
 
     // =============================================================================================
     //  COMMAREA (typed view) + per-turn map. source: :154-157,176,199-202
@@ -157,10 +157,10 @@ public sealed class TransactionReportProgram : ITransactionHandler
     public TransactionReportProgram() => _db = null;
 
     /// <inheritdoc/>
-    public string ProgramName => WS_PGMNAME; // PROGRAM-ID. CORPT00C. source: :24
+    public string ProgramName => ProgramId; // PROGRAM-ID. CORPT00C. source: :24
 
     /// <inheritdoc/>
-    public string TransId => WS_TRANID;      // CSD: CR00 -> CORPT00C. source: CSD_TRANSACTIONS.md:80; cbl:38
+    public string TransId => TransactionId;      // CSD: CR00 -> CORPT00C. source: CSD_TRANSACTIONS.md:80; cbl:38
 
     // =============================================================================================
     //  MAIN-PARA — source: CORPT00C.cbl:163-202
@@ -172,11 +172,11 @@ public sealed class TransactionReportProgram : ITransactionHandler
         _map = BuildMap();
         JobsQueue.Clear();
 
-        _errFlgOn = false;          // SET ERR-FLG-OFF       TO TRUE. source: :165
-        _wsTransactEof = 'N';       // SET TRANSACT-NOT-EOF  TO TRUE. source: :166
-        _wsSendEraseFlg = 'Y';      // SET SEND-ERASE-YES    TO TRUE. source: :167
+        _errorFlagOn = false;          // SET ERR-FLG-OFF       TO TRUE. source: :165
+        _transactEof = 'N';       // SET TRANSACT-NOT-EOF  TO TRUE. source: :166
+        _sendEraseFlag = 'Y';      // SET SEND-ERASE-YES    TO TRUE. source: :167
 
-        _wsMessage = "";                                       // MOVE SPACES TO WS-MESSAGE. source: :169
+        _message = "";                                       // MOVE SPACES TO WS-MESSAGE. source: :169
         _map.Field("ERRMSG").SetValue("", setMdt: false);      //               ERRMSGO OF CORPT0AO. source: :170
 
         if (ctx.EibCalen == 0)
@@ -218,9 +218,9 @@ public sealed class TransactionReportProgram : ITransactionHandler
                         return;                            // XCTL terminates this task.
                     default:
                         // WHEN OTHER. source: :190-194
-                        _errFlgOn = true;                          // MOVE 'Y' TO WS-ERR-FLG. source: :191
+                        _errorFlagOn = true;                          // MOVE 'Y' TO WS-ERR-FLG. source: :191
                         _map.Field("MONTHLY").CursorLength = -1;   // MOVE -1 TO MONTHLYL. source: :192
-                        _wsMessage = CCDA_MSG_INVALID_KEY;         // MOVE CCDA-MSG-INVALID-KEY. source: :193
+                        _message = InvalidKeyMessage;         // MOVE CCDA-MSG-INVALID-KEY. source: :193
                         SendTrnrptScreen(ctx);                     // PERFORM SEND-TRNRPT-SCREEN. source: :194
                         return;                                    // SEND-TRNRPT-SCREEN RETURNs to CICS (FB-1).
                 }
@@ -230,7 +230,7 @@ public sealed class TransactionReportProgram : ITransactionHandler
         // EXEC CICS RETURN TRANSID(WS-TRANID) COMMAREA(CARDDEMO-COMMAREA). source: :199-202
         // (Reached only when PROCESS-ENTER-KEY ran to completion without any SEND-TRNRPT-SCREEN — which it
         //  never does, since its success tail always SENDs; kept for structural fidelity to MAIN-PARA.)
-        ctx.ReturnTransId(WS_TRANID, _commArea);
+        ctx.ReturnTransId(TransactionId, _commArea);
     }
 
     // =============================================================================================
@@ -248,7 +248,7 @@ public sealed class TransactionReportProgram : ITransactionHandler
         if (NotSpacesOrLow(monthly))
         {
             // WHEN MONTHLYI NOT = SPACES AND LOW-VALUES (Monthly). source: :213-238
-            _wsReportName = "Monthly";                                  // MOVE 'Monthly' TO WS-REPORT-NAME. source: :214
+            _reportName = "Monthly";                                  // MOVE 'Monthly' TO WS-REPORT-NAME. source: :214
 
             // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: :215
             DateTime now = ctx.Clock.Now;
@@ -257,10 +257,10 @@ public sealed class TransactionReportProgram : ITransactionHandler
             int day = now.Day;
 
             // Start date = first of current month. source: :217-221
-            _wsStartDateYyyy = Four(year);
-            _wsStartDateMm = Two(month);
-            _wsStartDateDd = "01";
-            string startDate = WsStartDate;
+            _startDateYear = Four(year);
+            _startDateMonth = Two(month);
+            _startDateDay = "01";
+            string startDate = StartDate;
             SetParmStartDate(startDate);                                // PARM-START-DATE-1 / -2. source: :220-221
 
             // End date = last day of current month = (first of next month) - 1 day (FB-8). source: :223-230
@@ -279,10 +279,10 @@ public sealed class TransactionReportProgram : ITransactionHandler
             month = lastOfMonth.Month;
             day = lastOfMonth.Day;
 
-            _wsEndDateYyyy = Four(year);                                // source: :232
-            _wsEndDateMm = Two(month);                                  // source: :233
-            _wsEndDateDd = Two(day);                                    // source: :234
-            SetParmEndDate(WsEndDate);                                  // PARM-END-DATE-1 / -2. source: :235-236
+            _endDateYear = Four(year);                                // source: :232
+            _endDateMonth = Two(month);                                  // source: :233
+            _endDateDay = Two(day);                                    // source: :234
+            SetParmEndDate(EndDate);                                  // PARM-END-DATE-1 / -2. source: :235-236
 
             SubmitJobToIntrdr(ctx);                                     // PERFORM SUBMIT-JOB-TO-INTRDR. source: :238
             if (ctx.Outcome is not null) return;
@@ -290,22 +290,22 @@ public sealed class TransactionReportProgram : ITransactionHandler
         else if (NotSpacesOrLow(yearly))
         {
             // WHEN YEARLYI NOT = SPACES AND LOW-VALUES (Yearly). source: :239-255
-            _wsReportName = "Yearly";                                   // MOVE 'Yearly' TO WS-REPORT-NAME. source: :240
+            _reportName = "Yearly";                                   // MOVE 'Yearly' TO WS-REPORT-NAME. source: :240
 
             DateTime now = ctx.Clock.Now;                              // MOVE FUNCTION CURRENT-DATE. source: :241
             int year = now.Year;
 
             // Start = Jan 1 of current year. source: :243-248
-            _wsStartDateYyyy = Four(year);
-            _wsEndDateYyyy = Four(year);                                // WS-START-DATE-YYYY = WS-END-DATE-YYYY. source: :243-244
-            _wsStartDateMm = "01";                                      // source: :245-246
-            _wsStartDateDd = "01";
-            SetParmStartDate(WsStartDate);                             // PARM-START-DATE-1 / -2. source: :247-248
+            _startDateYear = Four(year);
+            _endDateYear = Four(year);                                // WS-START-DATE-YYYY = WS-END-DATE-YYYY. source: :243-244
+            _startDateMonth = "01";                                      // source: :245-246
+            _startDateDay = "01";
+            SetParmStartDate(StartDate);                             // PARM-START-DATE-1 / -2. source: :247-248
 
             // End = Dec 31 of current year. source: :250-253
-            _wsEndDateMm = "12";
-            _wsEndDateDd = "31";
-            SetParmEndDate(WsEndDate);                                 // PARM-END-DATE-1 / -2. source: :252-253
+            _endDateMonth = "12";
+            _endDateDay = "31";
+            SetParmEndDate(EndDate);                                 // PARM-END-DATE-1 / -2. source: :252-253
 
             SubmitJobToIntrdr(ctx);                                     // PERFORM SUBMIT-JOB-TO-INTRDR. source: :255
             if (ctx.Outcome is not null) return;
@@ -319,20 +319,20 @@ public sealed class TransactionReportProgram : ITransactionHandler
         else
         {
             // WHEN OTHER (no report type selected). source: :437-442
-            _wsMessage = "Select a report type to print report...";    // source: :438-439
-            _errFlgOn = true;                                          // MOVE 'Y' TO WS-ERR-FLG. source: :440
+            _message = "Select a report type to print report...";    // source: :438-439
+            _errorFlagOn = true;                                          // MOVE 'Y' TO WS-ERR-FLG. source: :440
             _map.Field("MONTHLY").CursorLength = -1;                   // MOVE -1 TO MONTHLYL. source: :441
             SendTrnrptScreen(ctx);                                     // PERFORM SEND-TRNRPT-SCREEN. source: :442
             if (ctx.Outcome is not null) return;
         }
 
         // Success tail — IF NOT ERR-FLG-ON. source: :445-456
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
             InitializeAllFields();                                     // PERFORM INITIALIZE-ALL-FIELDS. source: :447
             _map.Field("ERRMSG").ColorOverride = BmsColor.Green;       // MOVE DFHGREEN TO ERRMSGC. source: :448
             // STRING WS-REPORT-NAME (DELIM SPACE) ' report submitted for printing ...' (DELIM SIZE). source: :449-452
-            _wsMessage = DelimBySpace(_wsReportName) + " report submitted for printing ...";
+            _message = DelimBySpace(_reportName) + " report submitted for printing ...";
             _map.Field("MONTHLY").CursorLength = -1;                   // MOVE -1 TO MONTHLYL. source: :453
             SendTrnrptScreen(ctx);                                     // PERFORM SEND-TRNRPT-SCREEN. source: :454
         }
@@ -353,43 +353,43 @@ public sealed class TransactionReportProgram : ITransactionHandler
         // Empty-field guard (EVALUATE TRUE, first matching wins). source: :258-303
         if (IsSpacesOrLowValues(sdtMm))
         {
-            _wsMessage = "Start Date - Month can NOT be empty...";     // source: :261-262
-            _errFlgOn = true;                                          // source: :263
+            _message = "Start Date - Month can NOT be empty...";     // source: :261-262
+            _errorFlagOn = true;                                          // source: :263
             _map.Field("SDTMM").CursorLength = -1;                     // MOVE -1 TO SDTMML. source: :264
             SendTrnrptScreen(ctx); return;                            // source: :265 (FB-1)
         }
         else if (IsSpacesOrLowValues(sdtDd))
         {
-            _wsMessage = "Start Date - Day can NOT be empty...";       // source: :268-269
-            _errFlgOn = true;                                          // source: :270
+            _message = "Start Date - Day can NOT be empty...";       // source: :268-269
+            _errorFlagOn = true;                                          // source: :270
             _map.Field("SDTDD").CursorLength = -1;                     // MOVE -1 TO SDTDDL. source: :271
             SendTrnrptScreen(ctx); return;                            // source: :272 (FB-1)
         }
         else if (IsSpacesOrLowValues(sdtYyyy))
         {
-            _wsMessage = "Start Date - Year can NOT be empty...";      // source: :275-276
-            _errFlgOn = true;                                          // source: :277
+            _message = "Start Date - Year can NOT be empty...";      // source: :275-276
+            _errorFlagOn = true;                                          // source: :277
             _map.Field("SDTYYYY").CursorLength = -1;                   // MOVE -1 TO SDTYYYYL. source: :278
             SendTrnrptScreen(ctx); return;                            // source: :279 (FB-1)
         }
         else if (IsSpacesOrLowValues(edtMm))
         {
-            _wsMessage = "End Date - Month can NOT be empty...";       // source: :282-283
-            _errFlgOn = true;                                          // source: :284
+            _message = "End Date - Month can NOT be empty...";       // source: :282-283
+            _errorFlagOn = true;                                          // source: :284
             _map.Field("EDTMM").CursorLength = -1;                     // MOVE -1 TO EDTMML. source: :285
             SendTrnrptScreen(ctx); return;                            // source: :286 (FB-1)
         }
         else if (IsSpacesOrLowValues(edtDd))
         {
-            _wsMessage = "End Date - Day can NOT be empty...";         // source: :289-290
-            _errFlgOn = true;                                          // source: :291
+            _message = "End Date - Day can NOT be empty...";         // source: :289-290
+            _errorFlagOn = true;                                          // source: :291
             _map.Field("EDTDD").CursorLength = -1;                     // MOVE -1 TO EDTDDL. source: :292
             SendTrnrptScreen(ctx); return;                            // source: :293 (FB-1)
         }
         else if (IsSpacesOrLowValues(edtYyyy))
         {
-            _wsMessage = "End Date - Year can NOT be empty...";        // source: :296-297
-            _errFlgOn = true;                                          // source: :298
+            _message = "End Date - Year can NOT be empty...";        // source: :296-297
+            _errorFlagOn = true;                                          // source: :298
             _map.Field("EDTYYYY").CursorLength = -1;                   // MOVE -1 TO EDTYYYYL. source: :299
             SendTrnrptScreen(ctx); return;                            // source: :300 (FB-1)
         }
@@ -397,100 +397,100 @@ public sealed class TransactionReportProgram : ITransactionHandler
 
         // NUMVAL-C normalization of all six date parts; re-echo zero-padded into the INPUT fields (FB-2).
         // source: :305-327
-        _wsNum99 = NumValC2(sdtMm);   sdtMm = Pic2(_wsNum99);   _map.Field("SDTMM").SetValue(sdtMm, setMdt: false);     // :305-307
-        _wsNum99 = NumValC2(sdtDd);   sdtDd = Pic2(_wsNum99);   _map.Field("SDTDD").SetValue(sdtDd, setMdt: false);     // :309-311
-        _wsNum9999 = NumValC4(sdtYyyy); sdtYyyy = Pic4(_wsNum9999); _map.Field("SDTYYYY").SetValue(sdtYyyy, setMdt: false); // :313-315
-        _wsNum99 = NumValC2(edtMm);   edtMm = Pic2(_wsNum99);   _map.Field("EDTMM").SetValue(edtMm, setMdt: false);     // :317-319
-        _wsNum99 = NumValC2(edtDd);   edtDd = Pic2(_wsNum99);   _map.Field("EDTDD").SetValue(edtDd, setMdt: false);     // :321-323
-        _wsNum9999 = NumValC4(edtYyyy); edtYyyy = Pic4(_wsNum9999); _map.Field("EDTYYYY").SetValue(edtYyyy, setMdt: false); // :325-327
+        _num99 = NumValC2(sdtMm);   sdtMm = Pic2(_num99);   _map.Field("SDTMM").SetValue(sdtMm, setMdt: false);     // :305-307
+        _num99 = NumValC2(sdtDd);   sdtDd = Pic2(_num99);   _map.Field("SDTDD").SetValue(sdtDd, setMdt: false);     // :309-311
+        _num9999 = NumValC4(sdtYyyy); sdtYyyy = Pic4(_num9999); _map.Field("SDTYYYY").SetValue(sdtYyyy, setMdt: false); // :313-315
+        _num99 = NumValC2(edtMm);   edtMm = Pic2(_num99);   _map.Field("EDTMM").SetValue(edtMm, setMdt: false);     // :317-319
+        _num99 = NumValC2(edtDd);   edtDd = Pic2(_num99);   _map.Field("EDTDD").SetValue(edtDd, setMdt: false);     // :321-323
+        _num9999 = NumValC4(edtYyyy); edtYyyy = Pic4(_num9999); _map.Field("EDTYYYY").SetValue(edtYyyy, setMdt: false); // :325-327
 
         // Range/numeric validations (each independent IF, no ELSE, no early exit — FB-1 makes the first
         // failing SEND terminate the task). String comparisons '> 12' / '> 31' are alphanumeric on the field.
         if (!IsNumeric2(sdtMm) || string.CompareOrdinal(sdtMm, "12") > 0)
         {
-            _wsMessage = "Start Date - Not a valid Month...";          // source: :331-332
-            _errFlgOn = true;                                          // source: :333
+            _message = "Start Date - Not a valid Month...";          // source: :331-332
+            _errorFlagOn = true;                                          // source: :333
             _map.Field("SDTMM").CursorLength = -1;                     // MOVE -1 TO SDTMML. source: :334
             SendTrnrptScreen(ctx); return;                            // source: :335 (FB-1)
         }
         if (!IsNumeric2(sdtDd) || string.CompareOrdinal(sdtDd, "31") > 0)
         {
-            _wsMessage = "Start Date - Not a valid Day...";            // source: :340-341
-            _errFlgOn = true;                                          // source: :342
+            _message = "Start Date - Not a valid Day...";            // source: :340-341
+            _errorFlagOn = true;                                          // source: :342
             _map.Field("SDTDD").CursorLength = -1;                     // MOVE -1 TO SDTDDL. source: :343
             SendTrnrptScreen(ctx); return;                            // source: :344 (FB-1)
         }
         if (!IsNumeric4(sdtYyyy))
         {
-            _wsMessage = "Start Date - Not a valid Year...";           // source: :348-349
-            _errFlgOn = true;                                          // source: :350
+            _message = "Start Date - Not a valid Year...";           // source: :348-349
+            _errorFlagOn = true;                                          // source: :350
             _map.Field("SDTYYYY").CursorLength = -1;                   // MOVE -1 TO SDTYYYYL. source: :351
             SendTrnrptScreen(ctx); return;                            // source: :352 (FB-1)
         }
         if (!IsNumeric2(edtMm) || string.CompareOrdinal(edtMm, "12") > 0)
         {
-            _wsMessage = "End Date - Not a valid Month...";            // source: :357-358
-            _errFlgOn = true;                                          // source: :359
+            _message = "End Date - Not a valid Month...";            // source: :357-358
+            _errorFlagOn = true;                                          // source: :359
             _map.Field("EDTMM").CursorLength = -1;                     // MOVE -1 TO EDTMML. source: :360
             SendTrnrptScreen(ctx); return;                            // source: :361 (FB-1)
         }
         if (!IsNumeric2(edtDd) || string.CompareOrdinal(edtDd, "31") > 0)
         {
-            _wsMessage = "End Date - Not a valid Day...";              // source: :366-367
-            _errFlgOn = true;                                          // source: :368
+            _message = "End Date - Not a valid Day...";              // source: :366-367
+            _errorFlagOn = true;                                          // source: :368
             _map.Field("EDTDD").CursorLength = -1;                     // MOVE -1 TO EDTDDL. source: :369
             SendTrnrptScreen(ctx); return;                            // source: :370 (FB-1)
         }
         if (!IsNumeric4(edtYyyy))
         {
-            _wsMessage = "End Date - Not a valid Year...";             // source: :374-375
-            _errFlgOn = true;                                          // source: :376
+            _message = "End Date - Not a valid Year...";             // source: :374-375
+            _errorFlagOn = true;                                          // source: :376
             _map.Field("EDTYYYY").CursorLength = -1;                   // MOVE -1 TO EDTYYYYL. source: :377
             SendTrnrptScreen(ctx); return;                            // source: :378 (FB-1)
         }
 
         // Build dates from inputs. source: :381-386
-        _wsStartDateYyyy = sdtYyyy;
-        _wsStartDateMm = sdtMm;
-        _wsStartDateDd = sdtDd;
-        _wsEndDateYyyy = edtYyyy;
-        _wsEndDateMm = edtMm;
-        _wsEndDateDd = edtDd;
+        _startDateYear = sdtYyyy;
+        _startDateMonth = sdtMm;
+        _startDateDay = sdtDd;
+        _endDateYear = edtYyyy;
+        _endDateMonth = edtMm;
+        _endDateDay = edtDd;
 
         // CSUTLDTC start-date validation. source: :388-406
         // MOVE WS-START-DATE TO CSUTLDTC-DATE; WS-DATE-FORMAT TO CSUTLDTC-DATE-FORMAT; SPACES TO RESULT.
-        _csutldtcResult = DateValidationUtility(WsStartDate, WS_DATE_FORMAT);       // CALL 'CSUTLDTC'. source: :392-394
-        if (SevCd(_csutldtcResult) == "0000")
+        _dateValidationResult = DateValidationUtility(StartDate, DateFormat);       // CALL 'CSUTLDTC'. source: :392-394
+        if (SevCd(_dateValidationResult) == "0000")
         {
             // CONTINUE. source: :396-397
         }
-        else if (MsgNum(_csutldtcResult) != "2513")
+        else if (MsgNum(_dateValidationResult) != "2513")
         {
-            _wsMessage = "Start Date - Not a valid date...";           // source: :400-401
-            _errFlgOn = true;                                          // source: :402
+            _message = "Start Date - Not a valid date...";           // source: :400-401
+            _errorFlagOn = true;                                          // source: :402
             _map.Field("SDTMM").CursorLength = -1;                     // MOVE -1 TO SDTMML. source: :403
             SendTrnrptScreen(ctx); return;                            // source: :404 (FB-1)
         }
 
         // CSUTLDTC end-date validation. source: :408-426
-        _csutldtcResult = DateValidationUtility(WsEndDate, WS_DATE_FORMAT);         // CALL 'CSUTLDTC'. source: :412-414
-        if (SevCd(_csutldtcResult) == "0000")
+        _dateValidationResult = DateValidationUtility(EndDate, DateFormat);         // CALL 'CSUTLDTC'. source: :412-414
+        if (SevCd(_dateValidationResult) == "0000")
         {
             // CONTINUE. source: :416-417
         }
-        else if (MsgNum(_csutldtcResult) != "2513")
+        else if (MsgNum(_dateValidationResult) != "2513")
         {
-            _wsMessage = "End Date - Not a valid date...";             // source: :420-421
-            _errFlgOn = true;                                          // source: :422
+            _message = "End Date - Not a valid date...";             // source: :420-421
+            _errorFlagOn = true;                                          // source: :422
             _map.Field("EDTMM").CursorLength = -1;                     // MOVE -1 TO EDTMML. source: :423
             SendTrnrptScreen(ctx); return;                            // source: :424 (FB-1)
         }
 
         // Move dates to the PARM placeholders; WS-REPORT-NAME='Custom'; submit if no error. source: :429-436
-        SetParmStartDate(WsStartDate);                                // source: :429-430
-        SetParmEndDate(WsEndDate);                                    // source: :431-432
-        _wsReportName = "Custom";                                     // MOVE 'Custom' TO WS-REPORT-NAME. source: :433
-        if (!ErrFlgOn)                                                // IF NOT ERR-FLG-ON. source: :434
+        SetParmStartDate(StartDate);                                // source: :429-430
+        SetParmEndDate(EndDate);                                    // source: :431-432
+        _reportName = "Custom";                                     // MOVE 'Custom' TO WS-REPORT-NAME. source: :433
+        if (!ErrorFlagOn)                                                // IF NOT ERR-FLG-ON. source: :434
         {
             SubmitJobToIntrdr(ctx);                                   // PERFORM SUBMIT-JOB-TO-INTRDR. source: :435
             if (ctx.Outcome is not null) return;
@@ -508,35 +508,35 @@ public sealed class TransactionReportProgram : ITransactionHandler
         if (IsSpacesOrLowValues(confirm))
         {
             // STRING 'Please confirm to print the ' WS-REPORT-NAME(DELIM SPACE) ' report...'. source: :465-470
-            _wsMessage = "Please confirm to print the " + DelimBySpace(_wsReportName) + " report...";
-            _errFlgOn = true;                                          // source: :471
+            _message = "Please confirm to print the " + DelimBySpace(_reportName) + " report...";
+            _errorFlagOn = true;                                          // source: :471
             _map.Field("CONFIRM").CursorLength = -1;                   // MOVE -1 TO CONFIRML. source: :472
             SendTrnrptScreen(ctx);                                     // PERFORM SEND-TRNRPT-SCREEN. source: :473
             return;                                                    // (FB-1)
         }
 
         // IF NOT ERR-FLG-ON. source: :476-510
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
             // EVALUATE TRUE on CONFIRMI. source: :477-494
-            string c1 = confirm.Length > 0 ? confirm.Substring(0, 1) : "";
-            if (c1 == "Y" || c1 == "y")
+            string firstChar = confirm.Length > 0 ? confirm.Substring(0, 1) : "";
+            if (firstChar == "Y" || firstChar == "y")
             {
                 // WHEN 'Y' OR 'y' -> CONTINUE (proceed to submit). source: :478-479
             }
-            else if (c1 == "N" || c1 == "n")
+            else if (firstChar == "N" || firstChar == "n")
             {
                 // WHEN 'N' OR 'n' -> cancel: clear form, flag, redisplay with blank message. source: :480-483
                 InitializeAllFields();                                // PERFORM INITIALIZE-ALL-FIELDS. source: :481
-                _errFlgOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :482
+                _errorFlagOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :482
                 SendTrnrptScreen(ctx);                                // PERFORM SEND-TRNRPT-SCREEN. source: :483
                 return;                                               // (FB-1)
             }
             else
             {
                 // WHEN OTHER -> STRING '"' CONFIRMI(DELIM SPACE) '" is not a valid value to confirm...'. source: :484-493
-                _wsMessage = "\"" + DelimBySpace(confirm) + "\" is not a valid value to confirm...";
-                _errFlgOn = true;                                     // source: :491
+                _message = "\"" + DelimBySpace(confirm) + "\" is not a valid value to confirm...";
+                _errorFlagOn = true;                                     // source: :491
                 _map.Field("CONFIRM").CursorLength = -1;              // MOVE -1 TO CONFIRML. source: :492
                 SendTrnrptScreen(ctx);                                // PERFORM SEND-TRNRPT-SCREEN. source: :493
                 return;                                              // (FB-1)
@@ -546,10 +546,10 @@ public sealed class TransactionReportProgram : ITransactionHandler
 
             // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL WS-IDX > 1000 OR END-LOOP-YES OR ERR-FLG-ON. source: :498-499
             string[] jobLines = BuildJobLines();
-            for (_wsIdx = 1; !(_wsIdx > 1000 || _endLoopYes || _errFlgOn); _wsIdx++)
+            for (_index = 1; !(_index > 1000 || _endLoopYes || _errorFlagOn); _index++)
             {
                 // MOVE JOB-LINES(WS-IDX) TO JCL-RECORD. source: :501
-                _jclRecord = _wsIdx <= jobLines.Length ? jobLines[_wsIdx - 1] : new string(' ', 80);
+                _jclRecord = _index <= jobLines.Length ? jobLines[_index - 1] : new string(' ', 80);
 
                 // IF JCL-RECORD = '/*EOF' OR SPACES OR LOW-VALUES -> SET END-LOOP-YES (BEFORE the write, FB-3). source: :502-505
                 string trimmed = _jclRecord.TrimEnd(' ');
@@ -570,11 +570,11 @@ public sealed class TransactionReportProgram : ITransactionHandler
         // EXEC CICS WRITEQ TD QUEUE('JOBS') FROM(JCL-RECORD) LENGTH(LENGTH OF JCL-RECORD=80) RESP/RESP2. source: :517-523
         // The in-process job-submit sink: append the fixed 80-byte line; always NORMAL.
         JobsQueue.Add(PadX(_jclRecord, 80));
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
 
         // EVALUATE WS-RESP-CD. source: :525-535
-        if (_wsRespCd == (int)Resp.Normal)
+        if (_responseCode == (int)Resp.Normal)
         {
             // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :526-527
         }
@@ -582,8 +582,8 @@ public sealed class TransactionReportProgram : ITransactionHandler
         {
             // WHEN OTHER. source: :528-534
             // DISPLAY 'RESP:' ... 'REAS:' ... (operator console trace, FB-7). source: :529
-            _errFlgOn = true;                                          // MOVE 'Y' TO WS-ERR-FLG. source: :530
-            _wsMessage = "Unable to Write TDQ (JOBS)...";              // source: :531-532
+            _errorFlagOn = true;                                          // MOVE 'Y' TO WS-ERR-FLG. source: :530
+            _message = "Unable to Write TDQ (JOBS)...";              // source: :531-532
             _map.Field("MONTHLY").CursorLength = -1;                   // MOVE -1 TO MONTHLYL. source: :533
             SendTrnrptScreen(ctx);                                     // PERFORM SEND-TRNRPT-SCREEN. source: :534
         }
@@ -598,8 +598,8 @@ public sealed class TransactionReportProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_commArea.ToProgram))
             _commArea.ToProgram = "COSGN00C";
 
-        _commArea.FromTranId = WS_TRANID;       // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :545
-        _commArea.FromProgram = WS_PGMNAME;     // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :546
+        _commArea.FromTranId = TransactionId;       // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :545
+        _commArea.FromProgram = ProgramId;     // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :546
         _commArea.SetFirstEntry();              // MOVE ZEROS TO CDEMO-PGM-CONTEXT. source: :547
 
         // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :548-551
@@ -615,7 +615,7 @@ public sealed class TransactionReportProgram : ITransactionHandler
         PopulateHeaderInfo(ctx);                                       // PERFORM POPULATE-HEADER-INFO. source: :558
 
         // MOVE WS-MESSAGE TO ERRMSGO (X80 -> X78: silent 2-char clamp, FB-5). source: :560
-        _map.Field("ERRMSG").SetValue(ClampTo(_wsMessage, 78), setMdt: false);
+        _map.Field("ERRMSG").SetValue(ClampTo(_message, 78), setMdt: false);
 
         // IF SEND-ERASE-YES (always true here) -> SEND ... ERASE CURSOR; ELSE (dead) SEND ... CURSOR. source: :562-578
         ctx.SendMap("CORPT0A", "CORPT00", _map, new SendMapOptions
@@ -635,7 +635,7 @@ public sealed class TransactionReportProgram : ITransactionHandler
     private void ReturnToCics(CicsContext ctx)
     {
         // EXEC CICS RETURN TRANSID(WS-TRANID) COMMAREA(CARDDEMO-COMMAREA) — ends the task. source: :587-591
-        ctx.ReturnTransId(WS_TRANID, _commArea);
+        ctx.ReturnTransId(TransactionId, _commArea);
     }
 
     // =============================================================================================
@@ -645,8 +645,8 @@ public sealed class TransactionReportProgram : ITransactionHandler
     {
         // EXEC CICS RECEIVE MAP('CORPT0A') MAPSET('CORPT00') INTO(CORPT0AI) RESP/RESP2 (RESP never inspected). source: :598-604
         ctx.ReceiveMap("CORPT0A", "CORPT00", _map);
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
     }
 
     // =============================================================================================
@@ -656,10 +656,10 @@ public sealed class TransactionReportProgram : ITransactionHandler
     {
         DateTime now = ctx.Clock.Now;                                 // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: :611
 
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01, setMdt: false);  // MOVE CCDA-TITLE01 TO TITLE01O. source: :613
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02, setMdt: false);  // MOVE CCDA-TITLE02 TO TITLE02O. source: :614
-        _map.Field("TRNNAME").SetValue(WS_TRANID, setMdt: false);     // MOVE WS-TRANID  TO TRNNAMEO. source: :615
-        _map.Field("PGMNAME").SetValue(WS_PGMNAME, setMdt: false);    // MOVE WS-PGMNAME TO PGMNAMEO. source: :616
+        _map.Field("TITLE01").SetValue(Title01, setMdt: false);  // MOVE CCDA-TITLE01 TO TITLE01O. source: :613
+        _map.Field("TITLE02").SetValue(Title02, setMdt: false);  // MOVE CCDA-TITLE02 TO TITLE02O. source: :614
+        _map.Field("TRNNAME").SetValue(TransactionId, setMdt: false);     // MOVE WS-TRANID  TO TRNNAMEO. source: :615
+        _map.Field("PGMNAME").SetValue(ProgramId, setMdt: false);    // MOVE WS-PGMNAME TO PGMNAMEO. source: :616
 
         // CURDATEO = mm/dd/yy (year = last two digits, WS-CURDATE-YEAR(3:2)). source: :618-622
         _map.Field("CURDATE").SetValue(
@@ -686,7 +686,7 @@ public sealed class TransactionReportProgram : ITransactionHandler
         _map.Field("EDTDD").SetValue("", setMdt: false);
         _map.Field("EDTYYYY").SetValue("", setMdt: false);
         _map.Field("CONFIRM").SetValue("", setMdt: false);
-        _wsMessage = "";
+        _message = "";
     }
 
     // =============================================================================================

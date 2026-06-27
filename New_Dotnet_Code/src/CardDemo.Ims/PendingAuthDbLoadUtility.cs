@@ -50,20 +50,20 @@ public sealed class PendingAuthDbLoadUtility
     private int _currentDate;        // CURRENT-DATE   9(06) — ACCEPT FROM DATE
     private int _currentYyddd;       // CURRENT-YYDDD  9(05) — ACCEPT FROM DAY
 
-    private int _wsNoSumryRead;      // WS-NO-SUMRY-READ    (unused here)
-    private int _wsNoDtlRead;        // WS-NO-DTL-READ      (unused here)
+    private int _summaryReadCount;   // WS-NO-SUMRY-READ    (unused here)
+    private int _detailReadCount;    // WS-NO-DTL-READ      (unused here)
 
-    private string _wsInfil1Status = "  ";  // WS-INFIL1-STATUS X(02) VALUE SPACES
-    private string _wsInfil2Status = "  ";  // WS-INFIL2-STATUS X(02) VALUE SPACES
+    private string _infile1Status = "  ";  // WS-INFIL1-STATUS X(02) VALUE SPACES
+    private string _infile2Status = "  ";  // WS-INFIL2-STATUS X(02) VALUE SPACES
     private string _endRootSegFile = " ";   // END-ROOT-SEG-FILE  X(01) — root file sentinel
     private string _endChildSegFile = " ";  // END-CHILD-SEG-FILE X(01) — child file sentinel
 
     // ---- PCB status the program branches on ----------------------------------------------------------
-    private string _pautPcbStatus = "  ";   // PAUT-PCB-STATUS: '  ' ok / 'II' dup / 'GE' not-found
-    private string _pautKeyfb = "";         // PAUT-KEYFB
+    private string _pcbStatus = "  ";   // PAUT-PCB-STATUS: '  ' ok / 'II' dup / 'GE' not-found
+    private string _keyFeedback = "";   // PAUT-KEYFB
 
     // ROOT-QUAL-SSA key value (MOVE ROOT-SEG-KEY TO QUAL-SSA-KEY-VALUE) — the GU parent key.
-    private long _qualSsaKeyValue;
+    private long _parentRootKey;        // QUAL-SSA-KEY-VALUE
 
     // ---- The io-areas --------------------------------------------------------------------------------
     private PautSummary? _summaryRec;       // PENDING-AUTH-SUMMARY (root io-area)
@@ -128,21 +128,21 @@ public sealed class PendingAuthDbLoadUtility
             // ENTRY 'DLITCBL' USING PAUTBPCB. // source: PAUDBLOD.CBL:171
             _sysout.Add("STARTING PAUDBLOD");                         // source: PAUDBLOD.CBL:173
 
-            Initialize1000();                                         // source: PAUDBLOD.CBL:175
+            Initialize();                                             // source: PAUDBLOD.CBL:175
 
             // PERFORM 2000-READ-ROOT-SEG-FILE UNTIL END-ROOT-SEG-FILE = 'Y'. // source: PAUDBLOD.CBL:177-178
             while (_endRootSegFile != "Y")
             {
-                ReadRootSegFile2000();
+                ReadRootSegFile();
             }
 
             // PERFORM 3000-READ-CHILD-SEG-FILE UNTIL END-CHILD-SEG-FILE = 'Y'. // source: PAUDBLOD.CBL:180-181
             while (_endChildSegFile != "Y")
             {
-                ReadChildSegFile3000();
+                ReadChildSegFile();
             }
 
-            FileClose4000();                                          // source: PAUDBLOD.CBL:183
+            FileClose();                                              // source: PAUDBLOD.CBL:183
 
             // GOBACK. // source: PAUDBLOD.CBL:187
         }
@@ -156,7 +156,7 @@ public sealed class PendingAuthDbLoadUtility
     // =================================================================================================
     // 1000-INITIALIZE // source: PAUDBLOD.CBL:190-219
     // =================================================================================================
-    private void Initialize1000()
+    private void Initialize()  // COBOL paragraph: 1000-INITIALIZE
     {
         // ACCEPT CURRENT-DATE FROM DATE; ACCEPT CURRENT-YYDDD FROM DAY. // source: PAUDBLOD.CBL:193-194
         DateTime now = _clock.Now;
@@ -170,53 +170,53 @@ public sealed class PendingAuthDbLoadUtility
         // OPEN INPUT INFILE1. // source: PAUDBLOD.CBL:201
         _infile1 = ReadAllRecords(_infile1Path, PautSegmentImages.SummaryImageLength, out string s1);
         _infile1Pos = 0;
-        _wsInfil1Status = s1;
-        if (_wsInfil1Status == "  " || _wsInfil1Status == "00")       // source: PAUDBLOD.CBL:202-203
+        _infile1Status = s1;
+        if (_infile1Status == "  " || _infile1Status == "00")         // source: PAUDBLOD.CBL:202-203
         {
             // CONTINUE
         }
         else                                                          // source: PAUDBLOD.CBL:204-207
         {
-            _sysout.Add("ERROR IN OPENING INFILE1:" + _wsInfil1Status);
-            Abend9999();
+            _sysout.Add("ERROR IN OPENING INFILE1:" + _infile1Status);
+            Abend();
         }
 
         // OPEN INPUT INFILE2. // source: PAUDBLOD.CBL:209
         _infile2 = ReadAllRecords(_infile2Path,
             PautSegmentImages.RootSegKeyLength + PautSegmentImages.DetailImageLength, out string s2);
         _infile2Pos = 0;
-        _wsInfil2Status = s2;
-        if (_wsInfil2Status == "  " || _wsInfil2Status == "00")       // source: PAUDBLOD.CBL:210-211
+        _infile2Status = s2;
+        if (_infile2Status == "  " || _infile2Status == "00")         // source: PAUDBLOD.CBL:210-211
         {
             // CONTINUE
         }
         else                                                          // source: PAUDBLOD.CBL:212-215
         {
-            _sysout.Add("ERROR IN OPENING INFILE2:" + _wsInfil2Status);
-            Abend9999();
+            _sysout.Add("ERROR IN OPENING INFILE2:" + _infile2Status);
+            Abend();
         }
     }
 
     // =================================================================================================
     // 2000-READ-ROOT-SEG-FILE // source: PAUDBLOD.CBL:222-240
     // =================================================================================================
-    private void ReadRootSegFile2000()
+    private void ReadRootSegFile()  // COBOL paragraph: 2000-READ-ROOT-SEG-FILE
     {
         // READ INFILE1. // source: PAUDBLOD.CBL:226
-        _wsInfil1Status = ReadNext(_infile1, ref _infile1Pos, out byte[]? rec);
+        _infile1Status = ReadNext(_infile1, ref _infile1Pos, out byte[]? rec);
 
         // IF WS-INFIL1-STATUS = SPACES OR '00' ... // source: PAUDBLOD.CBL:228
-        if (_wsInfil1Status == "  " || _wsInfil1Status == "00")
+        if (_infile1Status == "  " || _infile1Status == "00")
         {
             // MOVE INFIL1-REC TO PENDING-AUTH-SUMMARY. // source: PAUDBLOD.CBL:229
             _summaryRec = PautSegmentImages.DecodeSummary(rec!, _host);
             // PERFORM 2100-INSERT-ROOT-SEG. // source: PAUDBLOD.CBL:230
-            InsertRootSeg2100();
+            InsertRootSeg();
         }
         else                                                          // source: PAUDBLOD.CBL:231
         {
             // IF WS-INFIL1-STATUS = '10' MOVE 'Y' TO END-ROOT-SEG-FILE. // source: PAUDBLOD.CBL:232-233
-            if (_wsInfil1Status == "10")
+            if (_infile1Status == "10")
             {
                 _endRootSegFile = "Y";
             }
@@ -230,45 +230,45 @@ public sealed class PendingAuthDbLoadUtility
     // =================================================================================================
     // 2100-INSERT-ROOT-SEG // source: PAUDBLOD.CBL:242-265
     // =================================================================================================
-    private void InsertRootSeg2100()
+    private void InsertRootSeg()  // COBOL paragraph: 2100-INSERT-ROOT-SEG
     {
         // CALL 'CBLTDLI' USING FUNC-ISRT PAUTBPCB PENDING-AUTH-SUMMARY ROOT-UNQUAL-SSA. // source: PAUDBLOD.CBL:244-247
         string status = _summary.Insert(_summaryRec!);
-        _pautPcbStatus = MapInsertStatus(status);                     // '00'->'  ', '22'->'II'
+        _pcbStatus = MapInsertStatus(status);                         // '00'->'  ', '22'->'II'
 
         _sysout.Add(" *******************************");              // source: PAUDBLOD.CBL:248
         _sysout.Add(" *******************************");              // source: PAUDBLOD.CBL:252
 
         // IF PAUT-PCB-STATUS = SPACES DISPLAY 'ROOT INSERT SUCCESS'. // source: PAUDBLOD.CBL:253-255
-        if (_pautPcbStatus == "  ")
+        if (_pcbStatus == "  ")
         {
             _sysout.Add("ROOT INSERT SUCCESS    ");
         }
 
         // IF PAUT-PCB-STATUS = 'II' DISPLAY 'ROOT SEGMENT ALREADY IN DB'. // source: PAUDBLOD.CBL:256-258
-        if (_pautPcbStatus == "II")
+        if (_pcbStatus == "II")
         {
             _sysout.Add("ROOT SEGMENT ALREADY IN DB");
         }
 
         // IF PAUT-PCB-STATUS NOT EQUAL TO SPACES AND 'II' ... // source: PAUDBLOD.CBL:259-262
-        if (_pautPcbStatus != "  " && _pautPcbStatus != "II")
+        if (_pcbStatus != "  " && _pcbStatus != "II")
         {
-            _sysout.Add("ROOT INSERT FAILED  :" + _pautPcbStatus);
-            Abend9999();
+            _sysout.Add("ROOT INSERT FAILED  :" + _pcbStatus);
+            Abend();
         }
     }
 
     // =================================================================================================
     // 3000-READ-CHILD-SEG-FILE // source: PAUDBLOD.CBL:269-291
     // =================================================================================================
-    private void ReadChildSegFile3000()
+    private void ReadChildSegFile()  // COBOL paragraph: 3000-READ-CHILD-SEG-FILE
     {
         // READ INFILE2. // source: PAUDBLOD.CBL:272
-        _wsInfil2Status = ReadNext(_infile2, ref _infile2Pos, out byte[]? rec);
+        _infile2Status = ReadNext(_infile2, ref _infile2Pos, out byte[]? rec);
 
         // IF WS-INFIL2-STATUS = SPACES OR '00' ... // source: PAUDBLOD.CBL:274
-        if (_wsInfil2Status == "  " || _wsInfil2Status == "00")
+        if (_infile2Status == "  " || _infile2Status == "00")
         {
             // INFIL2-REC = ROOT-SEG-KEY (6) + CHILD-SEG-REC (200).
             ReadOnlySpan<byte> rootSegKey = rec.AsSpan(0, PautSegmentImages.RootSegKeyLength);
@@ -279,20 +279,20 @@ public sealed class PendingAuthDbLoadUtility
             if (PautSegmentImages.IsNumericComp3(rootSegKey))
             {
                 // MOVE ROOT-SEG-KEY TO QUAL-SSA-KEY-VALUE. // source: PAUDBLOD.CBL:277
-                _qualSsaKeyValue = PautSegmentImages.DecodeRootSegKey(rootSegKey);
+                _parentRootKey = PautSegmentImages.DecodeRootSegKey(rootSegKey);
 
                 // MOVE CHILD-SEG-REC TO PENDING-AUTH-DETAILS. // source: PAUDBLOD.CBL:280
                 // The child's parentage (ACCT_ID) is the GU'd root key (QUAL-SSA-KEY-VALUE).
-                _detailRec = PautSegmentImages.DecodeDetail(childSegRec, _qualSsaKeyValue, _host);
+                _detailRec = PautSegmentImages.DecodeDetail(childSegRec, _parentRootKey, _host);
 
                 // PERFORM 3100-INSERT-CHILD-SEG. // source: PAUDBLOD.CBL:281
-                InsertChildSeg3100();
+                InsertChildSeg();
             }
         }
         else                                                          // source: PAUDBLOD.CBL:283
         {
             // IF WS-INFIL2-STATUS = '10' MOVE 'Y' TO END-CHILD-SEG-FILE. // source: PAUDBLOD.CBL:284-285
-            if (_wsInfil2Status == "10")
+            if (_infile2Status == "10")
             {
                 _endChildSegFile = "Y";
             }
@@ -306,36 +306,36 @@ public sealed class PendingAuthDbLoadUtility
     // =================================================================================================
     // 3100-INSERT-CHILD-SEG // source: PAUDBLOD.CBL:292-315
     // =================================================================================================
-    private void InsertChildSeg3100()
+    private void InsertChildSeg()  // COBOL paragraph: 3100-INSERT-CHILD-SEG
     {
         // INITIALIZE PAUT-PCB-STATUS. // source: PAUDBLOD.CBL:295
-        _pautPcbStatus = "  ";
+        _pcbStatus = "  ";
 
         // CALL 'CBLTDLI' USING FUNC-GU PAUTBPCB PENDING-AUTH-SUMMARY ROOT-QUAL-SSA. // source: PAUDBLOD.CBL:296-299
         // GU the parent root by QUAL-SSA-KEY-VALUE (the existence check).
-        string guStatus = _summary.ReadByKey(_qualSsaKeyValue, out PautSummary? root);
-        _pautPcbStatus = (guStatus == FileStatus.Ok) ? "  " : "GE";   // '00'->'  ', '23'->'GE'
-        if (_pautPcbStatus == "  ") _summaryRec = root;               // GU ... INTO PENDING-AUTH-SUMMARY
+        string guStatus = _summary.ReadByKey(_parentRootKey, out PautSummary? root);
+        _pcbStatus = (guStatus == FileStatus.Ok) ? "  " : "GE";       // '00'->'  ', '23'->'GE'
+        if (_pcbStatus == "  ") _summaryRec = root;                   // GU ... INTO PENDING-AUTH-SUMMARY
 
         _sysout.Add("***************************");                   // source: PAUDBLOD.CBL:300
         _sysout.Add("***************************");                   // source: PAUDBLOD.CBL:304
 
         // IF PAUT-PCB-STATUS = SPACES ... (no ELSE — a failed GU silently skips the child, bug #1)
         // source: PAUDBLOD.CBL:305
-        if (_pautPcbStatus == "  ")
+        if (_pcbStatus == "  ")
         {
             _sysout.Add("GU CALL TO ROOT SEG SUCCESS");               // source: PAUDBLOD.CBL:306
 
             // PERFORM 3200-INSERT-IMS-CALL. // source: PAUDBLOD.CBL:309
-            InsertImsCall3200();
+            InsertImsCall();
 
             // IF PAUT-PCB-STATUS NOT EQUAL TO SPACES AND 'II' ... (re-tests the post-ISRT status, bug #1)
             // source: PAUDBLOD.CBL:310-313
-            if (_pautPcbStatus != "  " && _pautPcbStatus != "II")
+            if (_pcbStatus != "  " && _pcbStatus != "II")
             {
-                _sysout.Add("ROOT GU CALL FAIL:" + _pautPcbStatus);
-                _sysout.Add("KFB AREA IN CHILD:" + _pautKeyfb);
-                Abend9999();
+                _sysout.Add("ROOT GU CALL FAIL:" + _pcbStatus);
+                _sysout.Add("KFB AREA IN CHILD:" + _keyFeedback);
+                Abend();
             }
         }
     }
@@ -343,67 +343,67 @@ public sealed class PendingAuthDbLoadUtility
     // =================================================================================================
     // 3200-INSERT-IMS-CALL // source: PAUDBLOD.CBL:318-339
     // =================================================================================================
-    private void InsertImsCall3200()
+    private void InsertImsCall()  // COBOL paragraph: 3200-INSERT-IMS-CALL
     {
         // CALL 'CBLTDLI' USING FUNC-ISRT PAUTBPCB PENDING-AUTH-DETAILS CHILD-UNQUAL-SSA. // source: PAUDBLOD.CBL:321-324
         string status = _detail.Insert(_detailRec!);
-        _pautPcbStatus = MapInsertStatus(status);                     // '00'->'  ', '22'->'II'
+        _pcbStatus = MapInsertStatus(status);                         // '00'->'  ', '22'->'II'
 
         // IF PAUT-PCB-STATUS = SPACES DISPLAY 'CHILD SEGMENT INSERTED SUCCESS'. // source: PAUDBLOD.CBL:326-328
-        if (_pautPcbStatus == "  ")
+        if (_pcbStatus == "  ")
         {
             _sysout.Add("CHILD SEGMENT INSERTED SUCCESS");
         }
 
         // IF PAUT-PCB-STATUS = 'II' DISPLAY 'CHILD SEGMENT ALREADY IN DB'. // source: PAUDBLOD.CBL:329-331
-        if (_pautPcbStatus == "II")
+        if (_pcbStatus == "II")
         {
             _sysout.Add("CHILD SEGMENT ALREADY IN DB");
         }
 
         // IF PAUT-PCB-STATUS NOT EQUAL TO SPACES AND 'II' ... // source: PAUDBLOD.CBL:332-336
-        if (_pautPcbStatus != "  " && _pautPcbStatus != "II")
+        if (_pcbStatus != "  " && _pcbStatus != "II")
         {
-            _sysout.Add("INSERT CALL FAIL FOR CHILD:" + _pautPcbStatus);
-            _sysout.Add("KFB AREA IN CHILD:" + _pautKeyfb);
-            Abend9999();
+            _sysout.Add("INSERT CALL FAIL FOR CHILD:" + _pcbStatus);
+            _sysout.Add("KFB AREA IN CHILD:" + _keyFeedback);
+            Abend();
         }
     }
 
     // =================================================================================================
     // 4000-FILE-CLOSE // source: PAUDBLOD.CBL:341-358
     // =================================================================================================
-    private void FileClose4000()
+    private void FileClose()  // COBOL paragraph: 4000-FILE-CLOSE
     {
         _sysout.Add("CLOSING THE FILE");                             // source: PAUDBLOD.CBL:342
 
         // CLOSE INFILE1. // source: PAUDBLOD.CBL:343
-        _wsInfil1Status = "00";
-        if (_wsInfil1Status == "  " || _wsInfil1Status == "00")      // source: PAUDBLOD.CBL:345-346
+        _infile1Status = "00";
+        if (_infile1Status == "  " || _infile1Status == "00")        // source: PAUDBLOD.CBL:345-346
         {
             // CONTINUE
         }
         else                                                         // source: PAUDBLOD.CBL:347-349
         {
-            _sysout.Add("ERROR IN CLOSING 1ST FILE:" + _wsInfil1Status);
+            _sysout.Add("ERROR IN CLOSING 1ST FILE:" + _infile1Status);
         }
 
         // CLOSE INFILE2. // source: PAUDBLOD.CBL:350
-        _wsInfil2Status = "00";
-        if (_wsInfil2Status == "  " || _wsInfil2Status == "00")      // source: PAUDBLOD.CBL:352-353
+        _infile2Status = "00";
+        if (_infile2Status == "  " || _infile2Status == "00")        // source: PAUDBLOD.CBL:352-353
         {
             // CONTINUE
         }
         else                                                         // source: PAUDBLOD.CBL:354-356
         {
-            _sysout.Add("ERROR IN CLOSING 2ND FILE:" + _wsInfil2Status);
+            _sysout.Add("ERROR IN CLOSING 2ND FILE:" + _infile2Status);
         }
     }
 
     // =================================================================================================
     // 9999-ABEND // source: PAUDBLOD.CBL:360-366
     // =================================================================================================
-    private void Abend9999()
+    private void Abend()  // COBOL paragraph: 9999-ABEND
     {
         _sysout.Add("IMS LOAD ABENDING ...");                        // source: PAUDBLOD.CBL:363
         ReturnCode = 16;                                             // MOVE 16 TO RETURN-CODE // source: PAUDBLOD.CBL:365

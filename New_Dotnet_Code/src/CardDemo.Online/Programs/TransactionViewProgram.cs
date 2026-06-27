@@ -53,58 +53,58 @@ public sealed class TransactionViewProgram : ITransactionHandler
     // =============================================================================================
     //  WS-VARIABLES — source: COTRN01C.cbl:35-50
     // =============================================================================================
-    private const string WS_PGMNAME = "COTRN01C";       // 05 WS-PGMNAME       PIC X(08) VALUE 'COTRN01C'. source: :36
-    private const string WS_TRANID = "CT01";            // 05 WS-TRANID        PIC X(04) VALUE 'CT01'.     source: :37
-    private const string WS_TRANSACT_FILE = "TRANSACT"; // 05 WS-TRANSACT-FILE PIC X(08) VALUE 'TRANSACT'. source: :39
+    private const string ProgramId = "COTRN01C";       // WS-PGMNAME       PIC X(08) VALUE 'COTRN01C'. source: :36
+    private const string TranId = "CT01";              // WS-TRANID        PIC X(04) VALUE 'CT01'.     source: :37
+    private const string TransactFileName = "TRANSACT"; // WS-TRANSACT-FILE PIC X(08) VALUE 'TRANSACT'. source: :39
 
-    private string _wsMessage = "";                     // 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
+    private string _message = "";                       // WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
 
     // 05 WS-ERR-FLG PIC X(01) VALUE 'N'. 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. source: :40-42
-    private bool _errFlgOn;
-    private bool ErrFlgOn => _errFlgOn;   // 88 ERR-FLG-ON
+    private bool _errorFlagOn;                           // WS-ERR-FLG
+    private bool ErrorFlagOn => _errorFlagOn;   // 88 ERR-FLG-ON
 
     // 05 WS-RESP-CD / WS-REAS-CD PIC S9(09) COMP VALUE ZEROS. source: :43-44
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode;                           // WS-RESP-CD
+    private int _reasonCode;                             // WS-REAS-CD
 
     // 05 WS-USR-MODIFIED PIC X(01) VALUE 'N'. 88 USR-MODIFIED-YES='Y' / USR-MODIFIED-NO='N'. source: :45-47
     // FB-4: SET to NO at entry, never inspected — dead state kept for fidelity.
-    private bool _usrModifiedYes;
-    private void SetUsrModifiedNo() => _usrModifiedYes = false; // SET USR-MODIFIED-NO TO TRUE. source: :89
+    private bool _userModifiedYes;                       // WS-USR-MODIFIED
+    private void SetUserModifiedNo() => _userModifiedYes = false; // SET USR-MODIFIED-NO TO TRUE. source: :89
 
     // 05 WS-TRAN-AMT  PIC +99999999.99.            source: :49 (8 integer digits — see FB-2)
     // 05 WS-TRAN-DATE PIC X(08) VALUE '00/00/00'.  source: :50 (declared, never referenced here)
-    private string _wsTranDate = "00/00/00";
+    private string _transactionDate = "00/00/00";        // WS-TRAN-DATE
 
     // CCDA-TITLE01/02 (COTTL01Y) + CCDA-MSG-INVALID-KEY (CSMSG01Y) — shared header / messages.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...         ";
+    private const string Title01 = "      AWS Mainframe Modernization       ";
+    private const string Title02 = "              CardDemo                  ";
+    private const string MsgInvalidKey = "Invalid key pressed. Please see below...         ";
 
     // =============================================================================================
     //  COCOM01Y trailer — CDEMO-CT01-INFO (program-private state, overlays the unused customer slots).
     //  source: COTRN01C.cbl:53-61
     // =============================================================================================
     // 10 CDEMO-CT01-TRNID-FIRST   PIC X(16).            source: :54
-    private string _ct01TrnidFirst = "";
+    private string _firstTranId = "";        // CDEMO-CT01-TRNID-FIRST
     // 10 CDEMO-CT01-TRNID-LAST    PIC X(16).            source: :55
-    private string _ct01TrnidLast = "";
+    private string _lastTranId = "";         // CDEMO-CT01-TRNID-LAST
     // 10 CDEMO-CT01-PAGE-NUM      PIC 9(08).            source: :56
-    private int _ct01PageNum;
+    private int _pageNumber;                 // CDEMO-CT01-PAGE-NUM
     // 10 CDEMO-CT01-NEXT-PAGE-FLG PIC X(01) VALUE 'N'.  source: :57-59
-    private char _ct01NextPageFlg = 'N';
+    private char _nextPageFlag = 'N';        // CDEMO-CT01-NEXT-PAGE-FLG
     // 10 CDEMO-CT01-TRN-SEL-FLG   PIC X(01).            source: :60
-    private string _ct01TrnSelFlg = "";
+    private string _tranSelectFlag = "";     // CDEMO-CT01-TRN-SEL-FLG
     // 10 CDEMO-CT01-TRN-SELECTED  PIC X(16).            source: :61
-    private string _ct01TrnSelected = "";
+    private string _selectedTranId = "";     // CDEMO-CT01-TRN-SELECTED
 
     // =============================================================================================
     //  TRAN-ID RIDFLD + the TRAN-RECORD read by the keyed READ (CVTRA05Y). source: :172,269-274
     // =============================================================================================
     // TRAN-ID X(16) — the READ RIDFLD.
-    private string _tranId = "";
+    private string _recordKey = "";          // TRAN-ID (RIDFLD)
     // The TRAN-RECORD just read.
-    private Transaction? _tranRecord;
+    private Transaction? _transactionRecord; // TRAN-RECORD
 
     // =============================================================================================
     //  COMMAREA (typed view) + per-turn map + DB. source: :78-80,98,136-139
@@ -125,10 +125,10 @@ public sealed class TransactionViewProgram : ITransactionHandler
     public TransactionViewProgram() => _db = null!;
 
     /// <inheritdoc/>
-    public string ProgramName => WS_PGMNAME; // PROGRAM-ID. COTRN01C. source: :23
+    public string ProgramName => ProgramId; // PROGRAM-ID. COTRN01C. source: :23
 
     /// <inheritdoc/>
-    public string TransId => WS_TRANID;      // CSD: CT01 -> COTRN01C. source: CSD_TRANSACTIONS.md:82; cbl:37
+    public string TransId => TranId;         // CSD: CT01 -> COTRN01C. source: CSD_TRANSACTIONS.md:82; cbl:37
 
     // =============================================================================================
     //  MAIN-PARA — source: COTRN01C.cbl:86-139
@@ -141,11 +141,11 @@ public sealed class TransactionViewProgram : ITransactionHandler
         if (_db is not null) _transactions = new TransactionRepository(_db.Connection);
 
         // SET ERR-FLG-OFF TO TRUE / SET USR-MODIFIED-NO TO TRUE. source: :88-89
-        _errFlgOn = false;
-        SetUsrModifiedNo();
+        _errorFlagOn = false;
+        SetUserModifiedNo();
 
         // MOVE SPACES TO WS-MESSAGE  ERRMSGO OF COTRN1AO. source: :91-92
-        _wsMessage = "";
+        _message = "";
         _map.Field("ERRMSG").SetValue("", setMdt: false);
 
         if (ctx.EibCalen == 0)
@@ -169,10 +169,10 @@ public sealed class TransactionViewProgram : ITransactionHandler
                 _map.Field("TRNIDIN").CursorLength = -1; // MOVE -1 TO TRNIDINL OF COTRN1AI. source: :102
 
                 // IF CDEMO-CT01-TRN-SELECTED NOT = SPACES AND LOW-VALUES. source: :103-104
-                if (NotSpacesOrLow(_ct01TrnSelected))
+                if (NotSpacesOrLow(_selectedTranId))
                 {
                     // MOVE CDEMO-CT01-TRN-SELECTED TO TRNIDINI OF COTRN1AI. source: :105-106
-                    _map.Field("TRNIDIN").SetValue(_ct01TrnSelected, setMdt: false);
+                    _map.Field("TRNIDIN").SetValue(_selectedTranId, setMdt: false);
                     ProcessEnterKey(ctx);            // PERFORM PROCESS-ENTER-KEY. source: :107
                 }
 
@@ -206,8 +206,8 @@ public sealed class TransactionViewProgram : ITransactionHandler
                         break;
                     default:
                         // WHEN OTHER. source: :128-131
-                        _errFlgOn = true;                          // MOVE 'Y' TO WS-ERR-FLG. source: :129
-                        _wsMessage = CCDA_MSG_INVALID_KEY;         // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. source: :130
+                        _errorFlagOn = true;                       // MOVE 'Y' TO WS-ERR-FLG. source: :129
+                        _message = MsgInvalidKey;           // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. source: :130
                         SendTrnviewScreen(ctx);                    // PERFORM SEND-TRNVIEW-SCREEN. source: :131
                         break;
                 }
@@ -218,7 +218,7 @@ public sealed class TransactionViewProgram : ITransactionHandler
         if (ctx.Outcome is null)
         {
             SaveCt01Info();
-            ctx.ReturnTransId(WS_TRANID, _commArea);
+            ctx.ReturnTransId(TranId, _commArea);
         }
     }
 
@@ -231,8 +231,8 @@ public sealed class TransactionViewProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_map.Field("TRNIDIN").Value))
         {
             // WHEN TRNIDINI = SPACES OR LOW-VALUES. source: :147-152
-            _errFlgOn = true;                                   // MOVE 'Y' TO WS-ERR-FLG. source: :148
-            _wsMessage = "Tran ID can NOT be empty...";         // source: :149-150
+            _errorFlagOn = true;                                // MOVE 'Y' TO WS-ERR-FLG. source: :148
+            _message = "Tran ID can NOT be empty...";           // source: :149-150
             _map.Field("TRNIDIN").CursorLength = -1;            // MOVE -1 TO TRNIDINL. source: :151
             SendTrnviewScreen(ctx);                             // PERFORM SEND-TRNVIEW-SCREEN. source: :152
         }
@@ -243,7 +243,7 @@ public sealed class TransactionViewProgram : ITransactionHandler
         }
 
         // IF NOT ERR-FLG-ON. source: :158-174
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
             // MOVE SPACES TO the twelve display out-fields. source: :159-171
             _map.Field("TRNID").SetValue("", setMdt: false);    // TRNIDI    source: :159
@@ -261,12 +261,12 @@ public sealed class TransactionViewProgram : ITransactionHandler
             _map.Field("MZIP").SetValue("", setMdt: false);     // MZIPI     source: :171
 
             // MOVE TRNIDINI OF COTRN1AI TO TRAN-ID. source: :172
-            _tranId = PadX(_map.Field("TRNIDIN").Value, 16);
+            _recordKey = PadX(_map.Field("TRNIDIN").Value, 16);
             ReadTransactFile(ctx);                              // PERFORM READ-TRANSACT-FILE. source: :173
         }
 
         // IF NOT ERR-FLG-ON. source: :176-192
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
             // MOVE TRAN-AMT TO WS-TRAN-AMT (PIC +99999999.99 — FB-2 truncates the 9th integer digit). source: :177
             string wsTranAmt = EditTranAmt(TranAmt);
@@ -297,8 +297,8 @@ public sealed class TransactionViewProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_commArea.ToProgram))
             _commArea.ToProgram = "COSGN00C";
 
-        _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :202
-        _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :203
+        _commArea.FromTranId = TranId;     // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :202
+        _commArea.FromProgram = ProgramId; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :203
         _commArea.SetFirstEntry();          // MOVE ZEROS TO CDEMO-PGM-CONTEXT. source: :204
 
         // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :205-208
@@ -313,7 +313,7 @@ public sealed class TransactionViewProgram : ITransactionHandler
     {
         PopulateHeaderInfo(ctx);                                    // PERFORM POPULATE-HEADER-INFO. source: :215
 
-        _map.Field("ERRMSG").SetValue(_wsMessage, setMdt: false);  // MOVE WS-MESSAGE TO ERRMSGO. source: :217
+        _map.Field("ERRMSG").SetValue(_message, setMdt: false);    // MOVE WS-MESSAGE TO ERRMSGO. source: :217
 
         // EXEC CICS SEND MAP('COTRN1A') MAPSET('COTRN01') FROM(COTRN1AO) ERASE CURSOR. source: :219-225
         ctx.SendMap("COTRN1A", "COTRN01", _map, new SendMapOptions
@@ -322,7 +322,7 @@ public sealed class TransactionViewProgram : ITransactionHandler
             FreeKb = true,
             Cursor = -1, // CURSOR — honour the MOVE -1 TO TRNIDINL set throughout.
         });
-        _wsRespCd = (int)Resp.Normal;
+        _responseCode = (int)Resp.Normal;
     }
 
     // =============================================================================================
@@ -332,8 +332,8 @@ public sealed class TransactionViewProgram : ITransactionHandler
     {
         // EXEC CICS RECEIVE MAP('COTRN1A') MAPSET('COTRN01') INTO(COTRN1AI) RESP RESP2. source: :232-238
         ctx.ReceiveMap("COTRN1A", "COTRN01", _map);
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
     }
 
     // =============================================================================================
@@ -344,10 +344,10 @@ public sealed class TransactionViewProgram : ITransactionHandler
         // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: :245
         DateTime now = ctx.Clock.Now;
 
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :247
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :248
-        _map.Field("TRNNAME").SetValue(WS_TRANID, setMdt: false);    // MOVE WS-TRANID  TO TRNNAMEO. source: :249
-        _map.Field("PGMNAME").SetValue(WS_PGMNAME, setMdt: false);   // MOVE WS-PGMNAME TO PGMNAMEO. source: :250
+        _map.Field("TITLE01").SetValue(Title01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :247
+        _map.Field("TITLE02").SetValue(Title02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :248
+        _map.Field("TRNNAME").SetValue(TranId, setMdt: false);       // MOVE WS-TRANID  TO TRNNAMEO. source: :249
+        _map.Field("PGMNAME").SetValue(ProgramId, setMdt: false);    // MOVE WS-PGMNAME TO PGMNAMEO. source: :250
 
         // CURDATEO = mm/dd/yy (year last two digits). source: :252-256
         _map.Field("CURDATE").SetValue(
@@ -365,24 +365,24 @@ public sealed class TransactionViewProgram : ITransactionHandler
     {
         // EXEC CICS READ DATASET(WS-TRANSACT-FILE) INTO(TRAN-RECORD) RIDFLD(TRAN-ID) UPDATE RESP RESP2.
         // FB-1: UPDATE intent on a view-only read. The relational read is the keyed ReadByKey. source: :269-278
-        string fileStatus = _transactions.ReadByKey(_tranId, out _tranRecord);
+        string fileStatus = _transactions.ReadByKey(_recordKey, out _transactionRecord);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :280-296
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal: // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :281-282
                 break;
             case Resp.NotFnd: // WHEN DFHRESP(NOTFND). source: :283-288
-                _errFlgOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :284
-                _wsMessage = "Transaction ID NOT found...";    // source: :285-286
+                _errorFlagOn = true;                           // MOVE 'Y' TO WS-ERR-FLG. source: :284
+                _message = "Transaction ID NOT found...";      // source: :285-286
                 _map.Field("TRNIDIN").CursorLength = -1;       // MOVE -1 TO TRNIDINL. source: :287
                 SendTrnviewScreen(ctx);                        // PERFORM SEND-TRNVIEW-SCREEN. source: :288
                 break;
             default: // WHEN OTHER. source: :289-295
                 // FB-5: DISPLAY 'RESP:' WS-RESP-CD 'REAS:' WS-REAS-CD -> job-log trace; no-op here. source: :290
-                _errFlgOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :291
-                _wsMessage = "Unable to lookup Transaction..."; // source: :292-293
+                _errorFlagOn = true;                           // MOVE 'Y' TO WS-ERR-FLG. source: :291
+                _message = "Unable to lookup Transaction...";  // source: :292-293
                 _map.Field("TRNIDIN").CursorLength = -1;       // MOVE -1 TO TRNIDINL. source: :294
                 SendTrnviewScreen(ctx);                        // PERFORM SEND-TRNVIEW-SCREEN. source: :295
                 break;
@@ -419,25 +419,25 @@ public sealed class TransactionViewProgram : ITransactionHandler
         _map.Field("MNAME").SetValue("", setMdt: false);    // MNAMEI    source: :323
         _map.Field("MCITY").SetValue("", setMdt: false);    // MCITYI    source: :324
         _map.Field("MZIP").SetValue("", setMdt: false);     // MZIPI     source: :325
-        _wsMessage = "";                                    // WS-MESSAGE source: :326
+        _message = "";                                      // WS-MESSAGE source: :326
     }
 
     // =============================================================================================
     //  TRAN-RECORD field accessors (CVTRA05Y), with COBOL fixed-width formatting.
     // =============================================================================================
-    private string TranRecId => PadX(_tranRecord?.TranId, 16);            // TRAN-ID            X(16)
-    private string TranCardNum => PadX(_tranRecord?.CardNum, 16);         // TRAN-CARD-NUM      X(16)
-    private string TranTypeCd => PadX(_tranRecord?.TypeCd, 2);            // TRAN-TYPE-CD       X(02)
-    private string TranCatCd => Zoned(_tranRecord?.CatCd ?? 0, 4);        // TRAN-CAT-CD        9(04)
-    private string TranSource => PadX(_tranRecord?.Source, 10);           // TRAN-SOURCE        X(10)
-    private decimal TranAmt => _tranRecord?.Amt ?? 0m;                    // TRAN-AMT           S9(09)V99
-    private string TranDesc => PadX(_tranRecord?.Desc, 100);             // TRAN-DESC          X(100) (TDESC field is L60; SetValue truncates)
-    private string TranOrigTs => PadX(_tranRecord?.OrigTs, 26);          // TRAN-ORIG-TS       X(26) (TORIGDT field is L10; SetValue truncates)
-    private string TranProcTs => PadX(_tranRecord?.ProcTs, 26);          // TRAN-PROC-TS       X(26) (TPROCDT field is L10; SetValue truncates)
-    private string TranMerchantId => Zoned(_tranRecord?.MerchantId ?? 0, 9); // TRAN-MERCHANT-ID 9(09) (MID field is L9)
-    private string TranMerchantName => PadX(_tranRecord?.MerchantName, 50);  // TRAN-MERCHANT-NAME X(50) (MNAME field is L30; SetValue truncates)
-    private string TranMerchantCity => PadX(_tranRecord?.MerchantCity, 50);  // TRAN-MERCHANT-CITY X(50) (MCITY field is L25; SetValue truncates)
-    private string TranMerchantZip => PadX(_tranRecord?.MerchantZip, 10);    // TRAN-MERCHANT-ZIP  X(10) (MZIP field is L10)
+    private string TranRecId => PadX(_transactionRecord?.TranId, 16);            // TRAN-ID            X(16)
+    private string TranCardNum => PadX(_transactionRecord?.CardNum, 16);         // TRAN-CARD-NUM      X(16)
+    private string TranTypeCd => PadX(_transactionRecord?.TypeCd, 2);            // TRAN-TYPE-CD       X(02)
+    private string TranCatCd => Zoned(_transactionRecord?.CatCd ?? 0, 4);        // TRAN-CAT-CD        9(04)
+    private string TranSource => PadX(_transactionRecord?.Source, 10);           // TRAN-SOURCE        X(10)
+    private decimal TranAmt => _transactionRecord?.Amt ?? 0m;                    // TRAN-AMT           S9(09)V99
+    private string TranDesc => PadX(_transactionRecord?.Desc, 100);             // TRAN-DESC          X(100) (TDESC field is L60; SetValue truncates)
+    private string TranOrigTs => PadX(_transactionRecord?.OrigTs, 26);          // TRAN-ORIG-TS       X(26) (TORIGDT field is L10; SetValue truncates)
+    private string TranProcTs => PadX(_transactionRecord?.ProcTs, 26);          // TRAN-PROC-TS       X(26) (TPROCDT field is L10; SetValue truncates)
+    private string TranMerchantId => Zoned(_transactionRecord?.MerchantId ?? 0, 9); // TRAN-MERCHANT-ID 9(09) (MID field is L9)
+    private string TranMerchantName => PadX(_transactionRecord?.MerchantName, 50);  // TRAN-MERCHANT-NAME X(50) (MNAME field is L30; SetValue truncates)
+    private string TranMerchantCity => PadX(_transactionRecord?.MerchantCity, 50);  // TRAN-MERCHANT-CITY X(50) (MCITY field is L25; SetValue truncates)
+    private string TranMerchantZip => PadX(_transactionRecord?.MerchantZip, 10);    // TRAN-MERCHANT-ZIP  X(10) (MZIP field is L10)
 
     /// <summary>MOVE LOW-VALUES TO COTRN1AO — blank every named output field + clear per-turn overrides. source: :101</summary>
     private void MoveLowValuesToMapOut()
@@ -454,7 +454,7 @@ public sealed class TransactionViewProgram : ITransactionHandler
     // =============================================================================================
     private void SetResp(string fileStatus)
     {
-        _wsRespCd = fileStatus switch
+        _responseCode = fileStatus switch
         {
             FileStatus.Ok => (int)Resp.Normal,             // '00' -> DFHRESP(NORMAL)
             FileStatus.RecordNotFound => (int)Resp.NotFnd, // '23' -> DFHRESP(NOTFND)
@@ -462,7 +462,7 @@ public sealed class TransactionViewProgram : ITransactionHandler
             FileStatus.DuplicateKey => (int)Resp.DupRec,   // '02' -> DFHRESP(DUPREC)
             _ => (int)Resp.Error,                          // any other -> WHEN OTHER (file error)
         };
-        _wsReasCd = 0; // RESP2 unavailable from the relational repo; 0 for parity.
+        _reasonCode = 0; // RESP2 unavailable from the relational repo; 0 for parity.
     }
 
     // =============================================================================================
@@ -497,12 +497,12 @@ public sealed class TransactionViewProgram : ITransactionHandler
     private void SaveCt01Info()
     {
         string packed =
-            PadX(_ct01TrnidFirst, 16) +
-            PadX(_ct01TrnidLast, 16) +
-            Zoned(_ct01PageNum, 8) +
-            (_ct01NextPageFlg == '\0' ? 'N' : _ct01NextPageFlg) +
-            (string.IsNullOrEmpty(_ct01TrnSelFlg) ? " " : _ct01TrnSelFlg.Substring(0, 1)) +
-            PadX(_ct01TrnSelected, 16);
+            PadX(_firstTranId, 16) +
+            PadX(_lastTranId, 16) +
+            Zoned(_pageNumber, 8) +
+            (_nextPageFlag == '\0' ? 'N' : _nextPageFlag) +
+            (string.IsNullOrEmpty(_tranSelectFlag) ? " " : _tranSelectFlag.Substring(0, 1)) +
+            PadX(_selectedTranId, 16);
         packed = PadX(packed, 75);
         _commArea.CustFName = packed.Substring(0, 25);
         _commArea.CustMName = packed.Substring(25, 25);
@@ -513,14 +513,14 @@ public sealed class TransactionViewProgram : ITransactionHandler
     {
         string packed = PadX(_commArea.CustFName, 25) + PadX(_commArea.CustMName, 25) + PadX(_commArea.CustLName, 25);
         packed = PadX(packed, 75);
-        _ct01TrnidFirst = packed.Substring(0, 16).TrimEnd();
-        _ct01TrnidLast = packed.Substring(16, 16).TrimEnd();
-        _ct01PageNum = (int)ParseLong(packed.Substring(32, 8));
+        _firstTranId = packed.Substring(0, 16).TrimEnd();
+        _lastTranId = packed.Substring(16, 16).TrimEnd();
+        _pageNumber = (int)ParseLong(packed.Substring(32, 8));
         char nx = packed[40];
-        _ct01NextPageFlg = nx == 'Y' ? 'Y' : 'N';
+        _nextPageFlag = nx == 'Y' ? 'Y' : 'N';
         char sf = packed[41];
-        _ct01TrnSelFlg = sf == ' ' ? "" : sf.ToString();
-        _ct01TrnSelected = packed.Substring(42, 16).TrimEnd();
+        _tranSelectFlag = sf == ' ' ? "" : sf.ToString();
+        _selectedTranId = packed.Substring(42, 16).TrimEnd();
     }
 
     // =============================================================================================

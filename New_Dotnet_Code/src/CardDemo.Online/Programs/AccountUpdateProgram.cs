@@ -33,7 +33,7 @@ namespace CardDemo.Online.Programs;
 /// <list type="bullet">
 /// <item>FB-1 — <c>9700-CHECK-CHANGE-IN-REC</c> aborts on a detected change by <c>GO TO
 /// 9600-WRITE-PROCESSING-EXIT</c> (the caller's exit), jumping out of the PERFORM range so the REWRITEs
-/// are skipped. Reproduced by returning straight out of <c>WriteProcessing9600</c>.</item>
+/// are skipped. Reproduced by returning straight out of <c>WriteProcessing</c>.</item>
 /// <item>FB-2 — the DOB before-image compare in 9700 reads the 8-char dashless OLD field at
 /// <c>(5:2)</c>/<c>(7:2)</c> against the 10-char dashed live record at <c>(6:2)</c>/<c>(9:2)</c>. Exact
 /// offsets preserved.</item>
@@ -54,20 +54,20 @@ namespace CardDemo.Online.Programs;
 public sealed class AccountUpdateProgram : ITransactionHandler
 {
     // === WS-LITERALS. source: COACTUPC.cbl:532-582 ===
-    private const string LIT_THISPGM = "COACTUPC";      // :533-534
-    private const string LIT_THISTRANID = "CAUP";       // :535-536
-    private const string LIT_THISMAPSET = "COACTUP ";   // :537-538
-    private const string LIT_THISMAP = "CACTUPA";       // :539-540
-    private const string LIT_MENUPGM = "COMEN01C";      // :557-558
-    private const string LIT_MENUTRANID = "CM00";       // :559-560
-    private const string LIT_CCLISTMAPSET = "COCRDLI";  // :553-554
+    private const string ThisProgramId = "COACTUPC";    // WS-LIT-THISPGM PIC X(8). :533-534
+    private const string ThisTransId = "CAUP";          // WS-LIT-THISTRANID PIC X(4). :535-536
+    private const string ThisMapsetName = "COACTUP ";   // WS-LIT-THISMAPSET PIC X(8). :537-538
+    private const string ThisMapName = "CACTUPA";       // WS-LIT-THISMAP PIC X(7). :539-540
+    private const string MenuProgramId = "COMEN01C";    // WS-LIT-MENUPGM PIC X(8). :557-558
+    private const string MenuTransId = "CM00";          // WS-LIT-MENUTRANID PIC X(4). :559-560
+    private const string CardListMapsetName = "COCRDLI"; // WS-LIT-CCLISTMAPSET PIC X(7). :553-554
 
     // === COTTL01Y title constants (COPY COTTL01Y). source: 620 ===
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
+    private const string Title01 = "      AWS Mainframe Modernization       "; // CCDA-TITLE01 PIC X(40)
+    private const string Title02 = "              CardDemo                  "; // CCDA-TITLE02 PIC X(40)
 
     // === Output edited-numeric PIC. WS-EDIT-CURRENCY-9-2-F PIC +ZZZ,ZZZ,ZZZ.99. source: :371 ===
-    private const string CurrencyPic = "+ZZZ,ZZZ,ZZZ.99";
+    private const string CurrencyPic = "+ZZZ,ZZZ,ZZZ.99"; // WS-EDIT-CURRENCY-9-2-F PIC +ZZZ,ZZZ,ZZZ.99
 
     private readonly RelationalDb _db;
 
@@ -78,19 +78,19 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     /// <summary>Parameterless ctor for headless/registry probing where no DB is needed.</summary>
     public AccountUpdateProgram() => _db = null!;
 
-    public string ProgramName => LIT_THISPGM;   // PROGRAM-ID. source: :22-23
-    public string TransId => LIT_THISTRANID;     // CSD TRANSACTION(CAUP). source: CSD_TRANSACTIONS.md
+    public string ProgramName => ThisProgramId;   // PROGRAM-ID. source: :22-23
+    public string TransId => ThisTransId;     // CSD TRANSACTION(CAUP). source: CSD_TRANSACTIONS.md
 
     // ============================================================================================
     //  Working storage (re-initialized every task per pseudo-conversational semantics)
     // ============================================================================================
 
     // WS-CICS-PROCESSNG-VARS. source: :39-47
-    private string _wsTranId = "";              // WS-TRANID X(4). :44
+    private string _tranId = "";              // WS-TRANID X(4). :44
 
     // WS-RETURN-MSG X(75) — only the FIRST error wins (every STRING guarded by WS-RETURN-MSG-OFF). :479
-    private string _wsReturnMsg = "\0";         // WS-RETURN-FLAG-OFF == LOW-VALUES; here \0 == "off"
-    private bool ReturnMsgOff => _wsReturnMsg.Length == 0 || _wsReturnMsg[0] == '\0'; // 88 WS-RETURN-MSG-OFF (SPACES) — see SetReturnMsg
+    private string _returnMsg = "\0";         // WS-RETURN-FLAG-OFF == LOW-VALUES; here \0 == "off"
+    private bool ReturnMsgOff => _returnMsg.Length == 0 || _returnMsg[0] == '\0'; // 88 WS-RETURN-MSG-OFF (SPACES) — see SetReturnMsg
 
     // WS-INPUT-FLAG. source: :171-174
     private bool _inputError;                   // 88 INPUT-ERROR '1' (INPUT-OK '0')
@@ -113,7 +113,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     private bool _foundCustInMaster;           // 88 FOUND-CUST-IN-MASTER '1'
 
     // WS-INFO-MSG X(40) — set via 88-levels in 3250. source: :463-477
-    private string _wsInfoMsg = "";
+    private string _infoMsg = "";
 
     // WS-EDIT-VARIABLE-NAME X(25). source: :53
     private string _editVarName = "";
@@ -160,14 +160,14 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         _now = ctx.Clock.Now;
 
         // MOVE LIT-THISTRANID TO WS-TRANID. :872
-        _wsTranId = LIT_THISTRANID;
+        _tranId = ThisTransId;
         // SET WS-RETURN-MSG-OFF TO TRUE (clear error message). :876
-        _wsReturnMsg = "\0";
+        _returnMsg = "\0";
 
         // Store passed data. :880-893
         bool freshFromMenu;
         if (ctx.EibCalen == 0
-            || (Trim8(ctx.CommArea?.FromProgram) == LIT_THISPGM_MENU() && !(ctx.CommArea?.IsReenter ?? false)))
+            || (Trim8(ctx.CommArea?.FromProgram) == MenuProgramIdLiteral() && !(ctx.CommArea?.IsReenter ?? false)))
         {
             // INITIALIZE CARDDEMO-COMMAREA, WS-THIS-PROGCOMMAREA. :883-884
             _ca = ctx.CommArea is null ? new CardDemoCommArea() : ctx.CommArea; // keep inbound nav if present
@@ -207,20 +207,20 @@ public sealed class AccountUpdateProgram : ITransactionHandler
             // === PF03 EXIT: XCTL to caller or main menu. :927-959 ===
             // (SET CCARD-AID-PFK03 TO TRUE :928 — no-op here)
             if (IsLowOrSpaces(_ca.FromTranId))            // :930-931
-                _ca.ToTranId = LIT_MENUTRANID;            // :932
+                _ca.ToTranId = MenuTransId;            // :932
             else
                 _ca.ToTranId = _ca.FromTranId;            // :934
             if (IsLowOrSpaces(_ca.FromProgram))           // :937-938
-                _ca.ToProgram = LIT_MENUPGM;              // :939
+                _ca.ToProgram = MenuProgramId;              // :939
             else
                 _ca.ToProgram = _ca.FromProgram;          // :941
 
-            _ca.FromTranId = LIT_THISTRANID;              // :944
-            _ca.FromProgram = LIT_THISPGM;                // :945
+            _ca.FromTranId = ThisTransId;              // :944
+            _ca.FromProgram = ThisProgramId;                // :945
             _ca.SetUser();                                // SET CDEMO-USRTYP-USER. :947
             _ca.SetFirstEntry();                          // SET CDEMO-PGM-ENTER. :948
-            _ca.LastMapSet = LIT_THISMAPSET.TrimEnd();    // :949
-            _ca.LastMap = LIT_THISMAP;                    // :950
+            _ca.LastMapSet = ThisMapsetName.TrimEnd();    // :949
+            _ca.LastMap = ThisMapName;                    // :950
 
             // EXEC CICS SYNCPOINT :952-954 — no pending DB UOW on the exit path; nothing to commit.
             // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). :956-959
@@ -229,11 +229,11 @@ public sealed class AccountUpdateProgram : ITransactionHandler
             return;
         }
         else if ((_acup.ChangeAction == AcupAction.NotFetched && _ca.IsFirstEntry)
-                 || (Trim8(_ca.FromProgram) == LIT_MENUPGM && !_ca.IsReenter))
+                 || (Trim8(_ca.FromProgram) == MenuProgramId && !_ca.IsReenter))
         {
             // === FRESH ENTRY: ask for the search key. :964-973 ===
             _acup = new AcupCommArea();                   // INITIALIZE WS-THIS-PROGCOMMAREA. :968
-            SendMap3000(ctx);                             // PERFORM 3000-SEND-MAP. :969-970
+            SendMap(ctx);                             // PERFORM 3000-SEND-MAP. :969-970
             _ca.SetReenter();                             // SET CDEMO-PGM-REENTER. :971
             _acup.ChangeAction = AcupAction.NotFetched;   // SET ACUP-DETAILS-NOT-FETCHED. :972
             CommonReturn(ctx);                            // GO TO COMMON-RETURN. :973
@@ -248,7 +248,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
             ResetMiscStorage();                           // INITIALIZE WS-MISC-STORAGE. :982
             _ca.AcctId = 0;                               // INITIALIZE CDEMO-ACCT-ID. :983
             _ca.SetFirstEntry();                          // SET CDEMO-PGM-ENTER. :984
-            SendMap3000(ctx);                             // PERFORM 3000-SEND-MAP. :985-986
+            SendMap(ctx);                             // PERFORM 3000-SEND-MAP. :985-986
             _ca.SetReenter();                             // SET CDEMO-PGM-REENTER. :987
             _acup.ChangeAction = AcupAction.NotFetched;   // SET ACUP-DETAILS-NOT-FETCHED. :988
             CommonReturn(ctx);                            // GO TO COMMON-RETURN. :989
@@ -257,16 +257,16 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         else
         {
             // === WHEN OTHER: process inputs, decide, send. :996-1003 ===
-            ProcessInputs1000(ctx);                       // :997-998
-            DecideAction2000(ctx);                        // :999-1000
-            SendMap3000(ctx);                             // :1001-1002
+            ProcessInputs(ctx);                       // :997-998
+            DecideAction(ctx);                        // :999-1000
+            SendMap(ctx);                             // :1001-1002
             CommonReturn(ctx);                            // GO TO COMMON-RETURN. :1003
             return;
         }
     }
 
     // The COBOL test at :881 is `CDEMO-FROM-PROGRAM = LIT-MENUPGM`. Helper kept tiny + named per source.
-    private static string LIT_THISPGM_MENU() => LIT_MENUPGM;
+    private static string MenuProgramIdLiteral() => MenuProgramId; // COBOL literal: WS-LIT-MENUPGM
 
     // === COMMON-RETURN. source: COACTUPC.cbl:1007-1020 ===
     private void CommonReturn(CicsContext ctx)
@@ -276,16 +276,16 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         ProgStateStore.Save(_ca, _acup);
         // EXEC CICS RETURN TRANSID(CAUP) COMMAREA(WS-COMMAREA) LENGTH(2000). :1015-1019
         if (ctx.Outcome is null)
-            ctx.ReturnTransId(LIT_THISTRANID, _ca);
+            ctx.ReturnTransId(ThisTransId, _ca);
     }
 
     // ============================================================================================
     //  1000-PROCESS-INPUTS. source: COACTUPC.cbl:1025-1037
     // ============================================================================================
-    private void ProcessInputs1000(CicsContext ctx)
+    private void ProcessInputs(CicsContext ctx)
     {
-        ReceiveMap1100(ctx);     // PERFORM 1100-RECEIVE-MAP. :1026-1027
-        EditMapInputs1200();     // PERFORM 1200-EDIT-MAP-INPUTS. :1028-1029
+        ReceiveMap(ctx);     // PERFORM 1100-RECEIVE-MAP. :1026-1027
+        EditMapInputs();     // PERFORM 1200-EDIT-MAP-INPUTS. :1028-1029
         // MOVE WS-RETURN-MSG TO CCARD-ERROR-MSG. :1030 (work area; no persistence)
         // MOVE LIT-THISPGM/MAPSET/MAP TO CCARD-NEXT-*. :1031-1033 (work area)
     }
@@ -293,10 +293,10 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     // ============================================================================================
     //  1100-RECEIVE-MAP. source: COACTUPC.cbl:1039-1427
     // ============================================================================================
-    private void ReceiveMap1100(CicsContext ctx)
+    private void ReceiveMap(CicsContext ctx)
     {
         // EXEC CICS RECEIVE MAP('CACTUPA') MAPSET('COACTUP') INTO(CACTUPAI). :1040-1045
-        ctx.ReceiveMap(LIT_THISMAP, LIT_THISMAPSET.TrimEnd(), _map);
+        ctx.ReceiveMap(ThisMapName, ThisMapsetName.TrimEnd(), _map);
 
         // INITIALIZE ACUP-NEW-DETAILS. :1047
         _acup.New = new AcupDetails();
@@ -383,14 +383,14 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     // ============================================================================================
     //  1200-EDIT-MAP-INPUTS. source: COACTUPC.cbl:1429-1679
     // ============================================================================================
-    private void EditMapInputs1200()
+    private void EditMapInputs()
     {
         _inputError = false; // SET INPUT-OK TO TRUE. :1431
 
         if (_acup.ChangeAction == AcupAction.NotFetched)
         {
             // Validate the search keys only. :1433-1449
-            EditAccount1210();                                   // :1435-1436
+            EditAccount();                                   // :1435-1436
             _acup.Old = new AcupDetails();                       // MOVE LOW-VALUES TO ACUP-OLD-ACCT-DATA. :1438
             if (_acctFilter == AcctFilter.Blank)                 // :1441-1443
                 SetReturnMsg("No input received");               // 88 NO-SEARCH-CRITERIA-RECEIVED. :489-490
@@ -401,7 +401,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         _foundAcctInMaster = true; _foundCustInMaster = true;
         _acctFilter = AcctFilter.IsValid; _custFilter = CustFilter.IsValid;
 
-        CompareOldNew1205();                                     // :1460-1461
+        CompareOldNew();                                     // :1460-1461
 
         // No change, or already confirmed/done → clear flags + exit. :1463-1468
         if (!_changeHasOccurred
@@ -416,77 +416,77 @@ public sealed class AccountUpdateProgram : ITransactionHandler
 
         // === Full edit battery, in COBOL order. :1472-1662 ===
         _editVarName = "Account Status";                                                   // :1472
-        _fAcctStatus = EditYesNo1220(_acup.New.ActiveStatus);                              // :1473-1476
+        _fAcctStatus = EditYesNo(_acup.New.ActiveStatus);                              // :1473-1476
 
         EditDateCcyymmdd(_acup.New.OpenDate(), "Open Date", out _fOpenYear, out _fOpenMon, out _fOpenDay, dobCheck: false); // :1478-1482
 
         _editVarName = "Credit Limit";                                                     // :1484
-        _fCredLimit = EditSigned9V2(_acup.New.CreditLimitX);                               // :1485-1488
+        _fCredLimit = EditSignedDecimal(_acup.New.CreditLimitX);                               // :1485-1488
 
         EditDateCcyymmdd(_acup.New.ExpDate(), "Expiry Date", out _fExpYear, out _fExpMon, out _fExpDay, dobCheck: false); // :1490-1494
 
         _editVarName = "Cash Credit Limit";                                                // :1496
-        _fCashLimit = EditSigned9V2(_acup.New.CashCreditLimitX);                           // :1497-1501
+        _fCashLimit = EditSignedDecimal(_acup.New.CashCreditLimitX);                           // :1497-1501
 
         EditDateCcyymmdd(_acup.New.RisDate(), "Reissue Date", out _fRisYear, out _fRisMon, out _fRisDay, dobCheck: false); // :1503-1507
 
         _editVarName = "Current Balance";                                                  // :1509
-        _fCurrBal = EditSigned9V2(_acup.New.CurrBalX);                                     // :1510-1513
+        _fCurrBal = EditSignedDecimal(_acup.New.CurrBalX);                                     // :1510-1513
 
         _editVarName = "Current Cycle Credit Limit";                                       // :1515
-        _fCurrCycCredit = EditSigned9V2(_acup.New.CurrCycCreditX);                         // :1516-1520
+        _fCurrCycCredit = EditSignedDecimal(_acup.New.CurrCycCreditX);                         // :1516-1520
 
         _editVarName = "Current Cycle Debit Limit";                                        // :1522
-        _fCurrCycDebit = EditSigned9V2(_acup.New.CurrCycDebitX);                           // :1523-1527
+        _fCurrCycDebit = EditSignedDecimal(_acup.New.CurrCycDebitX);                           // :1523-1527
 
         _editVarName = "SSN";                                                              // :1529
-        EditUsSsn1265();                                                                   // :1530-1531
+        EditUsSsn();                                                                   // :1530-1531
 
         EditDateCcyymmdd(_acup.New.DobDate(), "Date of Birth", out _fDobYear, out _fDobMon, out _fDobDay, dobCheck: true); // :1533-1543
 
         _editVarName = "FICO Score";                                                       // :1545
-        _fFico = EditNumReqd1245(_acup.New.FicoX, 3);                                       // :1546-1552
+        _fFico = EditNumRequired(_acup.New.FicoX, 3);                                       // :1546-1552
         if (_fFico == Flg.Valid)                                                           // :1553
-            _fFico = EditFicoScore1275(_acup.New.FicoX);                                    // :1554-1555
+            _fFico = EditFicoScore(_acup.New.FicoX);                                    // :1554-1555
 
         _editVarName = "First Name";                                                        // :1560
-        _fFirstName = EditAlphaReqd1225(_acup.New.FirstName, 25);                           // :1561-1566
+        _fFirstName = EditAlphaRequired(_acup.New.FirstName, 25);                           // :1561-1566
         _editVarName = "Middle Name";                                                       // :1568
-        _fMiddleName = EditAlphaOpt1235(_acup.New.MiddleName, 25);                          // :1569-1574
+        _fMiddleName = EditAlphaOptional(_acup.New.MiddleName, 25);                          // :1569-1574
         _editVarName = "Last Name";                                                         // :1576
-        _fLastName = EditAlphaReqd1225(_acup.New.LastName, 25);                             // :1577-1582
+        _fLastName = EditAlphaRequired(_acup.New.LastName, 25);                             // :1577-1582
 
         _editVarName = "Address Line 1";                                                    // :1584
-        _fAddr1 = EditMandatory1215(_acup.New.AddrLine1, 50);                               // :1585-1590
+        _fAddr1 = EditMandatory(_acup.New.AddrLine1, 50);                               // :1585-1590
 
         _editVarName = "State";                                                             // :1592
-        _fState = EditAlphaReqd1225(_acup.New.StateCd, 2);                                  // :1593-1598
+        _fState = EditAlphaRequired(_acup.New.StateCd, 2);                                  // :1593-1598
         if (_fState == Flg.Valid)                                                           // FLG-ALPHA-ISVALID :1599
-            _fState = EditUsStateCd1270(_acup.New.StateCd);                                 // :1600-1601
+            _fState = EditUsStateCode(_acup.New.StateCd);                                 // :1600-1601
 
         _editVarName = "Zip";                                                               // :1605
-        _fZip = EditNumReqd1245(_acup.New.Zip, 5);                                          // :1606-1611
+        _fZip = EditNumRequired(_acup.New.Zip, 5);                                          // :1606-1611
 
         _editVarName = "City";                                                              // :1615
-        _fCity = EditAlphaReqd1225(_acup.New.AddrLine3, 50);                                // :1616-1621
+        _fCity = EditAlphaRequired(_acup.New.AddrLine3, 50);                                // :1616-1621
 
         _editVarName = "Country";                                                           // :1623
-        _fCountry = EditAlphaReqd1225(_acup.New.CountryCd, 3);                              // :1624-1630
+        _fCountry = EditAlphaRequired(_acup.New.CountryCd, 3);                              // :1624-1630
 
         _editVarName = "Phone Number 1";                                                    // :1632
-        EditUsPhone1260(_acup.New.PhoneNum1(), out _fPh1a, out _fPh1b, out _fPh1c);         // :1633-1638
+        EditUsPhone(_acup.New.PhoneNum1(), out _fPh1a, out _fPh1b, out _fPh1c);         // :1633-1638
         _editVarName = "Phone Number 2";                                                    // :1640
-        EditUsPhone1260(_acup.New.PhoneNum2(), out _fPh2a, out _fPh2b, out _fPh2c);         // :1641-1646
+        EditUsPhone(_acup.New.PhoneNum2(), out _fPh2a, out _fPh2b, out _fPh2c);         // :1641-1646
 
         _editVarName = "EFT Account Id";                                                    // :1648
-        _fEft = EditNumReqd1245(_acup.New.EftAccountId, 10);                                // :1649-1655
+        _fEft = EditNumRequired(_acup.New.EftAccountId, 10);                                // :1649-1655
 
         _editVarName = "Primary Card Holder";                                               // :1657
-        _fPriCardholder = EditYesNo1220(_acup.New.PriHolderInd);                            // :1658-1662
+        _fPriCardholder = EditYesNo(_acup.New.PriHolderInd);                            // :1658-1662
 
         // Cross-field: state + zip combo. :1665-1669
         if (_fState == Flg.Valid && _fZip == Flg.Valid)
-            EditUsStateZipCd1280();
+            EditUsStateZip();
 
         // If no error → SET ACUP-CHANGES-OK-NOT-CONFIRMED. :1671-1675
         if (!_inputError)
@@ -496,7 +496,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     // ============================================================================================
     //  1205-COMPARE-OLD-NEW. source: COACTUPC.cbl:1681-1779
     // ============================================================================================
-    private void CompareOldNew1205()
+    private void CompareOldNew()
     {
         _changeHasOccurred = false; // SET NO-CHANGES-FOUND (WS-DATACHANGED-FLAG). :1682
         _noChangesDetected = false; // NO-CHANGES-DETECTED is a WS-RETURN-MSG 88, set below.
@@ -550,7 +550,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     // ============================================================================================
     //  1210-EDIT-ACCOUNT. source: COACTUPC.cbl:1783-1822
     // ============================================================================================
-    private void EditAccount1210()
+    private void EditAccount()
     {
         _acctFilter = AcctFilter.NotOk; // SET FLG-ACCTFILTER-NOT-OK. :1784
         string ccAcctId = _acup.New.AcctIdX; // CC-ACCT-ID
@@ -587,7 +587,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     // ============================================================================================
 
     // 1215-EDIT-MANDATORY. source: :1824-1851
-    private Flg EditMandatory1215(string value, int len)
+    private Flg EditMandatory(string value, int len)
     {
         if (IsBlankField(value, len))
         {
@@ -599,7 +599,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 1220-EDIT-YESNO. source: :1856-1893
-    private Flg EditYesNo1220(string value)
+    private Flg EditYesNo(string value)
     {
         // WS-EDIT-YES-NO is a single char; blank/low/zero → must be supplied. :1861-1874
         char c = FirstChar(value);
@@ -617,7 +617,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 1225-EDIT-ALPHA-REQD. source: :1898-1950
-    private Flg EditAlphaReqd1225(string value, int len)
+    private Flg EditAlphaRequired(string value, int len)
     {
         if (IsBlankField(value, len))
         {
@@ -634,7 +634,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 1235-EDIT-ALPHA-OPT. source: :2012-2056
-    private Flg EditAlphaOpt1235(string value, int len)
+    private Flg EditAlphaOptional(string value, int len)
     {
         if (IsBlankField(value, len))
             return Flg.Valid; // optional → valid. :2024
@@ -646,7 +646,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 1245-EDIT-NUM-REQD. source: :2109-2175
-    private Flg EditNumReqd1245(string value, int len)
+    private Flg EditNumRequired(string value, int len)
     {
         if (IsBlankField(value, len))
         {
@@ -671,7 +671,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 1250-EDIT-SIGNED-9V2. source: :2180-2221
-    private Flg EditSigned9V2(string valueX)
+    private Flg EditSignedDecimal(string valueX)
     {
         // WS-EDIT-SIGNED-NUMBER-9V2-X is the raw X(12) from the money field. :2184-2196
         if (IsLowOrSpacesFull(valueX, 12))
@@ -690,7 +690,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     // ============================================================================================
     //  1260-EDIT-US-PHONE-NUM (+ EDIT-AREA-CODE / -PREFIX / -LINENUM). source: :2225-2426
     // ============================================================================================
-    private void EditUsPhone1260(string phone15, out Flg fa, out Flg fb, out Flg fc)
+    private void EditUsPhone(string phone15, out Flg fa, out Flg fb, out Flg fc)
     {
         fa = Flg.Valid; fb = Flg.Valid; fc = Flg.Valid;
         // The X(15) is (AAA)BBB-CCCC; parts via redefine: A=(2:3) B=(6:3) C=(10:4). source: :82-100
@@ -787,11 +787,11 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     // ============================================================================================
     //  1265-EDIT-US-SSN. source: :2431-2490
     // ============================================================================================
-    private void EditUsSsn1265()
+    private void EditUsSsn()
     {
         // Part 1: 3-digit num required, then INVALID-SSN-PART1 (0, 666, 900-999). :2439-2464
         _editVarName = "SSN: First 3 chars";
-        _fSsn1 = EditNumReqd1245(_acup.New.Ssn1, 3);
+        _fSsn1 = EditNumRequired(_acup.New.Ssn1, 3);
         if (_fSsn1 == Flg.Valid)
         {
             int p1 = (int)ParseLong(Field(_acup.New.Ssn1, 3));
@@ -803,14 +803,14 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         }
         // Part 2: 2-digit num required. :2469-2475
         _editVarName = "SSN 4th & 5th chars";
-        _fSsn2 = EditNumReqd1245(_acup.New.Ssn2, 2);
+        _fSsn2 = EditNumRequired(_acup.New.Ssn2, 2);
         // Part 3: 4-digit num required. :2481-2487
         _editVarName = "SSN Last 4 chars";
-        _fSsn3 = EditNumReqd1245(_acup.New.Ssn3, 4);
+        _fSsn3 = EditNumRequired(_acup.New.Ssn3, 4);
     }
 
     // 1270-EDIT-US-STATE-CD. source: :2493-2511
-    private Flg EditUsStateCd1270(string stateCd)
+    private Flg EditUsStateCode(string stateCd)
     {
         if (Lookups.ValidUsStateCode(Field(stateCd, 2))) // VALID-US-STATE-CODE. :2495
             return Flg.Valid; // unchanged from the alpha-valid caller
@@ -820,7 +820,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 1275-EDIT-FICO-SCORE. source: :2514-2531
-    private Flg EditFicoScore1275(string ficoX)
+    private Flg EditFicoScore(string ficoX)
     {
         int fico = (int)ParseLong(Field(ficoX, 3));
         if (fico >= 300 && fico <= 850) // 88 FICO-RANGE-IS-VALID. :848-849
@@ -831,7 +831,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 1280-EDIT-US-STATE-ZIP-CD. source: :2536-2558
-    private void EditUsStateZipCd1280()
+    private void EditUsStateZip()
     {
         // STRING state ++ first 2 of zip → US-STATE-AND-FIRST-ZIP2 (X(4)). :2537-2540
         string combo = ClampOrPad(Field(_acup.New.StateCd, 2) + Slice(_acup.New.Zip, 1, 2), 4);
@@ -1026,7 +1026,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     // ============================================================================================
     //  2000-DECIDE-ACTION. source: COACTUPC.cbl:2562-2645
     // ============================================================================================
-    private void DecideAction2000(CicsContext ctx)
+    private void DecideAction(CicsContext ctx)
     {
         CcardAid aid = CssTrpfy.StorePfKey(ctx.EibAid);
         if (!_pfkValid) aid = CcardAid.Enter; // AID was coerced to ENTER in 0000-MAIN if invalid.
@@ -1036,8 +1036,8 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         {
             if (_acctFilter == AcctFilter.IsValid)
             {
-                _wsReturnMsg = "\0";              // SET WS-RETURN-MSG-OFF. :2574
-                ReadAcct9000();                  // PERFORM 9000-READ-ACCT. :2575-2576
+                _returnMsg = "\0";              // SET WS-RETURN-MSG-OFF. :2574
+                ReadAccount();                  // PERFORM 9000-READ-ACCT. :2575-2576
                 if (_foundCustInMaster)          // :2577
                     _acup.ChangeAction = AcupAction.ShowDetails; // SET ACUP-SHOW-DETAILS. :2578
             }
@@ -1060,7 +1060,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         // WHEN ACUP-CHANGES-OK-NOT-CONFIRMED AND CCARD-AID-PFK05. :2602-2615
         else if (_acup.ChangeAction == AcupAction.ChangesOkNotConfirmed && aid == CcardAid.Pfk05)
         {
-            WriteProcessing9600();               // PERFORM 9600-WRITE-PROCESSING. :2604-2605
+            WriteProcessing();               // PERFORM 9600-WRITE-PROCESSING. :2604-2605
             if (_couldNotLockAcct)
                 _acup.ChangeAction = AcupAction.OkayedLockError;   // :2608
             else if (_lockedButUpdateFailed)
@@ -1102,18 +1102,18 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     // ============================================================================================
     //  3000-SEND-MAP and sub-paragraphs. source: COACTUPC.cbl:2649-3605
     // ============================================================================================
-    private void SendMap3000(CicsContext ctx)
+    private void SendMap(CicsContext ctx)
     {
-        ScreenInit3100(ctx);          // :2650-2651
-        SetupScreenVars3200();        // :2652-2653
-        SetupInfoMsg3250();           // :2654-2655
-        SetupScreenAttrs3300();       // :2656-2657
-        SetupInfoMsgAttrs3390();      // :2658-2659
-        SendScreen3400(ctx);          // :2660-2661
+        ScreenInit(ctx);          // :2650-2651
+        SetupScreenVars();        // :2652-2653
+        SetupInfoMsg();           // :2654-2655
+        SetupScreenAttrs();       // :2656-2657
+        SetupInfoMsgAttrs();      // :2658-2659
+        SendScreen(ctx);          // :2660-2661
     }
 
     // 3100-SCREEN-INIT. source: :2668-2692
-    private void ScreenInit3100(CicsContext ctx)
+    private void ScreenInit(CicsContext ctx)
     {
         // MOVE LOW-VALUES TO CACTUPAO (blank every output field, clear per-turn overrides). :2669
         foreach (ScreenField f in _map.Fields)
@@ -1123,10 +1123,10 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         }
         _now = ctx.Clock.Now;
 
-        SetOut("TITLE01", CCDA_TITLE01);                 // :2673
-        SetOut("TITLE02", CCDA_TITLE02);                 // :2674
-        SetOut("TRNNAME", LIT_THISTRANID);               // :2675
-        SetOut("PGMNAME", LIT_THISPGM);                  // :2676
+        SetOut("TITLE01", Title01);                 // :2673
+        SetOut("TITLE02", Title02);                 // :2674
+        SetOut("TRNNAME", ThisTransId);               // :2675
+        SetOut("PGMNAME", ThisProgramId);                  // :2676
         SetOut("CURDATE", _now.ToString("MM/dd/yy", CultureInfo.InvariantCulture)); // :2680-2684
         SetOut("CURTIME", _now.ToString("HH:mm:ss", CultureInfo.InvariantCulture)); // :2686-2690
     }
@@ -1134,7 +1134,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     private DateTime _now;
 
     // 3200-SETUP-SCREEN-VARS. source: :2698-2726
-    private void SetupScreenVars3200()
+    private void SetupScreenVars()
     {
         if (_ca.IsFirstEntry) return; // CDEMO-PGM-ENTER → leave blank. :2700-2701
 
@@ -1145,17 +1145,17 @@ public sealed class AccountUpdateProgram : ITransactionHandler
             SetOut("ACCTSID", FmtAcctId(_acup.New.AcctIdX));    // MOVE CC-ACCT-ID. :2707
 
         if (_acup.ChangeAction == AcupAction.NotFetched || ccAcctIdN == 0)
-            ShowInitialValues3201();                            // :2711-2714
+            ShowInitialValues();                            // :2711-2714
         else if (_acup.ChangeAction == AcupAction.ShowDetails)
-            ShowOriginalValues3202();                           // :2715-2717
+            ShowOriginalValues();                           // :2715-2717
         else if (IsChangesMade(_acup.ChangeAction))
-            ShowUpdatedValues3203();                            // :2718-2720
+            ShowUpdatedValues();                            // :2718-2720
         else
-            ShowOriginalValues3202();                           // WHEN OTHER. :2721-2723
+            ShowOriginalValues();                           // WHEN OTHER. :2721-2723
     }
 
     // 3201-SHOW-INITIAL-VALUES. source: :2731-2781
-    private void ShowInitialValues3201()
+    private void ShowInitialValues()
     {
         foreach (string f in new[]
         {
@@ -1169,7 +1169,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 3202-SHOW-ORIGINAL-VALUES. source: :2787-2864
-    private void ShowOriginalValues3202()
+    private void ShowOriginalValues()
     {
         ClearNonKeyFlags();                  // MOVE LOW-VALUES TO WS-NON-KEY-FLAGS. :2789
         SetInfo(Info.PromptForChanges);      // SET PROMPT-FOR-CHANGES. :2791
@@ -1211,7 +1211,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 3203-SHOW-UPDATED-VALUES. source: :2870-2949
-    private void ShowUpdatedValues3203()
+    private void ShowUpdatedValues()
     {
         AcupDetails n = _acup.New;
         SetOut("ACSTTUS", n.ActiveStatus);                                                       // :2872
@@ -1239,7 +1239,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 3250-SETUP-INFOMSG. source: :2955-2982
-    private void SetupInfoMsg3250()
+    private void SetupInfoMsg()
     {
         if (_ca.IsFirstEntry) SetInfo(Info.PromptForSearchKeys);                       // :2958-2959
         else switch (_acup.ChangeAction)
@@ -1252,17 +1252,17 @@ public sealed class AccountUpdateProgram : ITransactionHandler
             case AcupAction.OkayedLockError: SetInfo(Info.InformFailure); break;       // :2971-2972
             case AcupAction.OkayedButFailed: SetInfo(Info.InformFailure); break;       // :2973-2974
             default:
-                if (string.IsNullOrEmpty(_wsInfoMsg)) SetInfo(Info.PromptForSearchKeys); // WS-NO-INFO-MESSAGE. :2975-2976
+                if (string.IsNullOrEmpty(_infoMsg)) SetInfo(Info.PromptForSearchKeys); // WS-NO-INFO-MESSAGE. :2975-2976
                 break;
         }
-        SetOut("INFOMSG", _wsInfoMsg);                                                 // :2979
+        SetOut("INFOMSG", _infoMsg);                                                 // :2979
         SetOut("ERRMSG", ReturnMsgText());                                             // :2981
     }
 
     // 3300-SETUP-SCREEN-ATTRS. source: :2986-3436
-    private void SetupScreenAttrs3300()
+    private void SetupScreenAttrs()
     {
-        ProtectAllAttrs3310(); // PERFORM 3310-PROTECT-ALL-ATTRS. :2989-2990
+        ProtectAllAttrs(); // PERFORM 3310-PROTECT-ALL-ATTRS. :2989-2990
 
         // Unprotect based on context. :2993-3006
         switch (_acup.ChangeAction)
@@ -1272,7 +1272,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
                 break;
             case AcupAction.ShowDetails:
             case AcupAction.ChangesNotOk:
-                UnprotectFewAttrs3320();           // :2999-3000
+                UnprotectFewAttrs();           // :2999-3000
                 break;
             case AcupAction.ChangesOkNotConfirmed:
             case AcupAction.OkayedAndDone:
@@ -1284,10 +1284,10 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         }
 
         // Position cursor at the first errored field in screen order. :3009-3167
-        PositionCursor3300();
+        PositionCursor();
 
         // SETUP COLOR. :3170-3192
-        if (_ca.LastMapSet.TrimEnd() == LIT_CCLISTMAPSET)                   // :3171
+        if (_ca.LastMapSet.TrimEnd() == CardListMapsetName)                   // :3171
             SetColor("ACCTSID", BmsColor.Default);                         // DFHDFCOL. :3172
         if (_acctFilter == AcctFilter.NotOk)                               // :3176
             SetColor("ACCTSID", BmsColor.Red);                            // DFHRED. :3177
@@ -1302,34 +1302,34 @@ public sealed class AccountUpdateProgram : ITransactionHandler
             return; // GO TO 3300-SETUP-SCREEN-ATTRS-EXIT. :3186-3192
 
         // COPY CSSETATY per field: red + '*' when NOT-OK/BLANK and re-enter. :3208-3435
-        Csetaty(_fAcctStatus, "ACSTTUS"); // :3208-3211
-        Csetaty(_fOpenYear, "OPNYEAR"); Csetaty(_fOpenMon, "OPNMON"); Csetaty(_fOpenDay, "OPNDAY"); // :3214-3229
-        Csetaty(_fCredLimit, "ACRDLIM"); // :3231-3235
-        Csetaty(_fExpYear, "EXPYEAR"); Csetaty(_fExpMon, "EXPMON"); Csetaty(_fExpDay, "EXPDAY"); // :3237-3253
-        Csetaty(_fCashLimit, "ACSHLIM"); // :3255-3259
-        Csetaty(_fRisYear, "RISYEAR"); Csetaty(_fRisMon, "RISMON"); Csetaty(_fRisDay, "RISDAY"); // :3261-3277
-        Csetaty(_fCurrBal, "ACURBAL"); // :3279-3283
-        Csetaty(_fCurrCycCredit, "ACRCYCR"); Csetaty(_fCurrCycDebit, "ACRCYDB"); // :3285-3295
-        Csetaty(_fSsn1, "ACTSSN1"); Csetaty(_fSsn2, "ACTSSN2"); Csetaty(_fSsn3, "ACTSSN3"); // :3297-3313
-        Csetaty(_fDobYear, "DOBYEAR"); Csetaty(_fDobMon, "DOBMON"); Csetaty(_fDobDay, "DOBDAY"); // :3315-3331
-        Csetaty(_fFico, "ACSTFCO"); // :3333-3337
-        Csetaty(_fFirstName, "ACSFNAM"); Csetaty(_fMiddleName, "ACSMNAM"); Csetaty(_fLastName, "ACSLNAM"); // :3339-3355
-        Csetaty(_fAddr1, "ACSADL1"); // :3357-3361
-        Csetaty(_fState, "ACSSTTE"); // :3363-3367
+        ApplyErrorAttr(_fAcctStatus, "ACSTTUS"); // :3208-3211
+        ApplyErrorAttr(_fOpenYear, "OPNYEAR"); ApplyErrorAttr(_fOpenMon, "OPNMON"); ApplyErrorAttr(_fOpenDay, "OPNDAY"); // :3214-3229
+        ApplyErrorAttr(_fCredLimit, "ACRDLIM"); // :3231-3235
+        ApplyErrorAttr(_fExpYear, "EXPYEAR"); ApplyErrorAttr(_fExpMon, "EXPMON"); ApplyErrorAttr(_fExpDay, "EXPDAY"); // :3237-3253
+        ApplyErrorAttr(_fCashLimit, "ACSHLIM"); // :3255-3259
+        ApplyErrorAttr(_fRisYear, "RISYEAR"); ApplyErrorAttr(_fRisMon, "RISMON"); ApplyErrorAttr(_fRisDay, "RISDAY"); // :3261-3277
+        ApplyErrorAttr(_fCurrBal, "ACURBAL"); // :3279-3283
+        ApplyErrorAttr(_fCurrCycCredit, "ACRCYCR"); ApplyErrorAttr(_fCurrCycDebit, "ACRCYDB"); // :3285-3295
+        ApplyErrorAttr(_fSsn1, "ACTSSN1"); ApplyErrorAttr(_fSsn2, "ACTSSN2"); ApplyErrorAttr(_fSsn3, "ACTSSN3"); // :3297-3313
+        ApplyErrorAttr(_fDobYear, "DOBYEAR"); ApplyErrorAttr(_fDobMon, "DOBMON"); ApplyErrorAttr(_fDobDay, "DOBDAY"); // :3315-3331
+        ApplyErrorAttr(_fFico, "ACSTFCO"); // :3333-3337
+        ApplyErrorAttr(_fFirstName, "ACSFNAM"); ApplyErrorAttr(_fMiddleName, "ACSMNAM"); ApplyErrorAttr(_fLastName, "ACSLNAM"); // :3339-3355
+        ApplyErrorAttr(_fAddr1, "ACSADL1"); // :3357-3361
+        ApplyErrorAttr(_fState, "ACSSTTE"); // :3363-3367
         // Address Line 2 / Zip / City / Country. :3369-3391
-        Csetaty(Flg.Valid, "ACSADL2"); // ADDRESS-LINE-2 has no edit flag; always valid.
-        Csetaty(_fZip, "ACSZIPC");
-        Csetaty(_fCity, "ACSCITY");
-        Csetaty(_fCountry, "ACSCTRY");
-        Csetaty(_fPh1a, "ACSPH1A"); Csetaty(_fPh1b, "ACSPH1B"); Csetaty(_fPh1c, "ACSPH1C"); // :3393-3408
-        Csetaty(_fPh2a, "ACSPH2A"); Csetaty(_fPh2b, "ACSPH2B"); Csetaty(_fPh2c, "ACSPH2C"); // :3410-3425
+        ApplyErrorAttr(Flg.Valid, "ACSADL2"); // ADDRESS-LINE-2 has no edit flag; always valid.
+        ApplyErrorAttr(_fZip, "ACSZIPC");
+        ApplyErrorAttr(_fCity, "ACSCITY");
+        ApplyErrorAttr(_fCountry, "ACSCTRY");
+        ApplyErrorAttr(_fPh1a, "ACSPH1A"); ApplyErrorAttr(_fPh1b, "ACSPH1B"); ApplyErrorAttr(_fPh1c, "ACSPH1C"); // :3393-3408
+        ApplyErrorAttr(_fPh2a, "ACSPH2A"); ApplyErrorAttr(_fPh2b, "ACSPH2B"); ApplyErrorAttr(_fPh2c, "ACSPH2C"); // :3410-3425
         // FB-5: cross-labeled EFT vs Primary-Holder. EFT comment sets PRI-CARDHOLDER/ACSPFLG, and vice-versa.
-        Csetaty(_fPriCardholder, "ACSPFLG"); // :3426-3430 (labeled "EFT Account Id")
-        Csetaty(_fEft, "ACSEFTC");           // :3432-3435 (labeled "Primary Card Holder")
+        ApplyErrorAttr(_fPriCardholder, "ACSPFLG"); // :3426-3430 (labeled "EFT Account Id")
+        ApplyErrorAttr(_fEft, "ACSEFTC");           // :3432-3435 (labeled "Primary Card Holder")
     }
 
     // The big cursor-positioning EVALUATE. source: :3009-3167
-    private void PositionCursor3300()
+    private void PositionCursor()
     {
         // FOUND-ACCOUNT-DATA / NO-CHANGES-DETECTED → cursor on ACSTTUS. :3010-3012
         if (_foundAccountData || _noChangesDetected) { PutCursor("ACSTTUS"); return; }
@@ -1379,14 +1379,14 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     private bool _foundAccountData;
 
     // 3310-PROTECT-ALL-ATTRS. source: :3441-3495
-    private void ProtectAllAttrs3310()
+    private void ProtectAllAttrs()
     {
         foreach (string f in AllInputFields.Concat(new[] { "INFOMSG" }))
             SetAttr(f, Prot()); // MOVE DFHBMPRF (protect). :3442-3494
     }
 
     // 3320-UNPROTECT-FEW-ATTRS. source: :3500-3560
-    private void UnprotectFewAttrs3320()
+    private void UnprotectFewAttrs()
     {
         foreach (string f in new[]
         {
@@ -1409,10 +1409,10 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 3390-SETUP-INFOMSG-ATTRS. source: :3566-3583
-    private void SetupInfoMsgAttrs3390()
+    private void SetupInfoMsgAttrs()
     {
         // IF WS-NO-INFO-MESSAGE → DFHBMDAR (dark) ELSE DFHBMASB (bright). :3567-3571
-        SetAttr("INFOMSG", string.IsNullOrEmpty(Trim(_wsInfoMsg))
+        SetAttr("INFOMSG", string.IsNullOrEmpty(Trim(_infoMsg))
             ? BmsAttribute.AutoSkip | BmsAttribute.Dark      // DFHBMDAR
             : BmsAttribute.AutoSkip | BmsAttribute.Bright);  // DFHBMASB
 
@@ -1428,10 +1428,10 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 3400-SEND-SCREEN. source: :3589-3602
-    private void SendScreen3400(CicsContext ctx)
+    private void SendScreen(CicsContext ctx)
     {
         // EXEC CICS SEND MAP('CACTUPA') MAPSET('COACTUP') FROM(CACTUPAO) CURSOR ERASE FREEKB. :3594-3601
-        ctx.SendMap(LIT_THISMAP, LIT_THISMAPSET.TrimEnd(), _map, new SendMapOptions
+        ctx.SendMap(ThisMapName, ThisMapsetName.TrimEnd(), _map, new SendMapOptions
         {
             Erase = true,
             FreeKb = true,
@@ -1449,7 +1449,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     private bool _dataWasChanged;
 
     // 9000-READ-ACCT. source: :3608-3644
-    private void ReadAcct9000()
+    private void ReadAccount()
     {
         _acup.Old = new AcupDetails();      // INITIALIZE ACUP-OLD-DETAILS. :3610
         SetInfo(Info.None);                  // SET WS-NO-INFO-MESSAGE. :3612
@@ -1457,10 +1457,10 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         _acup.Old.AcctIdX = _acup.New.AcctIdX; // MOVE CC-ACCT-ID TO ACUP-OLD-ACCT-ID. :3614
         _cardRidAcctId = ccAcctId;             // … WS-CARD-RID-ACCT-ID. :3615
 
-        GetCardXrefByAcct9200();               // :3617-3618
+        GetCardXrefByAccount();               // :3617-3618
         if (_acctFilter == AcctFilter.NotOk) return; // :3620-3622
 
-        GetAcctDataByAcct9300();               // :3624-3625
+        GetAccountDataByAccount();               // :3624-3625
         // :3627-3629 IF DID-NOT-FIND-ACCT-IN-ACCTDAT GO TO 9000-READ-ACCT-EXIT. The 88-level
         // DID-NOT-FIND-ACCT-IN-ACCTDAT (on WS-RETURN-MSG, def :499-500) is NEVER set: its only SET is
         // COMMENTED OUT at COACTUPC.cbl:3719. So this guard is ALWAYS false and control FALLS THROUGH on
@@ -1469,14 +1469,14 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         // then 2000-DECIDE-ACTION SETs ACUP-SHOW-DETAILS. Reproduced faithfully (no early return here).
 
         _cardRidCustId = _ca.CustId;           // MOVE CDEMO-CUST-ID TO WS-CARD-RID-CUST-ID. :3631
-        GetCustDataByCust9400();               // :3633-3634
+        GetCustomerDataByCustomer();               // :3633-3634
         if (!_foundCustInMaster) return;       // DID-NOT-FIND-CUST-IN-CUSTDAT. :3636-3638
 
-        StoreFetchedData9500();                // :3642-3643
+        StoreFetchedData();                // :3642-3643
     }
 
     // 9200-GETCARDXREF-BYACCT. source: :3650-3697
-    private void GetCardXrefByAcct9200()
+    private void GetCardXrefByAccount()
     {
         var repo = new CardXrefRepository(_db.Connection);
         string status = repo.ReadByAltKey(_cardRidAcctId, out CardXref? xref); // READ CXACAIX by acct alt key. :3654-3662
@@ -1499,7 +1499,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 9300-GETACCTDATA-BYACCT. source: :3701-3748
-    private void GetAcctDataByAcct9300()
+    private void GetAccountDataByAccount()
     {
         var repo = new AccountRepository(_db.Connection);
         string status = repo.ReadByKey(_cardRidAcctId, out Account? acct); // READ ACCTDAT. :3703-3711
@@ -1521,7 +1521,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 9400-GETCUSTDATA-BYCUST. source: :3752-3797
-    private void GetCustDataByCust9400()
+    private void GetCustomerDataByCustomer()
     {
         var repo = new CustomerRepository(_db.Connection);
         string status = repo.ReadByKey(_cardRidCustId, out Customer? cust); // READ CUSTDAT. :3753-3761
@@ -1546,7 +1546,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     private Customer? _fetchedCustomer;
 
     // 9500-STORE-FETCHED-DATA. source: :3801-3884
-    private void StoreFetchedData9500()
+    private void StoreFetchedData()
     {
         // On the ACCTDAT-NOTFND fall-through (see 9000-READ-ACCT), _fetchedAccount is null; COBOL reads the
         // freshly-instantiated (low-values) ACCOUNT-RECORD here, i.e. zeros/spaces. A blank Account matches.
@@ -1590,7 +1590,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 9600-WRITE-PROCESSING. source: :3888-4104
-    private void WriteProcessing9600()
+    private void WriteProcessing()
     {
         _cardRidAcctId = ParseLong(_acup.New.AcctIdX); // MOVE CC-ACCT-ID TO WS-CARD-RID-ACCT-ID. :3892
 
@@ -1618,7 +1618,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
         _fetchedCustomer = cust;
 
         // (3) Optimistic-lock check. :3947-3952
-        CheckChangeInRec9700(acct, cust);
+        CheckChangeInRecord(acct, cust);
         if (_dataWasChanged)
             return; // GO TO 9600-WRITE-PROCESSING-EXIT. :3950-3951 (and FB-1: 9700 already short-circuits here)
 
@@ -1685,7 +1685,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // 9700-CHECK-CHANGE-IN-REC. source: :4109-4191
-    private void CheckChangeInRec9700(Account acct, Customer cust)
+    private void CheckChangeInRecord(Account acct, Customer cust)
     {
         AcupDetails o = _acup.Old;
 
@@ -1758,7 +1758,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     private static BmsAttribute Unprot() => BmsAttribute.Unprotected | BmsAttribute.Normal | BmsAttribute.Fset; // DFHBMFSE
 
     // CSSETATY: when the field is NOT-OK/BLANK and CDEMO-PGM-REENTER → red + '*' placeholder. source: CSSETATY.cpy:17-27
-    private void Csetaty(Flg flg, string field)
+    private void ApplyErrorAttr(Flg flg, string field) // COBOL copybook: CSSETATY
     {
         if ((flg == Flg.NotOk || flg == Flg.Blank) && _ca.IsReenter)
         {
@@ -1788,8 +1788,8 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     {
         _acctFilter = AcctFilter.NotOk; _custFilter = CustFilter.NotOk;
         _foundAcctInMaster = false; _foundCustInMaster = false;
-        _wsInfoMsg = ""; _foundAccountData = false; _noChangesDetected = false;
-        _wsReturnMsg = "\0";
+        _infoMsg = ""; _foundAccountData = false; _noChangesDetected = false;
+        _returnMsg = "\0";
     }
 
     // === Info-message setter (the WS-INFO-MSG 88-levels). source: :463-477 ===
@@ -1797,7 +1797,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     private void SetInfo(Info info)
     {
         _foundAccountData = info == Info.FoundAccountData;
-        _wsInfoMsg = info switch
+        _infoMsg = info switch
         {
             Info.FoundAccountData => "Details of selected account shown above",
             Info.PromptForSearchKeys => "Enter or update id of account to update",
@@ -1810,8 +1810,8 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     }
 
     // === WS-RETURN-MSG handling (first error wins). source: :876, 479-480 ===
-    private void SetReturnMsg(string msg) => _wsReturnMsg = msg; // turns WS-RETURN-MSG-OFF false (non-spaces/low)
-    private string ReturnMsgText() => ReturnMsgOff ? "" : _wsReturnMsg;
+    private void SetReturnMsg(string msg) => _returnMsg = msg; // turns WS-RETURN-MSG-OFF false (non-spaces/low)
+    private string ReturnMsgText() => ReturnMsgOff ? "" : _returnMsg;
 
     // === RESP/RESP2 text rendering for the file messages (pinned). source: §9.3 ===
     private static string RespText() => "0000000013"; // ERROR-RESP X(10) — NOTFND
@@ -2065,7 +2065,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     // Expose the OLD-side decimal money for 9500 setters via the AcupDetails properties used above.
     // (CurrBal etc. are MoneyField; 9500 sets .N + .IsNum via Money().)
     // Helper to bridge the 9500 MOVE ACCT-… TO ACUP-OLD-…-N pattern.
-    // (Implemented inline in StoreFetchedData9500 by setting MoneyField.N/IsNum.)
+    // (Implemented inline in StoreFetchedData by setting MoneyField.N/IsNum.)
 
     /// <summary>
     /// Cross-turn store for the program-private trailer. The console runtime round-trips only the nav area
@@ -2166,7 +2166,7 @@ public sealed class AccountUpdateProgram : ITransactionHandler
     // ============================================================================================
 
     /// <summary>The DFHMDI map name. source: SCREEN_COACTUP.md.</summary>
-    public const string MapName = LIT_THISMAP;
+    public const string MapName = ThisMapName;
 
     /// <summary>The DFHMSD mapset name. source: SCREEN_COACTUP.md.</summary>
     public const string MapsetName = "COACTUP";

@@ -59,76 +59,76 @@ public sealed class TransactionListProgram : ITransactionHandler
     // =============================================================================================
     //  WS-VARIABLES — source: COTRN00C.cbl:35-57
     // =============================================================================================
-    private const string WS_PGMNAME = "COTRN00C";       // 05 WS-PGMNAME PIC X(08) VALUE 'COTRN00C'. source: :36
-    private const string WS_TRANID = "CT00";            // 05 WS-TRANID  PIC X(04) VALUE 'CT00'.     source: :37
-    private const string WS_TRANSACT_FILE = "TRANSACT"; // 05 WS-TRANSACT-FILE PIC X(08) VALUE 'TRANSACT'. source: :39
+    private const string ProgramId = "COTRN00C";        // 05 WS-PGMNAME PIC X(08) VALUE 'COTRN00C'. source: :36
+    private const string TranId = "CT00";               // 05 WS-TRANID  PIC X(04) VALUE 'CT00'.     source: :37
+    private const string TransactFileName = "TRANSACT"; // 05 WS-TRANSACT-FILE PIC X(08) VALUE 'TRANSACT'. source: :39
 
-    private string _wsMessage = "";                     // 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
+    private string _message = "";                       // 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
 
     // 05 WS-ERR-FLG PIC X(01) VALUE 'N'. 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. source: :40-42
-    private bool _errFlgOn;
-    private bool ErrFlgOn => _errFlgOn;   // 88 ERR-FLG-ON
-    private bool ErrFlgOff => !_errFlgOn; // 88 ERR-FLG-OFF
+    private bool _errorFlagOn;                       // WS-ERR-FLG
+    private bool ErrorFlagOn => _errorFlagOn;        // 88 ERR-FLG-ON
+    private bool ErrorFlagOff => !_errorFlagOn;      // 88 ERR-FLG-OFF
 
     // 05 WS-TRANSACT-EOF PIC X(01) VALUE 'N'. 88 TRANSACT-EOF='Y' / TRANSACT-NOT-EOF='N'. source: :43-45
-    private bool _transactEof;
-    private bool TransactEof => _transactEof;       // 88 TRANSACT-EOF
-    private bool TransactNotEof => !_transactEof;   // 88 TRANSACT-NOT-EOF
+    private bool _transactionEof;                    // WS-TRANSACT-EOF
+    private bool TransactionEof => _transactionEof;        // 88 TRANSACT-EOF
+    private bool TransactionNotEof => !_transactionEof;    // 88 TRANSACT-NOT-EOF
 
     // 05 WS-SEND-ERASE-FLG PIC X(01) VALUE 'Y'. 88 SEND-ERASE-YES='Y' / SEND-ERASE-NO='N'. source: :46-48
-    private bool _sendEraseYes = true;
-    private bool SendEraseYes => _sendEraseYes;     // 88 SEND-ERASE-YES
+    private bool _sendEraseYes = true;               // WS-SEND-ERASE-FLG
+    private bool SendEraseYes => _sendEraseYes;      // 88 SEND-ERASE-YES
 
     // 05 WS-RESP-CD / WS-REAS-CD PIC S9(09) COMP. source: :50-51
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode;                       // WS-RESP-CD
+    private int _reasonCode;                         // WS-REAS-CD
 
     // 05 WS-REC-COUNT / WS-IDX / WS-PAGE-NUM PIC S9(04) COMP. source: :52-54
     // (WS-REC-COUNT, WS-PAGE-NUM declared but never referenced; WS-IDX drives the row loops.)
-    private int _wsIdx;
+    private int _rowIndex;                            // WS-IDX
 
     // 05 WS-TRAN-AMT PIC +99999999.99 (12-char signed edited). source: :56
     // 05 WS-TRAN-DATE PIC X(08) VALUE '00/00/00'. source: :57
-    private string _wsTranDate = "00/00/00";
+    private string _transactionDate = "00/00/00";    // WS-TRAN-DATE
 
     // CCDA-TITLE01/02 (COTTL01Y) + CCDA-MSG-INVALID-KEY (CSMSG01Y) — shared screen header / messages.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...         ";
+    private const string Title01 = "      AWS Mainframe Modernization       ";        // CCDA-TITLE01
+    private const string Title02 = "              CardDemo                  ";        // CCDA-TITLE02
+    private const string MsgInvalidKey = "Invalid key pressed. Please see below...         "; // CCDA-MSG-INVALID-KEY
 
     // =============================================================================================
     //  COCOM01Y trailer — CDEMO-CT00-INFO (the program-private paging state). source: :62-70
     // =============================================================================================
     // 10 CDEMO-CT00-TRNID-FIRST   PIC X(16). source: :63
-    private string _ct00TrnidFirst = "";
+    private string _firstTranIdOnPage = "";          // CDEMO-CT00-TRNID-FIRST
     // 10 CDEMO-CT00-TRNID-LAST    PIC X(16). source: :64
-    private string _ct00TrnidLast = "";
+    private string _lastTranIdOnPage = "";           // CDEMO-CT00-TRNID-LAST
     // 10 CDEMO-CT00-PAGE-NUM      PIC 9(08). source: :65
-    private int _ct00PageNum;
+    private int _pageNumber;                          // CDEMO-CT00-PAGE-NUM
     // 10 CDEMO-CT00-NEXT-PAGE-FLG PIC X(01) VALUE 'N'. 88 NEXT-PAGE-YES='Y' / NEXT-PAGE-NO='N'. source: :66-68
-    private char _ct00NextPageFlg = 'N';
-    private bool NextPageYes => _ct00NextPageFlg == 'Y'; // 88 NEXT-PAGE-YES
-    private void SetNextPageYes() => _ct00NextPageFlg = 'Y';
-    private void SetNextPageNo() => _ct00NextPageFlg = 'N';
+    private char _nextPageFlag = 'N';                // CDEMO-CT00-NEXT-PAGE-FLG
+    private bool NextPageYes => _nextPageFlag == 'Y'; // 88 NEXT-PAGE-YES
+    private void SetNextPageYes() => _nextPageFlag = 'Y';
+    private void SetNextPageNo() => _nextPageFlag = 'N';
     // 10 CDEMO-CT00-TRN-SEL-FLG   PIC X(01). source: :69
-    private string _ct00TrnSelFlg = "";
+    private string _selectedRowFlag = "";            // CDEMO-CT00-TRN-SEL-FLG
     // 10 CDEMO-CT00-TRN-SELECTED  PIC X(16). source: :70
-    private string _ct00TrnSelected = "";
+    private string _selectedTranId = "";             // CDEMO-CT00-TRN-SELECTED
 
     // =============================================================================================
     //  TRAN-ID RIDFLD + the TRAN-RECORD currently read by the browse (CVTRA05Y). source: :78,595,628
     // =============================================================================================
     // TRAN-ID X(16) — the STARTBR/READNEXT/READPREV RID. Empty string = LOW-VALUES (browse from first),
     // the 16x0xFF sentinel = HIGH-VALUES (browse past the last record).
-    private string _tranId = "";
+    private string _recordKey = "";                  // TRAN-ID RIDFLD
     private const string HighValues16 = "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
 
     // The TRAN-RECORD just read by the browse.
-    private Transaction? _tranRecord;
-    private string TranRecId => _tranRecord?.TranId ?? "";
-    private decimal TranAmt => _tranRecord?.Amt ?? 0m;
-    private string TranDesc => _tranRecord?.Desc ?? "";
-    private string TranOrigTs => _tranRecord?.OrigTs ?? "";
+    private Transaction? _currentTransaction;        // TRAN-RECORD
+    private string CurrentTranId => _currentTransaction?.TranId ?? "";
+    private decimal CurrentTranAmt => _currentTransaction?.Amt ?? 0m;
+    private string CurrentTranDesc => _currentTransaction?.Desc ?? "";
+    private string CurrentTranOrigTs => _currentTransaction?.OrigTs ?? "";
 
     // =============================================================================================
     //  COMMAREA (typed view) + per-turn map + DB. source: :87-89,111
@@ -149,10 +149,10 @@ public sealed class TransactionListProgram : ITransactionHandler
     public TransactionListProgram() => _db = null!;
 
     /// <inheritdoc/>
-    public string ProgramName => WS_PGMNAME; // PROGRAM-ID. COTRN00C. source: :23
+    public string ProgramName => ProgramId; // PROGRAM-ID. COTRN00C. source: :23
 
     /// <inheritdoc/>
-    public string TransId => WS_TRANID;      // CSD: CT00 -> COTRN00C. source: CSD_TRANSACTIONS.md:81; cbl:37
+    public string TransId => TranId;         // CSD: CT00 -> COTRN00C. source: CSD_TRANSACTIONS.md:81; cbl:37
 
     // =============================================================================================
     //  MAIN-PARA — source: COTRN00C.cbl:95-141
@@ -165,13 +165,13 @@ public sealed class TransactionListProgram : ITransactionHandler
         if (_db is not null) _transactions = new TransactionRepository(_db.Connection);
 
         // SET ERR-FLG-OFF / TRANSACT-NOT-EOF / NEXT-PAGE-NO / SEND-ERASE-YES TO TRUE. source: :97-100
-        _errFlgOn = false;
-        _transactEof = false;
+        _errorFlagOn = false;
+        _transactionEof = false;
         SetNextPageNo();
         _sendEraseYes = true;
 
         // MOVE SPACES TO WS-MESSAGE  ERRMSGO OF COTRN0AO. source: :102-103
-        _wsMessage = "";
+        _message = "";
         _map.Field("ERRMSG").SetValue("", setMdt: false);
 
         // MOVE -1 TO TRNIDINL OF COTRN0AI. source: :105
@@ -219,9 +219,9 @@ public sealed class TransactionListProgram : ITransactionHandler
                         break;
                     default:
                         // WHEN OTHER. source: :129-133
-                        _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :130
+                        _errorFlagOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :130
                         _map.Field("TRNIDIN").CursorLength = -1;           // MOVE -1 TO TRNIDINL. source: :131
-                        _wsMessage = CCDA_MSG_INVALID_KEY;                 // MOVE CCDA-MSG-INVALID-KEY. source: :132
+                        _message = MsgInvalidKey;                 // MOVE CCDA-MSG-INVALID-KEY. source: :132
                         SendTrnlstScreen(ctx);                             // PERFORM SEND-TRNLST-SCREEN. source: :133
                         break;
                 }
@@ -232,7 +232,7 @@ public sealed class TransactionListProgram : ITransactionHandler
         if (ctx.Outcome is null)
         {
             SaveCt00Info();
-            ctx.ReturnTransId(WS_TRANID, _commArea);
+            ctx.ReturnTransId(TranId, _commArea);
         }
     }
 
@@ -244,61 +244,61 @@ public sealed class TransactionListProgram : ITransactionHandler
         // EVALUATE TRUE — first non-blank selection row wins. source: :148-182
         if (NotSpacesOrLow(SelIn(1)))
         {
-            _ct00TrnSelFlg = SelIn(1); _ct00TrnSelected = TrnIdIn(1);   // source: :149-151
+            _selectedRowFlag = SelIn(1); _selectedTranId = TrnIdIn(1);   // source: :149-151
         }
         else if (NotSpacesOrLow(SelIn(2)))
         {
-            _ct00TrnSelFlg = SelIn(2); _ct00TrnSelected = TrnIdIn(2);   // source: :152-154
+            _selectedRowFlag = SelIn(2); _selectedTranId = TrnIdIn(2);   // source: :152-154
         }
         else if (NotSpacesOrLow(SelIn(3)))
         {
-            _ct00TrnSelFlg = SelIn(3); _ct00TrnSelected = TrnIdIn(3);   // source: :155-157
+            _selectedRowFlag = SelIn(3); _selectedTranId = TrnIdIn(3);   // source: :155-157
         }
         else if (NotSpacesOrLow(SelIn(4)))
         {
-            _ct00TrnSelFlg = SelIn(4); _ct00TrnSelected = TrnIdIn(4);   // source: :158-160
+            _selectedRowFlag = SelIn(4); _selectedTranId = TrnIdIn(4);   // source: :158-160
         }
         else if (NotSpacesOrLow(SelIn(5)))
         {
-            _ct00TrnSelFlg = SelIn(5); _ct00TrnSelected = TrnIdIn(5);   // source: :161-163
+            _selectedRowFlag = SelIn(5); _selectedTranId = TrnIdIn(5);   // source: :161-163
         }
         else if (NotSpacesOrLow(SelIn(6)))
         {
-            _ct00TrnSelFlg = SelIn(6); _ct00TrnSelected = TrnIdIn(6);   // source: :164-166
+            _selectedRowFlag = SelIn(6); _selectedTranId = TrnIdIn(6);   // source: :164-166
         }
         else if (NotSpacesOrLow(SelIn(7)))
         {
-            _ct00TrnSelFlg = SelIn(7); _ct00TrnSelected = TrnIdIn(7);   // source: :167-169
+            _selectedRowFlag = SelIn(7); _selectedTranId = TrnIdIn(7);   // source: :167-169
         }
         else if (NotSpacesOrLow(SelIn(8)))
         {
-            _ct00TrnSelFlg = SelIn(8); _ct00TrnSelected = TrnIdIn(8);   // source: :170-172
+            _selectedRowFlag = SelIn(8); _selectedTranId = TrnIdIn(8);   // source: :170-172
         }
         else if (NotSpacesOrLow(SelIn(9)))
         {
-            _ct00TrnSelFlg = SelIn(9); _ct00TrnSelected = TrnIdIn(9);   // source: :173-175
+            _selectedRowFlag = SelIn(9); _selectedTranId = TrnIdIn(9);   // source: :173-175
         }
         else if (NotSpacesOrLow(SelIn(10)))
         {
-            _ct00TrnSelFlg = SelIn(10); _ct00TrnSelected = TrnIdIn(10); // source: :176-178
+            _selectedRowFlag = SelIn(10); _selectedTranId = TrnIdIn(10); // source: :176-178
         }
         else
         {
-            _ct00TrnSelFlg = "";       // WHEN OTHER -> MOVE SPACES. source: :179-181
-            _ct00TrnSelected = "";
+            _selectedRowFlag = "";       // WHEN OTHER -> MOVE SPACES. source: :179-181
+            _selectedTranId = "";
         }
 
         // IF (TRN-SEL-FLG NOT = SPACES AND LOW-VALUES) AND (TRN-SELECTED NOT = SPACES AND LOW-VALUES). source: :183-204
-        if (NotSpacesOrLow(_ct00TrnSelFlg) && NotSpacesOrLow(_ct00TrnSelected))
+        if (NotSpacesOrLow(_selectedRowFlag) && NotSpacesOrLow(_selectedTranId))
         {
             // EVALUATE CDEMO-CT00-TRN-SEL-FLG. source: :185-203
-            string flg = _ct00TrnSelFlg.Length > 0 ? _ct00TrnSelFlg.Substring(0, 1) : "";
-            if (flg == "S" || flg == "s")
+            string selFlag = _selectedRowFlag.Length > 0 ? _selectedRowFlag.Substring(0, 1) : "";
+            if (selFlag == "S" || selFlag == "s")
             {
                 // WHEN 'S' / 's' — XCTL to the transaction detail program. source: :186-195
                 _commArea.ToProgram = "COTRN01C";   // MOVE 'COTRN01C' TO CDEMO-TO-PROGRAM. source: :188
-                _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :189
-                _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :190
+                _commArea.FromTranId = TranId;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :189
+                _commArea.FromProgram = ProgramId; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :190
                 _commArea.SetFirstEntry();          // MOVE 0 TO CDEMO-PGM-CONTEXT. source: :191
                 // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :192-195
                 SaveCt00Info();
@@ -310,29 +310,29 @@ public sealed class TransactionListProgram : ITransactionHandler
                 // WHEN OTHER — build the invalid-selection message. B-2: the SEND is commented out, so the
                 // program does NOT stop here; control falls through to the tran-id edit + page logic and the
                 // message gets overwritten. source: :196-203
-                _wsMessage = "Invalid selection. Valid value is S"; // source: :198-200
+                _message = "Invalid selection. Valid value is S"; // source: :198-200
                 _map.Field("TRNIDIN").CursorLength = -1;            // MOVE -1 TO TRNIDINL. source: :201
                 // PERFORM SEND-TRNLST-SCREEN is commented out in the COBOL. source: :202
             }
         }
 
         // IF TRNIDINI = SPACES OR LOW-VALUES -> MOVE LOW-VALUES TO TRAN-ID. source: :206-219
-        string trnidin = _map.Field("TRNIDIN").Value;
-        if (IsSpacesOrLowValues(trnidin))
+        string searchTranIdInput = _map.Field("TRNIDIN").Value;
+        if (IsSpacesOrLowValues(searchTranIdInput))
         {
-            _tranId = ""; // MOVE LOW-VALUES TO TRAN-ID. source: :207
+            _recordKey = ""; // MOVE LOW-VALUES TO TRAN-ID. source: :207
         }
         else
         {
             // IF TRNIDINI IS NUMERIC -> MOVE TO TRAN-ID; ELSE error. source: :209-218
-            if (IsNumericX(trnidin, 16))
+            if (IsNumericX(searchTranIdInput, 16))
             {
-                _tranId = PadX(trnidin, 16); // MOVE TRNIDINI (X(16)) TO TRAN-ID (X(16)). source: :210
+                _recordKey = PadX(searchTranIdInput, 16); // MOVE TRNIDINI (X(16)) TO TRAN-ID (X(16)). source: :210
             }
             else
             {
-                _errFlgOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :212
-                _wsMessage = "Tran ID must be Numeric ...";    // source: :213-215
+                _errorFlagOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :212
+                _message = "Tran ID must be Numeric ...";    // source: :213-215
                 _map.Field("TRNIDIN").CursorLength = -1;       // MOVE -1 TO TRNIDINL. source: :216
                 SendTrnlstScreen(ctx);                         // PERFORM SEND-TRNLST-SCREEN. source: :217
             }
@@ -342,11 +342,11 @@ public sealed class TransactionListProgram : ITransactionHandler
         _map.Field("TRNIDIN").CursorLength = -1;
 
         // MOVE 0 TO CDEMO-CT00-PAGE-NUM; PERFORM PROCESS-PAGE-FORWARD. source: :224-225
-        _ct00PageNum = 0;
+        _pageNumber = 0;
         ProcessPageForward(ctx);
 
         // IF NOT ERR-FLG-ON -> MOVE SPACE TO TRNIDINO. source: :227-229
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
             _map.Field("TRNIDIN").SetValue(" ", setMdt: false);
     }
 
@@ -356,18 +356,18 @@ public sealed class TransactionListProgram : ITransactionHandler
     private void ProcessPf7Key(CicsContext ctx)
     {
         // IF CDEMO-CT00-TRNID-FIRST = SPACES OR LOW-VALUES -> LOW-VALUES else TRNID-FIRST. source: :236-240
-        _tranId = IsSpacesOrLowValues(_ct00TrnidFirst) ? "" : _ct00TrnidFirst;
+        _recordKey = IsSpacesOrLowValues(_firstTranIdOnPage) ? "" : _firstTranIdOnPage;
 
         SetNextPageYes();                              // SET NEXT-PAGE-YES TO TRUE. source: :242
         _map.Field("TRNIDIN").CursorLength = -1;       // MOVE -1 TO TRNIDINL. source: :243
 
-        if (_ct00PageNum > 1)
+        if (_pageNumber > 1)
         {
             ProcessPageBackward(ctx);                  // PERFORM PROCESS-PAGE-BACKWARD. source: :246
         }
         else
         {
-            _wsMessage = "You are already at the top of the page..."; // source: :248-249
+            _message = "You are already at the top of the page..."; // source: :248-249
             _sendEraseYes = false;                     // SET SEND-ERASE-NO TO TRUE. source: :250
             SendTrnlstScreen(ctx);                     // PERFORM SEND-TRNLST-SCREEN. source: :251
         }
@@ -379,7 +379,7 @@ public sealed class TransactionListProgram : ITransactionHandler
     private void ProcessPf8Key(CicsContext ctx)
     {
         // IF CDEMO-CT00-TRNID-LAST = SPACES OR LOW-VALUES -> HIGH-VALUES else TRNID-LAST. source: :259-263
-        _tranId = IsSpacesOrLowValues(_ct00TrnidLast) ? HighValues16 : _ct00TrnidLast;
+        _recordKey = IsSpacesOrLowValues(_lastTranIdOnPage) ? HighValues16 : _lastTranIdOnPage;
 
         _map.Field("TRNIDIN").CursorLength = -1;       // MOVE -1 TO TRNIDINL. source: :265
 
@@ -389,7 +389,7 @@ public sealed class TransactionListProgram : ITransactionHandler
         }
         else
         {
-            _wsMessage = "You are already at the bottom of the page..."; // source: :270-271
+            _message = "You are already at the bottom of the page..."; // source: :270-271
             _sendEraseYes = false;                     // SET SEND-ERASE-NO TO TRUE. source: :272
             SendTrnlstScreen(ctx);                     // PERFORM SEND-TRNLST-SCREEN. source: :273
         }
@@ -402,7 +402,7 @@ public sealed class TransactionListProgram : ITransactionHandler
     {
         StartbrTransactFile(ctx);              // PERFORM STARTBR-TRANSACT-FILE. source: :281
 
-        if (!ErrFlgOn)                         // IF NOT ERR-FLG-ON. source: :283
+        if (!ErrorFlagOn)                         // IF NOT ERR-FLG-ON. source: :283
         {
             // B-1: IF EIBAID NOT = DFHENTER AND DFHPF7 AND DFHPF3 -> abbreviated condition expands to
             //   NOT=ENTER AND NOT=PF7 AND NOT=PF3. On PF8 (and any other key) this fires one extra
@@ -411,31 +411,31 @@ public sealed class TransactionListProgram : ITransactionHandler
                 ReadnextTransactFile(ctx);     // PERFORM READNEXT-TRANSACT-FILE. source: :286
 
             // IF TRANSACT-NOT-EOF AND ERR-FLG-OFF -> clear the 10 display rows. source: :289-293
-            if (TransactNotEof && ErrFlgOff)
+            if (TransactionNotEof && ErrorFlagOff)
             {
-                for (_wsIdx = 1; _wsIdx <= 10; _wsIdx++) // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL > 10. source: :290
+                for (_rowIndex = 1; _rowIndex <= 10; _rowIndex++) // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL > 10. source: :290
                     InitializeTranData();                 // PERFORM INITIALIZE-TRAN-DATA. source: :291
             }
 
-            _wsIdx = 1;                         // MOVE 1 TO WS-IDX. source: :295
+            _rowIndex = 1;                         // MOVE 1 TO WS-IDX. source: :295
 
             // PERFORM UNTIL WS-IDX >= 11 OR TRANSACT-EOF OR ERR-FLG-ON. source: :297-303
-            while (!(_wsIdx >= 11 || TransactEof || ErrFlgOn))
+            while (!(_rowIndex >= 11 || TransactionEof || ErrorFlagOn))
             {
                 ReadnextTransactFile(ctx);      // PERFORM READNEXT-TRANSACT-FILE. source: :298
-                if (TransactNotEof && ErrFlgOff) // IF TRANSACT-NOT-EOF AND ERR-FLG-OFF. source: :299
+                if (TransactionNotEof && ErrorFlagOff) // IF TRANSACT-NOT-EOF AND ERR-FLG-OFF. source: :299
                 {
                     PopulateTranData();          // PERFORM POPULATE-TRAN-DATA. source: :300
-                    _wsIdx = _wsIdx + 1;         // COMPUTE WS-IDX = WS-IDX + 1. source: :301
+                    _rowIndex = _rowIndex + 1;         // COMPUTE WS-IDX = WS-IDX + 1. source: :301
                 }
             }
 
             // IF TRANSACT-NOT-EOF AND ERR-FLG-OFF — peek for a next page. source: :305-320
-            if (TransactNotEof && ErrFlgOff)
+            if (TransactionNotEof && ErrorFlagOff)
             {
-                _ct00PageNum = _ct00PageNum + 1; // COMPUTE CDEMO-CT00-PAGE-NUM = + 1. source: :306-307
+                _pageNumber = _pageNumber + 1; // COMPUTE CDEMO-CT00-PAGE-NUM = + 1. source: :306-307
                 ReadnextTransactFile(ctx);       // PERFORM READNEXT-TRANSACT-FILE. source: :308
-                if (TransactNotEof && ErrFlgOff) // IF TRANSACT-NOT-EOF AND ERR-FLG-OFF. source: :309
+                if (TransactionNotEof && ErrorFlagOff) // IF TRANSACT-NOT-EOF AND ERR-FLG-OFF. source: :309
                     SetNextPageYes();            // SET NEXT-PAGE-YES TO TRUE. source: :310
                 else
                     SetNextPageNo();             // SET NEXT-PAGE-NO TO TRUE. source: :312
@@ -443,8 +443,8 @@ public sealed class TransactionListProgram : ITransactionHandler
             else
             {
                 SetNextPageNo();                 // SET NEXT-PAGE-NO TO TRUE. source: :315
-                if (_wsIdx > 1)                  // IF WS-IDX > 1. source: :316
-                    _ct00PageNum = _ct00PageNum + 1; // COMPUTE CDEMO-CT00-PAGE-NUM = + 1. source: :317-318
+                if (_rowIndex > 1)                  // IF WS-IDX > 1. source: :316
+                    _pageNumber = _pageNumber + 1; // COMPUTE CDEMO-CT00-PAGE-NUM = + 1. source: :317-318
             }
 
             EndbrTransactFile();                 // PERFORM ENDBR-TRANSACT-FILE. source: :322
@@ -452,7 +452,7 @@ public sealed class TransactionListProgram : ITransactionHandler
             // MOVE CDEMO-CT00-PAGE-NUM TO PAGENUMI; MOVE SPACE TO TRNIDINO; PERFORM SEND. source: :324-326
             // CDEMO-CT00-PAGE-NUM PIC 9(08) -> PAGENUMI PIC X(8): a numeric-to-alphanumeric MOVE copies the
             // 8 zoned digits, so page 1 renders as "00000001" (zero-filled), not "1".
-            _map.Field("PAGENUM").SetValue(_ct00PageNum.ToString("D8"), setMdt: false);
+            _map.Field("PAGENUM").SetValue(_pageNumber.ToString("D8"), setMdt: false);
             _map.Field("TRNIDIN").SetValue(" ", setMdt: false);
             SendTrnlstScreen(ctx);
         }
@@ -465,7 +465,7 @@ public sealed class TransactionListProgram : ITransactionHandler
     {
         StartbrTransactFile(ctx);              // PERFORM STARTBR-TRANSACT-FILE. source: :335
 
-        if (!ErrFlgOn)                         // IF NOT ERR-FLG-ON. source: :337
+        if (!ErrorFlagOn)                         // IF NOT ERR-FLG-ON. source: :337
         {
             // B-1: IF EIBAID NOT = DFHENTER AND DFHPF8 -> NOT=ENTER AND NOT=PF8. On PF7 this fires an extra
             //   READPREV to step over the boundary record. source: :339-341
@@ -473,35 +473,35 @@ public sealed class TransactionListProgram : ITransactionHandler
                 ReadprevTransactFile(ctx);     // PERFORM READPREV-TRANSACT-FILE. source: :340
 
             // IF TRANSACT-NOT-EOF AND ERR-FLG-OFF -> clear the 10 display rows. source: :343-347
-            if (TransactNotEof && ErrFlgOff)
+            if (TransactionNotEof && ErrorFlagOff)
             {
-                for (_wsIdx = 1; _wsIdx <= 10; _wsIdx++) // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL > 10. source: :344
+                for (_rowIndex = 1; _rowIndex <= 10; _rowIndex++) // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL > 10. source: :344
                     InitializeTranData();                 // PERFORM INITIALIZE-TRAN-DATA. source: :345
             }
 
-            _wsIdx = 10;                        // MOVE 10 TO WS-IDX. source: :349
+            _rowIndex = 10;                        // MOVE 10 TO WS-IDX. source: :349
 
             // PERFORM UNTIL WS-IDX <= 0 OR TRANSACT-EOF OR ERR-FLG-ON. source: :351-357
-            while (!(_wsIdx <= 0 || TransactEof || ErrFlgOn))
+            while (!(_rowIndex <= 0 || TransactionEof || ErrorFlagOn))
             {
                 ReadprevTransactFile(ctx);      // PERFORM READPREV-TRANSACT-FILE. source: :352
-                if (TransactNotEof && ErrFlgOff) // IF TRANSACT-NOT-EOF AND ERR-FLG-OFF. source: :353
+                if (TransactionNotEof && ErrorFlagOff) // IF TRANSACT-NOT-EOF AND ERR-FLG-OFF. source: :353
                 {
                     PopulateTranData();          // PERFORM POPULATE-TRAN-DATA. source: :354
-                    _wsIdx = _wsIdx - 1;         // COMPUTE WS-IDX = WS-IDX - 1. source: :355
+                    _rowIndex = _rowIndex - 1;         // COMPUTE WS-IDX = WS-IDX - 1. source: :355
                 }
             }
 
             // IF TRANSACT-NOT-EOF AND ERR-FLG-OFF — adjust the page number. source: :359-369
-            if (TransactNotEof && ErrFlgOff)
+            if (TransactionNotEof && ErrorFlagOff)
             {
                 ReadprevTransactFile(ctx);       // PERFORM READPREV-TRANSACT-FILE. source: :360
                 if (NextPageYes)                 // IF NEXT-PAGE-YES. source: :361
                 {
-                    if (TransactNotEof && ErrFlgOff && _ct00PageNum > 1) // source: :362-363
-                        _ct00PageNum = _ct00PageNum - 1; // SUBTRACT 1 FROM CDEMO-CT00-PAGE-NUM. source: :364
+                    if (TransactionNotEof && ErrorFlagOff && _pageNumber > 1) // source: :362-363
+                        _pageNumber = _pageNumber - 1; // SUBTRACT 1 FROM CDEMO-CT00-PAGE-NUM. source: :364
                     else
-                        _ct00PageNum = 1;        // MOVE 1 TO CDEMO-CT00-PAGE-NUM. source: :366
+                        _pageNumber = 1;        // MOVE 1 TO CDEMO-CT00-PAGE-NUM. source: :366
                 }
             }
 
@@ -510,7 +510,7 @@ public sealed class TransactionListProgram : ITransactionHandler
             // MOVE CDEMO-CT00-PAGE-NUM TO PAGENUMI; PERFORM SEND. source: :373-374
             // CDEMO-CT00-PAGE-NUM PIC 9(08) -> PAGENUMI PIC X(8): a numeric-to-alphanumeric MOVE copies the
             // 8 zoned digits, so page 1 renders as "00000001" (zero-filled), not "1".
-            _map.Field("PAGENUM").SetValue(_ct00PageNum.ToString("D8"), setMdt: false);
+            _map.Field("PAGENUM").SetValue(_pageNumber.ToString("D8"), setMdt: false);
             SendTrnlstScreen(ctx);
         }
     }
@@ -521,26 +521,26 @@ public sealed class TransactionListProgram : ITransactionHandler
     private void PopulateTranData()
     {
         // MOVE TRAN-AMT TO WS-TRAN-AMT (edited +99999999.99). source: :383
-        string wsTranAmt = EditTranAmt(TranAmt);
+        string transactionAmount = EditTransactionAmount(CurrentTranAmt);
 
         // MOVE TRAN-ORIG-TS TO WS-TIMESTAMP; build mm/dd/yy from the timestamp's yy/mm/dd. source: :384-388
-        string ts = PadX(TranOrigTs, 26);
+        string ts = PadX(CurrentTranOrigTs, 26);
         // WS-TIMESTAMP layout: YYYY(0..3) '-' MM(5..6) '-' DD(8..9) ' ' HH:MM:SS.MS6
         string yy = ts.Substring(2, 2);   // WS-TIMESTAMP-DT-YYYY(3:2) -> last 2 digits of year. source: :385
         string mm = ts.Substring(5, 2);   // WS-TIMESTAMP-DT-MM. source: :386
         string dd = ts.Substring(8, 2);   // WS-TIMESTAMP-DT-DD. source: :387
-        _wsTranDate = $"{mm}/{dd}/{yy}";  // MOVE WS-CURDATE-MM-DD-YY TO WS-TRAN-DATE. source: :388
+        _transactionDate = $"{mm}/{dd}/{yy}";  // MOVE WS-CURDATE-MM-DD-YY TO WS-TRAN-DATE. source: :388
 
         // EVALUATE WS-IDX -> stamp the row's TRNID / TDATE / TDESC / TAMT fields. source: :390-445
-        int n = _wsIdx;
+        int n = _rowIndex;
         if (n is < 1 or > 10) return; // WHEN OTHER -> CONTINUE. source: :443-444
 
-        _map.Field($"TRNID{n:D2}").SetValue(TranRecId, setMdt: false); // MOVE TRAN-ID TO TRNIDnnI. source: :392,398,...
-        if (n == 1) _ct00TrnidFirst = TranRecId;  // WHEN 1 also -> CDEMO-CT00-TRNID-FIRST. source: :392-393
-        if (n == 10) _ct00TrnidLast = TranRecId;  // WHEN 10 also -> CDEMO-CT00-TRNID-LAST. source: :438-439
-        _map.Field($"TDATE{n:D2}").SetValue(_wsTranDate, setMdt: false);  // MOVE WS-TRAN-DATE TO TDATEnnI. source: :394,...
-        _map.Field($"TDESC{n:D2}").SetValue(TranDesc, setMdt: false);     // MOVE TRAN-DESC TO TDESCnnI. source: :395,...
-        _map.Field($"TAMT{n:D3}").SetValue(wsTranAmt, setMdt: false);     // MOVE WS-TRAN-AMT TO TAMT0nnI. source: :396,...
+        _map.Field($"TRNID{n:D2}").SetValue(CurrentTranId, setMdt: false); // MOVE TRAN-ID TO TRNIDnnI. source: :392,398,...
+        if (n == 1) _firstTranIdOnPage = CurrentTranId;  // WHEN 1 also -> CDEMO-CT00-TRNID-FIRST. source: :392-393
+        if (n == 10) _lastTranIdOnPage = CurrentTranId;  // WHEN 10 also -> CDEMO-CT00-TRNID-LAST. source: :438-439
+        _map.Field($"TDATE{n:D2}").SetValue(_transactionDate, setMdt: false);  // MOVE WS-TRAN-DATE TO TDATEnnI. source: :394,...
+        _map.Field($"TDESC{n:D2}").SetValue(CurrentTranDesc, setMdt: false);     // MOVE TRAN-DESC TO TDESCnnI. source: :395,...
+        _map.Field($"TAMT{n:D3}").SetValue(transactionAmount, setMdt: false);     // MOVE WS-TRAN-AMT TO TAMT0nnI. source: :396,...
     }
 
     // =============================================================================================
@@ -549,7 +549,7 @@ public sealed class TransactionListProgram : ITransactionHandler
     private void InitializeTranData()
     {
         // EVALUATE WS-IDX -> MOVE SPACES to the row's four display fields. source: :452-505
-        int n = _wsIdx;
+        int n = _rowIndex;
         if (n is < 1 or > 10) return; // WHEN OTHER -> CONTINUE. source: :503-504
         _map.Field($"TRNID{n:D2}").SetValue(" ", setMdt: false); // MOVE SPACES TO TRNIDnnI. source: :454,...
         _map.Field($"TDATE{n:D2}").SetValue(" ", setMdt: false); // MOVE SPACES TO TDATEnnI. source: :455,...
@@ -566,8 +566,8 @@ public sealed class TransactionListProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_commArea.ToProgram))
             _commArea.ToProgram = "COSGN00C";
 
-        _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :515
-        _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :516
+        _commArea.FromTranId = TranId;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :515
+        _commArea.FromProgram = ProgramId; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :516
         _commArea.SetFirstEntry();          // MOVE ZEROS TO CDEMO-PGM-CONTEXT. source: :517
 
         // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :518-521
@@ -582,7 +582,7 @@ public sealed class TransactionListProgram : ITransactionHandler
     {
         PopulateHeaderInfo(ctx);                                     // PERFORM POPULATE-HEADER-INFO. source: :529
 
-        _map.Field("ERRMSG").SetValue(_wsMessage, setMdt: false);   // MOVE WS-MESSAGE TO ERRMSGO. source: :531
+        _map.Field("ERRMSG").SetValue(_message, setMdt: false);   // MOVE WS-MESSAGE TO ERRMSGO. source: :531
 
         // IF SEND-ERASE-YES -> SEND ... ERASE CURSOR; ELSE SEND ... CURSOR (no erase). source: :533-549
         ctx.SendMap("COTRN0A", "COTRN00", _map, new SendMapOptions
@@ -591,7 +591,7 @@ public sealed class TransactionListProgram : ITransactionHandler
             FreeKb = true,
             Cursor = -1, // CURSOR — honour the MOVE -1 TO TRNIDINL set throughout.
         });
-        _wsRespCd = (int)Resp.Normal;
+        _responseCode = (int)Resp.Normal;
     }
 
     // =============================================================================================
@@ -601,8 +601,8 @@ public sealed class TransactionListProgram : ITransactionHandler
     {
         // EXEC CICS RECEIVE MAP('COTRN0A') MAPSET('COTRN00') INTO(COTRN0AI) RESP. source: :556-562
         ctx.ReceiveMap("COTRN0A", "COTRN00", _map);
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
     }
 
     // =============================================================================================
@@ -613,10 +613,10 @@ public sealed class TransactionListProgram : ITransactionHandler
         // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: :569
         DateTime now = ctx.Clock.Now;
 
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :571
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :572
-        _map.Field("TRNNAME").SetValue(WS_TRANID, setMdt: false);    // MOVE WS-TRANID  TO TRNNAMEO. source: :573
-        _map.Field("PGMNAME").SetValue(WS_PGMNAME, setMdt: false);   // MOVE WS-PGMNAME TO PGMNAMEO. source: :574
+        _map.Field("TITLE01").SetValue(Title01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :571
+        _map.Field("TITLE02").SetValue(Title02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :572
+        _map.Field("TRNNAME").SetValue(TranId, setMdt: false);    // MOVE WS-TRANID  TO TRNNAMEO. source: :573
+        _map.Field("PGMNAME").SetValue(ProgramId, setMdt: false);   // MOVE WS-PGMNAME TO PGMNAMEO. source: :574
 
         // CURDATEO = mm/dd/yy (year last two digits). source: :576-580
         _map.Field("CURDATE").SetValue($"{Two(now.Month)}/{Two(now.Day)}/{Four(now.Year).Substring(2, 2)}", setMdt: false);
@@ -636,27 +636,27 @@ public sealed class TransactionListProgram : ITransactionHandler
         // STARTBR GTEQ positions at-or-after TRAN-ID and returns NORMAL when a record exists there, else
         // NOTFND. LOW-VALUES (empty) -> from the first record (NOTFND only on an empty file); HIGH-VALUES ->
         // no record is >= 0xFF...FF so NOTFND (the COBOL PF8-with-no-prior-page quirk).
-        if (_tranId.Length == 0)
+        if (_recordKey.Length == 0)
             _transactions.StartBrowse();
         else
-            _transactions.StartBrowse(_tranId);
+            _transactions.StartBrowse(_recordKey);
         string fileStatus = PeekForwardExists() ? FileStatus.Ok : FileStatus.RecordNotFound;
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :602-619
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal: // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :603-604
                 break;
             case Resp.NotFnd: // WHEN DFHRESP(NOTFND). source: :605-611
-                _transactEof = true;                                  // SET TRANSACT-EOF TO TRUE. source: :607
-                _wsMessage = "You are at the top of the page...";     // source: :608-609
+                _transactionEof = true;                                  // SET TRANSACT-EOF TO TRUE. source: :607
+                _message = "You are at the top of the page...";     // source: :608-609
                 _map.Field("TRNIDIN").CursorLength = -1;              // MOVE -1 TO TRNIDINL. source: :610
                 SendTrnlstScreen(ctx);                                // PERFORM SEND-TRNLST-SCREEN. source: :611
                 break;
             default: // WHEN OTHER. source: :612-618
-                _errFlgOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :614
-                _wsMessage = "Unable to lookup transaction...";       // source: :615-616
+                _errorFlagOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :614
+                _message = "Unable to lookup transaction...";       // source: :615-616
                 _map.Field("TRNIDIN").CursorLength = -1;              // MOVE -1 TO TRNIDINL. source: :617
                 SendTrnlstScreen(ctx);                                // PERFORM SEND-TRNLST-SCREEN. source: :618
                 break;
@@ -669,25 +669,25 @@ public sealed class TransactionListProgram : ITransactionHandler
     private void ReadnextTransactFile(CicsContext ctx)
     {
         // EXEC CICS READNEXT DATASET(WS-TRANSACT-FILE) INTO(TRAN-RECORD) RIDFLD(TRAN-ID) RESP. source: :626-634
-        string fileStatus = _transactions.ReadNext(out _tranRecord);
-        if (fileStatus == FileStatus.Ok && _tranRecord is not null)
-            _tranId = _tranRecord.TranId; // RIDFLD is updated with the key just read. source: :630
+        string fileStatus = _transactions.ReadNext(out _currentTransaction);
+        if (fileStatus == FileStatus.Ok && _currentTransaction is not null)
+            _recordKey = _currentTransaction.TranId; // RIDFLD is updated with the key just read. source: :630
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :636-653
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal: // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :637-638
                 break;
             case Resp.EndFile: // WHEN DFHRESP(ENDFILE). source: :639-645
-                _transactEof = true;                                       // SET TRANSACT-EOF TO TRUE. source: :641
-                _wsMessage = "You have reached the bottom of the page..."; // source: :642-643
+                _transactionEof = true;                                       // SET TRANSACT-EOF TO TRUE. source: :641
+                _message = "You have reached the bottom of the page..."; // source: :642-643
                 _map.Field("TRNIDIN").CursorLength = -1;                   // MOVE -1 TO TRNIDINL. source: :644
                 SendTrnlstScreen(ctx);                                     // PERFORM SEND-TRNLST-SCREEN. source: :645
                 break;
             default: // WHEN OTHER. source: :646-652
-                _errFlgOn = true;                                          // MOVE 'Y' TO WS-ERR-FLG. source: :648
-                _wsMessage = "Unable to lookup transaction...";           // source: :649-650
+                _errorFlagOn = true;                                          // MOVE 'Y' TO WS-ERR-FLG. source: :648
+                _message = "Unable to lookup transaction...";           // source: :649-650
                 _map.Field("TRNIDIN").CursorLength = -1;                   // MOVE -1 TO TRNIDINL. source: :651
                 SendTrnlstScreen(ctx);                                     // PERFORM SEND-TRNLST-SCREEN. source: :652
                 break;
@@ -700,25 +700,25 @@ public sealed class TransactionListProgram : ITransactionHandler
     private void ReadprevTransactFile(CicsContext ctx)
     {
         // EXEC CICS READPREV DATASET(WS-TRANSACT-FILE) INTO(TRAN-RECORD) RIDFLD(TRAN-ID) RESP. source: :660-668
-        string fileStatus = _transactions.ReadPrevious(out _tranRecord);
-        if (fileStatus == FileStatus.Ok && _tranRecord is not null)
-            _tranId = _tranRecord.TranId; // RIDFLD updated with the key just read. source: :664
+        string fileStatus = _transactions.ReadPrevious(out _currentTransaction);
+        if (fileStatus == FileStatus.Ok && _currentTransaction is not null)
+            _recordKey = _currentTransaction.TranId; // RIDFLD updated with the key just read. source: :664
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :670-687
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal: // WHEN DFHRESP(NORMAL) -> CONTINUE. source: :671-672
                 break;
             case Resp.EndFile: // WHEN DFHRESP(ENDFILE). source: :673-679
-                _transactEof = true;                                  // SET TRANSACT-EOF TO TRUE. source: :675
-                _wsMessage = "You have reached the top of the page..."; // source: :676-677
+                _transactionEof = true;                                  // SET TRANSACT-EOF TO TRUE. source: :675
+                _message = "You have reached the top of the page..."; // source: :676-677
                 _map.Field("TRNIDIN").CursorLength = -1;              // MOVE -1 TO TRNIDINL. source: :678
                 SendTrnlstScreen(ctx);                                // PERFORM SEND-TRNLST-SCREEN. source: :679
                 break;
             default: // WHEN OTHER. source: :680-686
-                _errFlgOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :682
-                _wsMessage = "Unable to lookup transaction...";       // source: :683-684
+                _errorFlagOn = true;                                     // MOVE 'Y' TO WS-ERR-FLG. source: :682
+                _message = "Unable to lookup transaction...";       // source: :683-684
                 _map.Field("TRNIDIN").CursorLength = -1;              // MOVE -1 TO TRNIDINL. source: :685
                 SendTrnlstScreen(ctx);                                // PERFORM SEND-TRNLST-SCREEN. source: :686
                 break;
@@ -743,8 +743,8 @@ public sealed class TransactionListProgram : ITransactionHandler
         string st = _transactions.ReadNext(out _);
         // Re-position at-or-after the same RID so the caller's first READNEXT returns the same record,
         // and a first READPREV returns the record at-or-before it (matching CICS browse after STARTBR).
-        if (_tranId.Length == 0) _transactions.StartBrowse();
-        else _transactions.StartBrowse(_tranId);
+        if (_recordKey.Length == 0) _transactions.StartBrowse();
+        else _transactions.StartBrowse(_recordKey);
         return st == FileStatus.Ok;
     }
 
@@ -753,7 +753,7 @@ public sealed class TransactionListProgram : ITransactionHandler
     // =============================================================================================
     private void SetResp(string fileStatus)
     {
-        _wsRespCd = fileStatus switch
+        _responseCode = fileStatus switch
         {
             FileStatus.Ok => (int)Resp.Normal,             // '00' -> DFHRESP(NORMAL)
             FileStatus.EndOfFile => (int)Resp.EndFile,     // '10' -> DFHRESP(ENDFILE)
@@ -761,7 +761,7 @@ public sealed class TransactionListProgram : ITransactionHandler
             FileStatus.DuplicateKey => (int)Resp.DupRec,   // '02' -> DFHRESP(DUPREC)
             _ => (int)Resp.Error,                          // any other -> WHEN OTHER (file error)
         };
-        _wsReasCd = 0; // RESP2 unavailable from the relational repo; 0 for parity.
+        _reasonCode = 0; // RESP2 unavailable from the relational repo; 0 for parity.
     }
 
     // =============================================================================================
@@ -783,7 +783,7 @@ public sealed class TransactionListProgram : ITransactionHandler
     // =============================================================================================
     //  WS-TRAN-AMT edit — PIC +99999999.99 (sign, 8 int digits, '.', 2 dec). source: :56,383
     // =============================================================================================
-    private static string EditTranAmt(decimal amt)
+    private static string EditTransactionAmount(decimal amt)
     {
         // MOVE S9(9)V99 TO +99999999.99: truncate toward zero to 2 decimals (no rounding), drop the
         // high-order integer digit that does not fit the 8 integer positions, and prefix the sign.
@@ -813,12 +813,12 @@ public sealed class TransactionListProgram : ITransactionHandler
     private void SaveCt00Info()
     {
         string packed =
-            PadX(_ct00TrnidFirst, 16) +
-            PadX(_ct00TrnidLast, 16) +
-            Zoned(_ct00PageNum, 8) +
-            (_ct00NextPageFlg == '\0' ? 'N' : _ct00NextPageFlg) +
-            (string.IsNullOrEmpty(_ct00TrnSelFlg) ? " " : _ct00TrnSelFlg.Substring(0, 1)) +
-            PadX(_ct00TrnSelected, 16);
+            PadX(_firstTranIdOnPage, 16) +
+            PadX(_lastTranIdOnPage, 16) +
+            Zoned(_pageNumber, 8) +
+            (_nextPageFlag == '\0' ? 'N' : _nextPageFlag) +
+            (string.IsNullOrEmpty(_selectedRowFlag) ? " " : _selectedRowFlag.Substring(0, 1)) +
+            PadX(_selectedTranId, 16);
         packed = PadX(packed, 75);
         _commArea.CustFName = packed.Substring(0, 25);
         _commArea.CustMName = packed.Substring(25, 25);
@@ -829,14 +829,14 @@ public sealed class TransactionListProgram : ITransactionHandler
     {
         string packed = PadX(_commArea.CustFName, 25) + PadX(_commArea.CustMName, 25) + PadX(_commArea.CustLName, 25);
         packed = PadX(packed, 75);
-        _ct00TrnidFirst = packed.Substring(0, 16).TrimEnd();
-        _ct00TrnidLast = packed.Substring(16, 16).TrimEnd();
-        _ct00PageNum = (int)ParseLong(packed.Substring(32, 8));
+        _firstTranIdOnPage = packed.Substring(0, 16).TrimEnd();
+        _lastTranIdOnPage = packed.Substring(16, 16).TrimEnd();
+        _pageNumber = (int)ParseLong(packed.Substring(32, 8));
         char nx = packed[40];
-        _ct00NextPageFlg = nx == 'Y' ? 'Y' : 'N';
+        _nextPageFlag = nx == 'Y' ? 'Y' : 'N';
         char sf = packed[41];
-        _ct00TrnSelFlg = sf == ' ' ? "" : sf.ToString();
-        _ct00TrnSelected = packed.Substring(42, 16).TrimEnd();
+        _selectedRowFlag = sf == ' ' ? "" : sf.ToString();
+        _selectedTranId = packed.Substring(42, 16).TrimEnd();
     }
 
     // =============================================================================================

@@ -57,57 +57,57 @@ public sealed class AccountViewProgram : ITransactionHandler
     // =============================================================================================
     //  WS-LITERALS — source: COACTVWC.cbl:142-202
     // =============================================================================================
-    private const string LIT_THISPGM = "COACTVWC";   // source: COACTVWC.cbl:143-144
-    private const string LIT_THISTRANID = "CAVW";    // source: COACTVWC.cbl:145-146
-    private const string LIT_THISMAPSET = "COACTVW"; // source: COACTVWC.cbl:147-148 ('COACTVW ' X(8))
-    private const string LIT_THISMAP = "CACTVWA";    // source: COACTVWC.cbl:149-150
-    private const string LIT_MENUPGM = "COMEN01C";   // source: COACTVWC.cbl:168-169
-    private const string LIT_MENUTRANID = "CM00";    // source: COACTVWC.cbl:170-171
+    private const string ProgramId = "COACTVWC";   // WS-THISPGM PIC X(8). source: COACTVWC.cbl:143-144
+    private const string TransactionId = "CAVW";    // WS-THISTRANID PIC X(4). source: COACTVWC.cbl:145-146
+    private const string MapSetId = "COACTVW"; // WS-THISMAPSET PIC X(8). source: COACTVWC.cbl:147-148 ('COACTVW ' X(8))
+    private const string MapId = "CACTVWA";    // WS-THISMAP PIC X(7). source: COACTVWC.cbl:149-150
+    private const string MenuProgramId = "COMEN01C";   // WS-MENUPGM PIC X(8). source: COACTVWC.cbl:168-169
+    private const string MenuTransactionId = "CM00";    // WS-MENUTRANID PIC X(4). source: COACTVWC.cbl:170-171
 
-    private const string LIT_ACCTFILENAME = "ACCTDAT ";          // source: COACTVWC.cbl:184-185
-    private const string LIT_CUSTFILENAME = "CUSTDAT ";          // source: COACTVWC.cbl:188-189
-    private const string LIT_CARDXREFNAME_ACCT_PATH = "CXACAIX "; // source: COACTVWC.cbl:192-193
+    private const string AccountFileName = "ACCTDAT ";          // WS-ACCTFILENAME PIC X(8). source: COACTVWC.cbl:184-185
+    private const string CustomerFileName = "CUSTDAT ";          // WS-CUSTFILENAME PIC X(8). source: COACTVWC.cbl:188-189
+    private const string CardXrefFileName = "CXACAIX "; // WS-CARDXREFNAME (acct alt-index path) PIC X(8). source: COACTVWC.cbl:192-193
 
     // CCDA-TITLE01/02 (COTTL01Y) — shared screen header. source: COTTL01Y.cpy.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
+    private const string Title01 = "      AWS Mainframe Modernization       "; // CCDA-TITLE01 PIC X(40)
+    private const string Title02 = "              CardDemo                  "; // CCDA-TITLE02 PIC X(40)
 
     // =============================================================================================
     //  WS-MISC-STORAGE flags — source: COACTVWC.cbl:35-105
     // =============================================================================================
 
     // 05 WS-RESP-CD / WS-REAS-CD PIC S9(09) COMP. source: COACTVWC.cbl:40-43
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode; // WS-RESP-CD
+    private int _reasonCode;   // WS-REAS-CD
 
     // 05 WS-INPUT-FLAG: 88 INPUT-OK='0' / INPUT-ERROR='1' / INPUT-PENDING=LOW-VALUES. source: :50-53
     // Initialised to LOW-VALUES (INPUT-PENDING) by INITIALIZE WS-MISC-STORAGE.
-    private char _wsInputFlag = '\0';
-    private bool InputOk => _wsInputFlag == '0';     // 88 INPUT-OK
-    private bool InputError => _wsInputFlag == '1';  // 88 INPUT-ERROR
-    private void SetInputOk() => _wsInputFlag = '0';
-    private void SetInputError() => _wsInputFlag = '1';
+    private char _inputFlag = '\0'; // WS-INPUT-FLAG
+    private bool InputOk => _inputFlag == '0';     // 88 INPUT-OK
+    private bool InputError => _inputFlag == '1';  // 88 INPUT-ERROR
+    private void SetInputOk() => _inputFlag = '0';
+    private void SetInputError() => _inputFlag = '1';
 
     // 05 WS-EDIT-ACCT-FLAG: 88 FLG-ACCTFILTER-NOT-OK='0' / ISVALID='1' / BLANK=' '. source: :58-61
-    private char _wsEditAcctFlag = '\0';
-    private bool FlgAcctFilterNotOk => _wsEditAcctFlag == '0';  // 88 FLG-ACCTFILTER-NOT-OK
-    private bool FlgAcctFilterBlank => _wsEditAcctFlag == ' ';  // 88 FLG-ACCTFILTER-BLANK
-    private void SetFlgAcctFilterNotOk() => _wsEditAcctFlag = '0';
-    private void SetFlgAcctFilterIsValid() => _wsEditAcctFlag = '1';
-    private void SetFlgAcctFilterBlank() => _wsEditAcctFlag = ' ';
+    private char _editAcctFlag = '\0'; // WS-EDIT-ACCT-FLAG
+    private bool FlgAcctFilterNotOk => _editAcctFlag == '0';  // 88 FLG-ACCTFILTER-NOT-OK
+    private bool FlgAcctFilterBlank => _editAcctFlag == ' ';  // 88 FLG-ACCTFILTER-BLANK
+    private void SetFlgAcctFilterNotOk() => _editAcctFlag = '0';
+    private void SetFlgAcctFilterIsValid() => _editAcctFlag = '1';
+    private void SetFlgAcctFilterBlank() => _editAcctFlag = ' ';
 
     // 05 WS-EDIT-CUST-FLAG: 88 FLG-CUSTFILTER-NOT-OK='0' / ISVALID='1' / BLANK=' '. source: :62-65
-    private char _wsEditCustFlag = '\0';
-    private void SetFlgCustFilterNotOk() => _wsEditCustFlag = '0';
+    private char _editCustFlag = '\0'; // WS-EDIT-CUST-FLAG
+    private void SetFlgCustFilterNotOk() => _editCustFlag = '0';
 
     // 05 WS-FILE-READ-FLAGS. source: COACTVWC.cbl:81-85
     // 88 FOUND-ACCT-IN-MASTER VALUE '1' ; 88 FOUND-CUST-IN-MASTER VALUE '1'.
-    private char _wsAccountMasterReadFlag = '\0';
-    private char _wsCustMasterReadFlag = '\0';
-    private bool FoundAcctInMaster => _wsAccountMasterReadFlag == '1'; // 88 FOUND-ACCT-IN-MASTER
-    private bool FoundCustInMaster => _wsCustMasterReadFlag == '1';    // 88 FOUND-CUST-IN-MASTER
-    private void SetFoundAcctInMaster() => _wsAccountMasterReadFlag = '1';
-    private void SetFoundCustInMaster() => _wsCustMasterReadFlag = '1';
+    private char _accountMasterReadFlag = '\0'; // WS-FILE-READ-FLAGS (acct)
+    private char _custMasterReadFlag = '\0';    // WS-FILE-READ-FLAGS (cust)
+    private bool FoundAcctInMaster => _accountMasterReadFlag == '1'; // 88 FOUND-ACCT-IN-MASTER
+    private bool FoundCustInMaster => _custMasterReadFlag == '1';    // 88 FOUND-CUST-IN-MASTER
+    private void SetFoundAcctInMaster() => _accountMasterReadFlag = '1';
+    private void SetFoundCustInMaster() => _custMasterReadFlag = '1';
 
     // 05 WS-FILE-ERROR-MESSAGE structure. source: COACTVWC.cbl:86-105
     private string _errorOpname = "        "; // ERROR-OPNAME X(8)
@@ -119,40 +119,40 @@ public sealed class AccountViewProgram : ITransactionHandler
     //  WS-INFO-MSG (40) — 88 levels. source: COACTVWC.cbl:110-116
     // =============================================================================================
     // WS-NO-INFO-MESSAGE = SPACES/LOW-VALUES ; WS-PROMPT-FOR-INPUT ; WS-INFORM-OUTPUT (dead).
-    private string _wsInfoMsg = "";
-    private bool WsNoInfoMessage => IsSpacesOrLowValues(_wsInfoMsg); // 88 WS-NO-INFO-MESSAGE
-    private void SetWsNoInfoMessage() => _wsInfoMsg = "";            // SET WS-NO-INFO-MESSAGE TO TRUE (SPACES)
-    private const string PROMPT_FOR_INPUT = "Enter or update id of account to display"; // X(40). source: :113-114
-    private void SetWsPromptForInput() => _wsInfoMsg = PROMPT_FOR_INPUT;
+    private string _infoMessage = ""; // WS-INFO-MSG PIC X(40)
+    private bool NoInfoMessage => IsSpacesOrLowValues(_infoMessage); // 88 WS-NO-INFO-MESSAGE
+    private void SetNoInfoMessage() => _infoMessage = "";            // SET WS-NO-INFO-MESSAGE TO TRUE (SPACES)
+    private const string PromptForInput = "Enter or update id of account to display"; // WS-PROMPT-FOR-INPUT PIC X(40). source: :113-114
+    private void SetPromptForInput() => _infoMessage = PromptForInput;
 
     // =============================================================================================
     //  WS-RETURN-MSG (75) — 88 levels. source: COACTVWC.cbl:117-138
     // =============================================================================================
     // 88 WS-RETURN-MSG-OFF = SPACES.   88 WS-PROMPT-FOR-ACCT = 'Account number not provided'.
     // 88 NO-SEARCH-CRITERIA-RECEIVED = 'No input received'.  (Other 88s are dead — FB-7.)
-    private string _wsReturnMsg = "";
-    private bool WsReturnMsgOff => IsSpaces(_wsReturnMsg);              // 88 WS-RETURN-MSG-OFF
-    private void SetWsReturnMsgOff() => _wsReturnMsg = "";             // SET WS-RETURN-MSG-OFF TO TRUE
-    private void SetWsPromptForAcct() => _wsReturnMsg = "Account number not provided"; // source: :121-122
-    private void SetNoSearchCriteriaReceived() => _wsReturnMsg = "No input received";  // source: :123-124
+    private string _returnMessage = ""; // WS-RETURN-MSG PIC X(75)
+    private bool ReturnMessageOff => IsSpaces(_returnMessage);          // 88 WS-RETURN-MSG-OFF
+    private void SetReturnMessageOff() => _returnMessage = "";          // SET WS-RETURN-MSG-OFF TO TRUE
+    private void SetPromptForAcct() => _returnMessage = "Account number not provided"; // source: :121-122
+    private void SetNoSearchCriteriaReceived() => _returnMessage = "No input received";  // source: :123-124
 
     // =============================================================================================
     //  WS-XREF-RID — the VSAM key area + its X redefines. source: COACTVWC.cbl:73-80
     // =============================================================================================
     // 10 WS-CARD-RID-CUST-ID 9(09) REDEFINES WS-CARD-RID-CUST-ID-X X(09)
     // 10 WS-CARD-RID-ACCT-ID 9(11) REDEFINES WS-CARD-RID-ACCT-ID-X X(11)
-    private long _ridAcctId;  // WS-CARD-RID-ACCT-ID 9(11)
-    private long _ridCustId;  // WS-CARD-RID-CUST-ID 9(09)
+    private long _acctIdKey;  // WS-CARD-RID-ACCT-ID 9(11)
+    private long _custIdKey;  // WS-CARD-RID-CUST-ID 9(09)
     // The -X redefine (zero-padded char form) used for the key and the message text.
-    private string RidAcctIdX => Zoned(_ridAcctId, 11); // WS-CARD-RID-ACCT-ID-X X(11)
-    private string RidCustIdX => Zoned(_ridCustId, 9);  // WS-CARD-RID-CUST-ID-X X(09)
+    private string AcctIdKeyText => Zoned(_acctIdKey, 11); // WS-CARD-RID-ACCT-ID-X X(11)
+    private string CustIdKeyText => Zoned(_custIdKey, 9);  // WS-CARD-RID-CUST-ID-X X(09)
 
     // =============================================================================================
     //  CC-WORK-AREA (CVCRD01Y): CC-ACCT-ID X(11) (redefine CC-ACCT-ID-N 9(11)). source: CVCRD01Y.cpy
     // =============================================================================================
     // CC-ACCT-ID is the X(11) form used for the class/space tests in 2210-EDIT-ACCOUNT.
     // LOW-VALUES sentinel modeled as null; SPACES as 11 blanks; otherwise the 11-char keyed value.
-    private string _ccAcctId = ""; // CC-ACCT-ID X(11)
+    private string _accountIdInput = ""; // CC-ACCT-ID X(11)
 
     // =============================================================================================
     //  Record images read from the files (CVACT01Y / CVCUS01Y / CVACT03Y).
@@ -167,8 +167,8 @@ public sealed class AccountViewProgram : ITransactionHandler
     private CardDemoCommArea _commArea = new();
     // WS-THIS-PROGCOMMAREA: CA-FROM-PROGRAM X(8) / CA-FROM-TRANID X(4) — INITIALIZEd, parsed, written
     // back, but not otherwise used in logic. source: COACTVWC.cbl:213-216, 288-292, 398-400.
-    private string _caFromProgram = "";
-    private string _caFromTranid = "";
+    private string _trailerFromProgram = ""; // CA-FROM-PROGRAM X(8)
+    private string _trailerFromTranId = "";  // CA-FROM-TRANID X(4)
 
     // The CCARD-AID code (from YYYY-STORE-PFKEY), and the post-gate forced ENTER/PF3. source: :306-314
     private CcardAid _ccardAid = CcardAid.None;
@@ -176,10 +176,10 @@ public sealed class AccountViewProgram : ITransactionHandler
     private bool CcardAidPfk03 => _ccardAid == CcardAid.Pfk03; // 88 CCARD-AID-PFK03
 
     // 05 WS-PFK-FLAG: 88 PFK-VALID='0' / PFK-INVALID='1'. source: COACTVWC.cbl:54-57
-    private char _wsPfkFlag = '\0';
-    private bool PfkInvalid => _wsPfkFlag == '1';
-    private void SetPfkValid() => _wsPfkFlag = '0';
-    private void SetPfkInvalid() => _wsPfkFlag = '1';
+    private char _pfKeyFlag = '\0'; // WS-PFK-FLAG
+    private bool PfkInvalid => _pfKeyFlag == '1';
+    private void SetPfkValid() => _pfKeyFlag = '0';
+    private void SetPfkInvalid() => _pfKeyFlag = '1';
 
     // The per-turn symbolic BMS map (CACTVWAI / CACTVWAO).
     private BmsMap _map = null!;
@@ -199,10 +199,10 @@ public sealed class AccountViewProgram : ITransactionHandler
     }
 
     /// <inheritdoc/>
-    public string ProgramName => LIT_THISPGM; // PROGRAM-ID. COACTVWC. source: COACTVWC.cbl:22-23
+    public string ProgramName => ProgramId; // PROGRAM-ID. COACTVWC. source: COACTVWC.cbl:22-23
 
     /// <inheritdoc/>
-    public string TransId => LIT_THISTRANID;  // CSD: CAVW -> COACTVWC. source: CSD_TRANSACTIONS.md; cbl:145-146
+    public string TransId => TransactionId;  // CSD: CAVW -> COACTVWC. source: CSD_TRANSACTIONS.md; cbl:145-146
 
     // =============================================================================================
     //  0000-MAIN — source: COACTVWC.cbl:262-393
@@ -213,7 +213,7 @@ public sealed class AccountViewProgram : ITransactionHandler
         // EXEC CICS HANDLE ABEND LABEL(ABEND-ROUTINE). source: :264-266 (modeled as a try/catch wrapper).
         try
         {
-            Main0000(ctx);
+            MainProcess(ctx);
         }
         catch (Exception)
         {
@@ -223,7 +223,7 @@ public sealed class AccountViewProgram : ITransactionHandler
         }
     }
 
-    private void Main0000(CicsContext ctx)
+    private void MainProcess(CicsContext ctx) // COBOL paragraph: 0000-MAIN
     {
         // Build a fresh symbolic map for this task (WORKING-STORAGE re-initialised per turn).
         _map = BuildMap();
@@ -234,7 +234,7 @@ public sealed class AccountViewProgram : ITransactionHandler
         // MOVE LIT-THISTRANID TO WS-TRANID. source: :274 (WS-TRANID is informational only.)
 
         // SET WS-RETURN-MSG-OFF TO TRUE. source: :278
-        SetWsReturnMsgOff();
+        SetReturnMessageOff();
 
         // Store passed data if any. source: :282-293
         //   IF EIBCALEN = 0
@@ -245,21 +245,21 @@ public sealed class AccountViewProgram : ITransactionHandler
         //      MOVE DFHCOMMAREA(... + 1 : ...)                 TO WS-THIS-PROGCOMMAREA
         bool freshCommarea =
             ctx.EibCalen == 0
-            || (ctx.CommArea is { } ca0 && ca0.FromProgram == PadX(LIT_MENUPGM, 8) && !ca0.IsReenter);
+            || (ctx.CommArea is { } ca0 && ca0.FromProgram == PadX(MenuProgramId, 8) && !ca0.IsReenter);
 
         if (freshCommarea)
         {
             // INITIALIZE CARDDEMO-COMMAREA WS-THIS-PROGCOMMAREA. source: :285-286
             _commArea = new CardDemoCommArea();
-            _caFromProgram = "";
-            _caFromTranid = "";
+            _trailerFromProgram = "";
+            _trailerFromTranId = "";
         }
         else
         {
             // Copy the carried COMMAREA + trailer. source: :288-292
             _commArea = ctx.CommArea!;
-            _caFromProgram = ""; // trailer is not transported by the typed COMMAREA; INITIALIZE-equivalent.
-            _caFromTranid = "";
+            _trailerFromProgram = ""; // trailer is not transported by the typed COMMAREA; INITIALIZE-equivalent.
+            _trailerFromTranId = "";
         }
 
         // PERFORM YYYY-STORE-PFKEY. source: :299-300 — EIBAID -> CCARD-AID-*.
@@ -278,23 +278,23 @@ public sealed class AccountViewProgram : ITransactionHandler
             // WHEN CCARD-AID-PFK03 — XCTL to caller or main menu. source: :324-352
             // IF CDEMO-FROM-TRANID = LOW-VALUES OR SPACES -> CM00 ELSE FROM-TRANID. source: :328-333
             if (IsLowValuesOrSpaces(_commArea.FromTranId))
-                _commArea.ToTranId = LIT_MENUTRANID;
+                _commArea.ToTranId = MenuTransactionId;
             else
                 _commArea.ToTranId = _commArea.FromTranId;
 
             // IF CDEMO-FROM-PROGRAM = LOW-VALUES OR SPACES -> COMEN01C ELSE FROM-PROGRAM. source: :334-339
             if (IsLowValuesOrSpaces(_commArea.FromProgram))
-                _commArea.ToProgram = LIT_MENUPGM;
+                _commArea.ToProgram = MenuProgramId;
             else
                 _commArea.ToProgram = _commArea.FromProgram;
 
-            _commArea.FromTranId = LIT_THISTRANID;   // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :341
-            _commArea.FromProgram = LIT_THISPGM;     // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :342
+            _commArea.FromTranId = TransactionId;   // MOVE LIT-THISTRANID TO CDEMO-FROM-TRANID. source: :341
+            _commArea.FromProgram = ProgramId;     // MOVE LIT-THISPGM    TO CDEMO-FROM-PROGRAM. source: :342
 
             _commArea.SetUser();                     // SET CDEMO-USRTYP-USER TO TRUE. source: :344
             _commArea.PgmContext = 0;                // SET CDEMO-PGM-ENTER   TO TRUE. source: :345
-            _commArea.LastMapSet = LIT_THISMAPSET;   // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :346
-            _commArea.LastMap = LIT_THISMAP;         // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :347
+            _commArea.LastMapSet = MapSetId;   // MOVE LIT-THISMAPSET TO CDEMO-LAST-MAPSET. source: :346
+            _commArea.LastMap = MapId;         // MOVE LIT-THISMAP    TO CDEMO-LAST-MAP. source: :347
 
             // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :349-352
             ctx.Xctl(_commArea.ToProgram.TrimEnd(), _commArea);
@@ -303,23 +303,23 @@ public sealed class AccountViewProgram : ITransactionHandler
         else if (_commArea.IsFirstEntry) // WHEN CDEMO-PGM-ENTER. source: :353-360
         {
             // Coming from some other context — gather selection criteria (empty prompt screen).
-            Perform1000SendMap(ctx);     // PERFORM 1000-SEND-MAP. source: :358-359
+            SendMap(ctx);                // PERFORM 1000-SEND-MAP. source: :358-359
             CommonReturn(ctx);           // GO TO COMMON-RETURN. source: :360
             return;
         }
         else if (_commArea.IsReenter)    // WHEN CDEMO-PGM-REENTER. source: :361-374
         {
-            Perform2000ProcessInputs(ctx); // PERFORM 2000-PROCESS-INPUTS. source: :362-363
+            ProcessInputs(ctx);            // PERFORM 2000-PROCESS-INPUTS. source: :362-363
             if (InputError)                // IF INPUT-ERROR. source: :364
             {
-                Perform1000SendMap(ctx);   // PERFORM 1000-SEND-MAP. source: :365-366
+                SendMap(ctx);              // PERFORM 1000-SEND-MAP. source: :365-366
                 CommonReturn(ctx);         // GO TO COMMON-RETURN. source: :367
                 return;
             }
             else
             {
-                Perform9000ReadAcct(ctx);  // PERFORM 9000-READ-ACCT. source: :369-370
-                Perform1000SendMap(ctx);   // PERFORM 1000-SEND-MAP. source: :371-372
+                ReadAccount(ctx);          // PERFORM 9000-READ-ACCT. source: :369-370
+                SendMap(ctx);              // PERFORM 1000-SEND-MAP. source: :371-372
                 CommonReturn(ctx);         // GO TO COMMON-RETURN. source: :373
                 return;
             }
@@ -328,7 +328,7 @@ public sealed class AccountViewProgram : ITransactionHandler
         {
             // WHEN OTHER — abend scenario (no real abend; SEND-PLAIN-TEXT + RETURN). source: :375-382
             // MOVE 'UNEXPECTED DATA SCENARIO' TO WS-RETURN-MSG. source: :379-380
-            _wsReturnMsg = "UNEXPECTED DATA SCENARIO";
+            _returnMessage = "UNEXPECTED DATA SCENARIO";
             SendPlainText(ctx);           // PERFORM SEND-PLAIN-TEXT. source: :381
             return;                       // SEND-PLAIN-TEXT issues EXEC CICS RETURN (terminal end).
         }
@@ -351,34 +351,34 @@ public sealed class AccountViewProgram : ITransactionHandler
         // Reassemble WS-COMMAREA = [CARDDEMO-COMMAREA][WS-THIS-PROGCOMMAREA] and RETURN. source: :397-406
         // The typed CardDemoCommArea carries the first segment; the trailer (CA-FROM-*) is informational
         // and not part of the typed image — preserve the 2000-byte semantics conceptually via TransId.
-        _ = _caFromProgram;
-        _ = _caFromTranid;
+        _ = _trailerFromProgram;
+        _ = _trailerFromTranId;
 
         // EXEC CICS RETURN TRANSID(LIT-THISTRANID) COMMAREA(WS-COMMAREA) LENGTH(LENGTH OF WS-COMMAREA).
-        ctx.ReturnTransId(LIT_THISTRANID, _commArea); // source: :402-406
+        ctx.ReturnTransId(TransactionId, _commArea); // source: :402-406
     }
 
     // =============================================================================================
     //  0000-MAIN-EXIT (FB-1: duplicated paragraph). source: COACTVWC.cbl:408-413
     // =============================================================================================
-    private static void Main0000Exit() { /* EXIT. source: :408-410 */ }
-    private static void Main0000Exit_Duplicate() { /* EXIT. (duplicate label) source: :411-413 */ }
+    private static void MainExit() { /* EXIT. source: :408-410 */ } // COBOL paragraph: 0000-MAIN-EXIT
+    private static void MainExitDuplicate() { /* EXIT. (duplicate label) source: :411-413 */ } // COBOL paragraph: 0000-MAIN-EXIT (FB-1)
 
     // =============================================================================================
     //  1000-SEND-MAP — source: COACTVWC.cbl:416-425
     // =============================================================================================
-    private void Perform1000SendMap(CicsContext ctx)
+    private void SendMap(CicsContext ctx) // COBOL paragraph: 1000-SEND-MAP
     {
-        Screen1100Init(ctx);           // PERFORM 1100-SCREEN-INIT. source: :417-418
-        Screen1200SetupVars(ctx);      // PERFORM 1200-SETUP-SCREEN-VARS. source: :419-420
-        Screen1300SetupAttrs();        // PERFORM 1300-SETUP-SCREEN-ATTRS. source: :421-422
-        Screen1400SendScreen(ctx);     // PERFORM 1400-SEND-SCREEN. source: :423-424
+        InitScreen(ctx);           // PERFORM 1100-SCREEN-INIT. source: :417-418
+        SetupScreenVars(ctx);      // PERFORM 1200-SETUP-SCREEN-VARS. source: :419-420
+        SetupScreenAttrs();        // PERFORM 1300-SETUP-SCREEN-ATTRS. source: :421-422
+        SendScreen(ctx);           // PERFORM 1400-SEND-SCREEN. source: :423-424
     }
 
     // =============================================================================================
     //  1100-SCREEN-INIT — source: COACTVWC.cbl:431-455
     // =============================================================================================
-    private void Screen1100Init(CicsContext ctx)
+    private void InitScreen(CicsContext ctx) // COBOL paragraph: 1100-SCREEN-INIT
     {
         // MOVE LOW-VALUES TO CACTVWAO. source: :432
         MoveLowValuesToMapOut();
@@ -387,10 +387,10 @@ public sealed class AccountViewProgram : ITransactionHandler
         DateTime now = ctx.Clock.Now;
 
         // MOVE CCDA-TITLE01/02, LIT-THISTRANID, LIT-THISPGM. source: :436-439
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01);
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02);
-        _map.Field("TRNNAME").SetValue(LIT_THISTRANID);
-        _map.Field("PGMNAME").SetValue(LIT_THISPGM);
+        _map.Field("TITLE01").SetValue(Title01);
+        _map.Field("TITLE02").SetValue(Title02);
+        _map.Field("TRNNAME").SetValue(TransactionId);
+        _map.Field("PGMNAME").SetValue(ProgramId);
 
         // CURDATEO = MM/DD/YY (year = WS-CURDATE-YEAR(3:2), last two digits). source: :443-447
         string mm = Two(now.Month);
@@ -405,12 +405,12 @@ public sealed class AccountViewProgram : ITransactionHandler
     // =============================================================================================
     //  1200-SETUP-SCREEN-VARS — source: COACTVWC.cbl:460-535
     // =============================================================================================
-    private void Screen1200SetupVars(CicsContext ctx)
+    private void SetupScreenVars(CicsContext ctx) // COBOL paragraph: 1200-SETUP-SCREEN-VARS
     {
         // IF EIBCALEN = 0 SET WS-PROMPT-FOR-INPUT. source: :462-463
         if (ctx.EibCalen == 0)
         {
-            SetWsPromptForInput();
+            SetPromptForInput();
         }
         else
         {
@@ -418,7 +418,7 @@ public sealed class AccountViewProgram : ITransactionHandler
             if (FlgAcctFilterBlank)
                 _map.Field("ACCTSID").SetValue("", setMdt: false); // MOVE LOW-VALUES TO ACCTSIDO
             else
-                _map.Field("ACCTSID").SetValue(_ccAcctId, setMdt: false); // MOVE CC-ACCT-ID TO ACCTSIDO
+                _map.Field("ACCTSID").SetValue(_accountIdInput, setMdt: false); // MOVE CC-ACCT-ID TO ACCTSIDO
 
             // IF FOUND-ACCT-IN-MASTER OR FOUND-CUST-IN-MASTER -> move ACCT-* to screen. source: :471-491
             if (FoundAcctInMaster || FoundCustInMaster)
@@ -469,20 +469,20 @@ public sealed class AccountViewProgram : ITransactionHandler
         }
 
         // IF WS-NO-INFO-MESSAGE SET WS-PROMPT-FOR-INPUT. source: :528-530
-        if (WsNoInfoMessage)
-            SetWsPromptForInput();
+        if (NoInfoMessage)
+            SetPromptForInput();
 
         // MOVE WS-RETURN-MSG TO ERRMSGO. source: :532
-        _map.Field("ERRMSG").SetValue(_wsReturnMsg, setMdt: false);
+        _map.Field("ERRMSG").SetValue(_returnMessage, setMdt: false);
 
         // MOVE WS-INFO-MSG TO INFOMSGO. source: :534
-        _map.Field("INFOMSG").SetValue(_wsInfoMsg, setMdt: false);
+        _map.Field("INFOMSG").SetValue(_infoMessage, setMdt: false);
     }
 
     // =============================================================================================
     //  1300-SETUP-SCREEN-ATTRS — source: COACTVWC.cbl:541-572
     // =============================================================================================
-    private void Screen1300SetupAttrs()
+    private void SetupScreenAttrs() // COBOL paragraph: 1300-SETUP-SCREEN-ATTRS
     {
         ScreenField acctsid = _map.Field("ACCTSID");
 
@@ -509,7 +509,7 @@ public sealed class AccountViewProgram : ITransactionHandler
 
         // INFOMSG colour: no info -> DFHBMDAR (dark/non-display); else DFHNEUTR. source: :567-571
         ScreenField infomsg = _map.Field("INFOMSG");
-        if (WsNoInfoMessage)
+        if (NoInfoMessage)
             infomsg.AttributeOverride = infomsg.Attribute | BmsAttribute.Dark; // DFHBMDAR (dark)
         else
             infomsg.ColorOverride = BmsColor.Neutral; // DFHNEUTR
@@ -518,16 +518,16 @@ public sealed class AccountViewProgram : ITransactionHandler
     // =============================================================================================
     //  1400-SEND-SCREEN — source: COACTVWC.cbl:577-591
     // =============================================================================================
-    private void Screen1400SendScreen(CicsContext ctx)
+    private void SendScreen(CicsContext ctx) // COBOL paragraph: 1400-SEND-SCREEN
     {
         // MOVE LIT-THISMAPSET/MAP TO CCARD-NEXT-MAPSET/MAP. source: :579-580
         // SET CDEMO-PGM-REENTER TO TRUE — next turn is a re-entry. source: :581
         _commArea.SetReenter();
-        _commArea.LastMapSet = LIT_THISMAPSET;
-        _commArea.LastMap = LIT_THISMAP;
+        _commArea.LastMapSet = MapSetId;
+        _commArea.LastMap = MapId;
 
         // EXEC CICS SEND MAP(CACTVWA) MAPSET(COACTVW) FROM(CACTVWAO) CURSOR ERASE FREEKB. source: :583-590
-        ctx.SendMap(LIT_THISMAP, LIT_THISMAPSET, _map, new SendMapOptions
+        ctx.SendMap(MapId, MapSetId, _map, new SendMapOptions
         {
             Erase = true,
             FreeKb = true,
@@ -538,10 +538,10 @@ public sealed class AccountViewProgram : ITransactionHandler
     // =============================================================================================
     //  2000-PROCESS-INPUTS — source: COACTVWC.cbl:596-605
     // =============================================================================================
-    private void Perform2000ProcessInputs(CicsContext ctx)
+    private void ProcessInputs(CicsContext ctx) // COBOL paragraph: 2000-PROCESS-INPUTS
     {
-        Receive2100Map(ctx);    // PERFORM 2100-RECEIVE-MAP. source: :597-598
-        Edit2200MapInputs();    // PERFORM 2200-EDIT-MAP-INPUTS. source: :599-600
+        ReceiveMap(ctx);        // PERFORM 2100-RECEIVE-MAP. source: :597-598
+        EditMapInputs();        // PERFORM 2200-EDIT-MAP-INPUTS. source: :599-600
         // MOVE WS-RETURN-MSG TO CCARD-ERROR-MSG; set next prog/mapset/map literals. source: :601-604
         // (CCARD-* are staging fields; the COMMAREA-side error is rendered via ERRMSGO at SEND time.)
     }
@@ -549,31 +549,31 @@ public sealed class AccountViewProgram : ITransactionHandler
     // =============================================================================================
     //  2100-RECEIVE-MAP — source: COACTVWC.cbl:610-617
     // =============================================================================================
-    private void Receive2100Map(CicsContext ctx)
+    private void ReceiveMap(CicsContext ctx) // COBOL paragraph: 2100-RECEIVE-MAP
     {
         // EXEC CICS RECEIVE MAP(CACTVWA) MAPSET(COACTVW) INTO(CACTVWAI) RESP RESP2. source: :611-616
-        ctx.ReceiveMap(LIT_THISMAP, LIT_THISMAPSET, _map);
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        ctx.ReceiveMap(MapId, MapSetId, _map);
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
     }
 
     // =============================================================================================
     //  2200-EDIT-MAP-INPUTS — source: COACTVWC.cbl:622-643
     // =============================================================================================
-    private void Edit2200MapInputs()
+    private void EditMapInputs() // COBOL paragraph: 2200-EDIT-MAP-INPUTS
     {
         SetInputOk();              // SET INPUT-OK TO TRUE. source: :624
         SetFlgAcctFilterIsValid(); // SET FLG-ACCTFILTER-ISVALID TO TRUE. source: :625
 
         // REPLACE * WITH LOW-VALUES: IF ACCTSIDI = '*' OR SPACES -> CC-ACCT-ID = LOW-VALUES. source: :627-633
-        string acctsidi = _map.Field("ACCTSID").Value; // ACCTSIDI OF CACTVWAI (raw keyed value)
-        if (acctsidi == "*" || IsSpaces(acctsidi) || string.IsNullOrEmpty(acctsidi))
-            _ccAcctId = "\0\0\0\0\0\0\0\0\0\0\0"; // LOW-VALUES (11 NULs)
+        string acctIdRaw = _map.Field("ACCTSID").Value; // ACCTSIDI OF CACTVWAI (raw keyed value)
+        if (acctIdRaw == "*" || IsSpaces(acctIdRaw) || string.IsNullOrEmpty(acctIdRaw))
+            _accountIdInput = "\0\0\0\0\0\0\0\0\0\0\0"; // LOW-VALUES (11 NULs)
         else
-            _ccAcctId = PadX(acctsidi, 11);       // MOVE ACCTSIDI TO CC-ACCT-ID (X(11))
+            _accountIdInput = PadX(acctIdRaw, 11);       // MOVE ACCTSIDI TO CC-ACCT-ID (X(11))
 
         // PERFORM 2210-EDIT-ACCOUNT. source: :636-637
-        Edit2210Account();
+        EditAccount();
 
         // CROSS FIELD EDITS: IF FLG-ACCTFILTER-BLANK SET NO-SEARCH-CRITERIA-RECEIVED. source: :640-642
         if (FlgAcctFilterBlank)
@@ -583,56 +583,56 @@ public sealed class AccountViewProgram : ITransactionHandler
     // =============================================================================================
     //  2210-EDIT-ACCOUNT — source: COACTVWC.cbl:649-685
     // =============================================================================================
-    private void Edit2210Account()
+    private void EditAccount() // COBOL paragraph: 2210-EDIT-ACCOUNT
     {
         SetFlgAcctFilterNotOk(); // SET FLG-ACCTFILTER-NOT-OK TO TRUE. source: :650
 
         // Not supplied: IF CC-ACCT-ID = LOW-VALUES OR SPACES. source: :653-662
-        if (IsLowValues(_ccAcctId) || IsSpaces(_ccAcctId))
+        if (IsLowValues(_accountIdInput) || IsSpaces(_accountIdInput))
         {
             SetInputError();          // SET INPUT-ERROR TO TRUE. source: :655
             SetFlgAcctFilterBlank();  // SET FLG-ACCTFILTER-BLANK TO TRUE. source: :656
-            if (WsReturnMsgOff)       // IF WS-RETURN-MSG-OFF. source: :657
-                SetWsPromptForAcct(); // SET WS-PROMPT-FOR-ACCT TO TRUE. source: :658
+            if (ReturnMessageOff)     // IF WS-RETURN-MSG-OFF. source: :657
+                SetPromptForAcct();   // SET WS-PROMPT-FOR-ACCT TO TRUE. source: :658
             _commArea.AcctId = 0;     // MOVE ZEROES TO CDEMO-ACCT-ID. source: :660
             return;                   // GO TO 2210-EDIT-ACCOUNT-EXIT. source: :661
         }
 
         // Not numeric / not 11 chars: IF CC-ACCT-ID IS NOT NUMERIC OR = ZEROES. source: :666-680
-        if (!IsNumeric11(_ccAcctId) || IsZeroes11(_ccAcctId))
+        if (!IsNumeric11(_accountIdInput) || IsZeroes11(_accountIdInput))
         {
             SetInputError();           // SET INPUT-ERROR TO TRUE. source: :668
             SetFlgAcctFilterNotOk();   // SET FLG-ACCTFILTER-NOT-OK TO TRUE. source: :669
-            if (WsReturnMsgOff)        // IF WS-RETURN-MSG-OFF. source: :670
+            if (ReturnMessageOff)      // IF WS-RETURN-MSG-OFF. source: :670
                 // FB-2/FB-3: the MOVEd literal has a DOUBLE space "must  be". The trailing '00' (col
                 // artifact) is not part of the message. source: :671-673
-                _wsReturnMsg = "Account Filter must  be a non-zero 11 digit number";
+                _returnMessage = "Account Filter must  be a non-zero 11 digit number";
             _commArea.AcctId = 0;      // MOVE ZERO TO CDEMO-ACCT-ID. source: :675
             return;                    // GO TO 2210-EDIT-ACCOUNT-EXIT. source: :676
         }
         else
         {
-            _commArea.AcctId = ParseLong11(_ccAcctId); // MOVE CC-ACCT-ID TO CDEMO-ACCT-ID. source: :678
-            SetFlgAcctFilterIsValid();                 // SET FLG-ACCTFILTER-ISVALID TO TRUE. source: :679
+            _commArea.AcctId = ParseLong11(_accountIdInput); // MOVE CC-ACCT-ID TO CDEMO-ACCT-ID. source: :678
+            SetFlgAcctFilterIsValid();                       // SET FLG-ACCTFILTER-ISVALID TO TRUE. source: :679
         }
     }
 
     // =============================================================================================
     //  9000-READ-ACCT — source: COACTVWC.cbl:687-722
     // =============================================================================================
-    private void Perform9000ReadAcct(CicsContext ctx)
+    private void ReadAccount(CicsContext ctx) // COBOL paragraph: 9000-READ-ACCT
     {
-        SetWsNoInfoMessage();                        // SET WS-NO-INFO-MESSAGE TO TRUE. source: :689
+        SetNoInfoMessage();                          // SET WS-NO-INFO-MESSAGE TO TRUE. source: :689
 
-        _ridAcctId = _commArea.AcctId;               // MOVE CDEMO-ACCT-ID TO WS-CARD-RID-ACCT-ID. source: :691
+        _acctIdKey = _commArea.AcctId;               // MOVE CDEMO-ACCT-ID TO WS-CARD-RID-ACCT-ID. source: :691
 
-        Read9200GetCardXrefByAcct(ctx);              // PERFORM 9200-GETCARDXREF-BYACCT. source: :693-694
+        GetCardXrefByAccount(ctx);                   // PERFORM 9200-GETCARDXREF-BYACCT. source: :693-694
 
         // IF FLG-ACCTFILTER-NOT-OK GO TO 9000-READ-ACCT-EXIT. source: :697-699
         if (FlgAcctFilterNotOk)
             return;
 
-        Read9300GetAcctDataByAcct(ctx);              // PERFORM 9300-GETACCTDATA-BYACCT. source: :701-702
+        GetAccountDataByAccount(ctx);                // PERFORM 9300-GETACCTDATA-BYACCT. source: :701-702
 
         // FB-5: IF DID-NOT-FIND-ACCT-IN-ACCTDAT GO TO EXIT — but DID-NOT-FIND-ACCT-IN-ACCTDAT is never
         // SET (commented out at :792), so this guard is dead and control falls through to 9400 even
@@ -640,9 +640,9 @@ public sealed class AccountViewProgram : ITransactionHandler
         if (false /* DID-NOT-FIND-ACCT-IN-ACCTDAT — never set */)
             return;
 
-        _ridCustId = _commArea.CustId;               // MOVE CDEMO-CUST-ID TO WS-CARD-RID-CUST-ID. source: :708
+        _custIdKey = _commArea.CustId;               // MOVE CDEMO-CUST-ID TO WS-CARD-RID-CUST-ID. source: :708
 
-        Read9400GetCustDataByCust(ctx);              // PERFORM 9400-GETCUSTDATA-BYCUST. source: :710-711
+        GetCustomerDataByCustomer(ctx);              // PERFORM 9400-GETCUSTDATA-BYCUST. source: :710-711
 
         // FB-4: IF DID-NOT-FIND-CUST-IN-CUSTDAT GO TO EXIT — never SET (commented out at :842); dead.
         // source: :713-715
@@ -653,34 +653,34 @@ public sealed class AccountViewProgram : ITransactionHandler
     // =============================================================================================
     //  9200-GETCARDXREF-BYACCT — READ CXACAIX (CARD_XREF by acct_id alt index). source: :723-773
     // =============================================================================================
-    private void Read9200GetCardXrefByAcct(CicsContext ctx)
+    private void GetCardXrefByAccount(CicsContext ctx) // COBOL paragraph: 9200-GETCARDXREF-BYACCT
     {
         // EXEC CICS READ DATASET(CXACAIX) RIDFLD(WS-CARD-RID-ACCT-ID-X) INTO(CARD-XREF-RECORD). :727-735
-        _ = LIT_CARDXREFNAME_ACCT_PATH; // dataset name (fixed)
+        _ = CardXrefFileName; // dataset name (fixed)
         var repo = new CardXrefRepository(_db.Connection);
-        string fileStatus = repo.ReadByAltKey(_ridAcctId, out _cardXref);
+        string fileStatus = repo.ReadByAltKey(_acctIdKey, out _cardXref);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :737-769
-        if (_wsRespCd == (int)Resp.Normal)
+        if (_responseCode == (int)Resp.Normal)
         {
             // WHEN NORMAL — MOVE XREF-CUST-ID/CARD-NUM TO CDEMO-CUST-ID/CARD-NUM. source: :738-740
             _commArea.CustId = _cardXref?.CustId ?? 0;
             _commArea.CardNum = ParseLong(_cardXref?.XrefCardNum ?? "0");
         }
-        else if (_wsRespCd == (int)Resp.NotFnd)
+        else if (_responseCode == (int)Resp.NotFnd)
         {
             // WHEN NOTFND. source: :741-758
             SetInputError();         // SET INPUT-ERROR TO TRUE. :742
             SetFlgAcctFilterNotOk(); // SET FLG-ACCTFILTER-NOT-OK TO TRUE. :743
-            if (WsReturnMsgOff)      // IF WS-RETURN-MSG-OFF. :744
+            if (ReturnMessageOff)    // IF WS-RETURN-MSG-OFF. :744
             {
-                _errorResp = Alpha(_wsRespCd, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. :745
-                _errorResp2 = Alpha(_wsReasCd, 10);  // MOVE WS-REAS-CD TO ERROR-RESP2. :746
+                _errorResp = Alpha(_responseCode, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. :745
+                _errorResp2 = Alpha(_reasonCode, 10);    // MOVE WS-REAS-CD TO ERROR-RESP2. :746
                 // STRING 'Account:' acct-id-X ' not found in' ' Cross ref file.  Resp:' ERROR-RESP
                 //        ' Reas:' ERROR-RESP2 INTO WS-RETURN-MSG. :747-757
-                _wsReturnMsg = Truncate75(
-                    "Account:" + RidAcctIdX + " not found in" + " Cross ref file.  Resp:" +
+                _returnMessage = Truncate75(
+                    "Account:" + AcctIdKeyText + " not found in" + " Cross ref file.  Resp:" +
                     _errorResp + " Reas:" + _errorResp2);
             }
         }
@@ -690,43 +690,43 @@ public sealed class AccountViewProgram : ITransactionHandler
             SetInputError();          // SET INPUT-ERROR TO TRUE. :760
             SetFlgAcctFilterNotOk();  // SET FLG-ACCTFILTER-NOT-OK TO TRUE. :761
             _errorOpname = PadX("READ", 8);                       // :762
-            _errorFile = PadX(LIT_CARDXREFNAME_ACCT_PATH, 9);     // :763
-            _errorResp = Alpha(_wsRespCd, 10);                    // :764
-            _errorResp2 = Alpha(_wsReasCd, 10);                   // :765
-            _wsReturnMsg = Truncate75(BuildFileErrorMessage());   // MOVE WS-FILE-ERROR-MESSAGE TO WS-RETURN-MSG. :766
+            _errorFile = PadX(CardXrefFileName, 9);               // :763
+            _errorResp = Alpha(_responseCode, 10);                // :764
+            _errorResp2 = Alpha(_reasonCode, 10);                 // :765
+            _returnMessage = Truncate75(BuildFileErrorMessage()); // MOVE WS-FILE-ERROR-MESSAGE TO WS-RETURN-MSG. :766
         }
     }
 
     // =============================================================================================
     //  9300-GETACCTDATA-BYACCT — READ ACCTDAT (ACCOUNT by acct_id). source: :774-823
     // =============================================================================================
-    private void Read9300GetAcctDataByAcct(CicsContext ctx)
+    private void GetAccountDataByAccount(CicsContext ctx) // COBOL paragraph: 9300-GETACCTDATA-BYACCT
     {
         // EXEC CICS READ DATASET(ACCTDAT) RIDFLD(WS-CARD-RID-ACCT-ID-X) INTO(ACCOUNT-RECORD). :776-784
-        _ = LIT_ACCTFILENAME;
+        _ = AccountFileName;
         var repo = new AccountRepository(_db.Connection);
-        string fileStatus = repo.ReadByKey(_ridAcctId, out _account);
+        string fileStatus = repo.ReadByKey(_acctIdKey, out _account);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :786-819
-        if (_wsRespCd == (int)Resp.Normal)
+        if (_responseCode == (int)Resp.Normal)
         {
             SetFoundAcctInMaster(); // WHEN NORMAL — SET FOUND-ACCT-IN-MASTER TO TRUE. :787-788
         }
-        else if (_wsRespCd == (int)Resp.NotFnd)
+        else if (_responseCode == (int)Resp.NotFnd)
         {
             // WHEN NOTFND. source: :789-807
             SetInputError();          // SET INPUT-ERROR. :790
             SetFlgAcctFilterNotOk();  // SET FLG-ACCTFILTER-NOT-OK. :791
             // (SET DID-NOT-FIND-ACCT-IN-ACCTDAT is commented out — FB-5. :792)
-            if (WsReturnMsgOff)       // IF WS-RETURN-MSG-OFF. :793
+            if (ReturnMessageOff)     // IF WS-RETURN-MSG-OFF. :793
             {
-                _errorResp = Alpha(_wsRespCd, 10);   // :794
-                _errorResp2 = Alpha(_wsReasCd, 10);  // :795
+                _errorResp = Alpha(_responseCode, 10);   // :794
+                _errorResp2 = Alpha(_reasonCode, 10);    // :795
                 // STRING 'Account:' acct-id-X ' not found in' ' Acct Master file.Resp:' ERROR-RESP
                 //        ' Reas:' ERROR-RESP2. :796-806
-                _wsReturnMsg = Truncate75(
-                    "Account:" + RidAcctIdX + " not found in" + " Acct Master file.Resp:" +
+                _returnMessage = Truncate75(
+                    "Account:" + AcctIdKeyText + " not found in" + " Acct Master file.Resp:" +
                     _errorResp + " Reas:" + _errorResp2);
             }
         }
@@ -736,44 +736,44 @@ public sealed class AccountViewProgram : ITransactionHandler
             SetInputError();          // :810
             SetFlgAcctFilterNotOk();  // :811
             _errorOpname = PadX("READ", 8);            // :812
-            _errorFile = PadX(LIT_ACCTFILENAME, 9);    // :813
-            _errorResp = Alpha(_wsRespCd, 10);         // :814
-            _errorResp2 = Alpha(_wsReasCd, 10);        // :815
-            _wsReturnMsg = Truncate75(BuildFileErrorMessage()); // :816
+            _errorFile = PadX(AccountFileName, 9);     // :813
+            _errorResp = Alpha(_responseCode, 10);     // :814
+            _errorResp2 = Alpha(_reasonCode, 10);      // :815
+            _returnMessage = Truncate75(BuildFileErrorMessage()); // :816
         }
     }
 
     // =============================================================================================
     //  9400-GETCUSTDATA-BYCUST — READ CUSTDAT (CUSTOMER by cust_id). source: :825-872
     // =============================================================================================
-    private void Read9400GetCustDataByCust(CicsContext ctx)
+    private void GetCustomerDataByCustomer(CicsContext ctx) // COBOL paragraph: 9400-GETCUSTDATA-BYCUST
     {
         // EXEC CICS READ DATASET(CUSTDAT) RIDFLD(WS-CARD-RID-CUST-ID-X) INTO(CUSTOMER-RECORD). :826-834
-        _ = LIT_CUSTFILENAME;
+        _ = CustomerFileName;
         var repo = new CustomerRepository(_db.Connection);
-        string fileStatus = repo.ReadByKey(_ridCustId, out _customer);
+        string fileStatus = repo.ReadByKey(_custIdKey, out _customer);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :836-868
-        if (_wsRespCd == (int)Resp.Normal)
+        if (_responseCode == (int)Resp.Normal)
         {
             SetFoundCustInMaster(); // WHEN NORMAL — SET FOUND-CUST-IN-MASTER TO TRUE. :837-838
         }
-        else if (_wsRespCd == (int)Resp.NotFnd)
+        else if (_responseCode == (int)Resp.NotFnd)
         {
             // WHEN NOTFND. source: :839-857
             SetInputError();         // SET INPUT-ERROR. :840
             SetFlgCustFilterNotOk(); // FB-4: SET FLG-CUSTFILTER-NOT-OK (not the read-acct guard flag). :841
             // (SET DID-NOT-FIND-CUST-IN-CUSTDAT is commented out — FB-4. :842)
             // FB-6: ERROR-RESP/RESP2 moved BEFORE the WS-RETURN-MSG-OFF guard (unlike 9200/9300). :843-844
-            _errorResp = Alpha(_wsRespCd, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. :843
-            _errorResp2 = Alpha(_wsReasCd, 10);  // MOVE WS-REAS-CD TO ERROR-RESP2. :844
-            if (WsReturnMsgOff)      // IF WS-RETURN-MSG-OFF. :845
+            _errorResp = Alpha(_responseCode, 10);   // MOVE WS-RESP-CD TO ERROR-RESP. :843
+            _errorResp2 = Alpha(_reasonCode, 10);    // MOVE WS-REAS-CD TO ERROR-RESP2. :844
+            if (ReturnMessageOff)    // IF WS-RETURN-MSG-OFF. :845
             {
                 // STRING 'CustId:' cust-id-X ' not found' ' in customer master.Resp: ' ERROR-RESP
                 //        ' REAS:' ERROR-RESP2. :846-856
-                _wsReturnMsg = Truncate75(
-                    "CustId:" + RidCustIdX + " not found" + " in customer master.Resp: " +
+                _returnMessage = Truncate75(
+                    "CustId:" + CustIdKeyText + " not found" + " in customer master.Resp: " +
                     _errorResp + " REAS:" + _errorResp2);
             }
         }
@@ -783,10 +783,10 @@ public sealed class AccountViewProgram : ITransactionHandler
             SetInputError();          // :859
             SetFlgCustFilterNotOk();  // :860
             _errorOpname = PadX("READ", 8);            // :861
-            _errorFile = PadX(LIT_CUSTFILENAME, 9);    // :862
-            _errorResp = Alpha(_wsRespCd, 10);         // :863
-            _errorResp2 = Alpha(_wsReasCd, 10);        // :864
-            _wsReturnMsg = Truncate75(BuildFileErrorMessage()); // :865
+            _errorFile = PadX(CustomerFileName, 9);    // :862
+            _errorResp = Alpha(_responseCode, 10);     // :863
+            _errorResp2 = Alpha(_reasonCode, 10);      // :864
+            _returnMessage = Truncate75(BuildFileErrorMessage()); // :865
         }
     }
 
@@ -796,7 +796,7 @@ public sealed class AccountViewProgram : ITransactionHandler
     private void SendPlainText(CicsContext ctx)
     {
         // EXEC CICS SEND TEXT FROM(WS-RETURN-MSG) LENGTH(LENGTH OF WS-RETURN-MSG) ERASE FREEKB. :878-883
-        ctx.SendText(PadX(_wsReturnMsg, 75), erase: true, freeKb: true);
+        ctx.SendText(PadX(_returnMessage, 75), erase: true, freeKb: true);
         // EXEC CICS RETURN (no TRANSID — ends the conversation). source: :885-886
         ctx.ReturnTerminal();
     }
@@ -832,13 +832,13 @@ public sealed class AccountViewProgram : ITransactionHandler
     /// <summary>Maps a repository FileStatus to the CICS RESP/RESP2 the EVALUATE branches on.</summary>
     private void SetResp(string fileStatus)
     {
-        _wsRespCd = fileStatus switch
+        _responseCode = fileStatus switch
         {
             FileStatus.Ok => (int)Resp.Normal,             // '00' -> DFHRESP(NORMAL)
             FileStatus.RecordNotFound => (int)Resp.NotFnd, // '23' -> DFHRESP(NOTFND)
             _ => (int)Resp.Error,                          // any other -> WHEN OTHER (file error)
         };
-        _wsReasCd = 0; // RESP2 (reason) unavailable from the relational repo; 0 for parity.
+        _reasonCode = 0; // RESP2 (reason) unavailable from the relational repo; 0 for parity.
     }
 
     /// <summary>
@@ -962,7 +962,7 @@ public sealed class AccountViewProgram : ITransactionHandler
     //  source: app/bms/COACTVW.bms:19-375 / SCREEN_COACTVW.md
     // =============================================================================================
     /// <summary>The DFHMDI map name. source: COACTVW.bms:25.</summary>
-    public const string MapName = LIT_THISMAP;          // "CACTVWA"
+    public const string MapName = MapId;          // "CACTVWA"
 
     /// <summary>The DFHMSD mapset name. source: COACTVW.bms:20.</summary>
     public const string MapsetName = "COACTVW";

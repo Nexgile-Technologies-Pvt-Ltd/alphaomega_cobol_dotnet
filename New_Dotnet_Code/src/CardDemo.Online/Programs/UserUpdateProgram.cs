@@ -56,54 +56,54 @@ public sealed class UserUpdateProgram : ITransactionHandler
     // =============================================================================================
     //  WS-VARIABLES — source: COUSR02C.cbl:35-47
     // =============================================================================================
-    private const string WS_PGMNAME = "COUSR02C";     // 05 WS-PGMNAME PIC X(08) VALUE 'COUSR02C'. source: :36
-    private const string WS_TRANID = "CU02";          // 05 WS-TRANID  PIC X(04) VALUE 'CU02'.     source: :37
-    private const string WS_USRSEC_FILE = "USRSEC  "; // 05 WS-USRSEC-FILE PIC X(08) VALUE 'USRSEC  '. source: :39
+    private const string ProgramId = "COUSR02C";     // WS-PGMNAME PIC X(08) VALUE 'COUSR02C'. source: :36
+    private const string TranId = "CU02";          // WS-TRANID  PIC X(04) VALUE 'CU02'.     source: :37
+    private const string UserSecFileName = "USRSEC  "; // WS-USRSEC-FILE PIC X(08) VALUE 'USRSEC  '. source: :39
 
-    private string _wsMessage = "";                   // 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
+    private string _message = "";                   // WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
 
     // 05 WS-ERR-FLG PIC X(01) VALUE 'N'. 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. source: :40-42
-    private bool _errFlgOn;
-    private bool ErrFlgOn => _errFlgOn;   // 88 ERR-FLG-ON
+    private bool _errorFlagOn;                       // WS-ERR-FLG
+    private bool ErrFlgOn => _errorFlagOn;   // 88 ERR-FLG-ON
 
     // 05 WS-RESP-CD / WS-REAS-CD PIC S9(09) COMP VALUE ZEROS. source: :43-44
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode;                       // WS-RESP-CD
+    private int _reasonCode;                          // WS-REAS-CD
 
     // 05 WS-USR-MODIFIED PIC X(01) VALUE 'N'. 88 USR-MODIFIED-YES='Y' / USR-MODIFIED-NO='N'. source: :45-47
-    private bool _usrModified;
-    private bool UsrModifiedYes => _usrModified;   // 88 USR-MODIFIED-YES
-    private void SetUsrModifiedYes() => _usrModified = true;  // SET USR-MODIFIED-YES TO TRUE
-    private void SetUsrModifiedNo() => _usrModified = false;  // SET USR-MODIFIED-NO  TO TRUE
+    private bool _userModified;                       // WS-USR-MODIFIED
+    private bool UsrModifiedYes => _userModified;   // 88 USR-MODIFIED-YES
+    private void SetUsrModifiedYes() => _userModified = true;  // SET USR-MODIFIED-YES TO TRUE
+    private void SetUsrModifiedNo() => _userModified = false;  // SET USR-MODIFIED-NO  TO TRUE
 
     // CCDA-TITLE01/02 (COTTL01Y) + CCDA-MSG-INVALID-KEY (CSMSG01Y) — shared screen header / messages.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...         ";
+    private const string Title01 = "      AWS Mainframe Modernization       ";       // CCDA-TITLE01
+    private const string Title02 = "              CardDemo                  ";       // CCDA-TITLE02
+    private const string InvalidKeyMessage = "Invalid key pressed. Please see below...         "; // CCDA-MSG-INVALID-KEY
 
     // =============================================================================================
     //  COCOM01Y trailer — CDEMO-CU02-INFO (the program-private selection state). source: :50-58
     // =============================================================================================
     // Only CDEMO-CU02-USR-SELECTED is read by this program (pre-selected user from the list screen).
     // 10 CDEMO-CU02-USRID-FIRST   PIC X(08). source: :51
-    private string _cu02UsridFirst = "";
+    private string _firstUserId = "";                 // CDEMO-CU02-USRID-FIRST
     // 10 CDEMO-CU02-USRID-LAST    PIC X(08). source: :52
-    private string _cu02UsridLast = "";
+    private string _lastUserId = "";                  // CDEMO-CU02-USRID-LAST
     // 10 CDEMO-CU02-PAGE-NUM      PIC 9(08). source: :53
-    private int _cu02PageNum;
+    private int _pageNumber;                          // CDEMO-CU02-PAGE-NUM
     // 10 CDEMO-CU02-NEXT-PAGE-FLG PIC X(01) VALUE 'N'. source: :54
-    private char _cu02NextPageFlg = 'N';
+    private char _nextPageFlag = 'N';                 // CDEMO-CU02-NEXT-PAGE-FLG
     // 10 CDEMO-CU02-USR-SEL-FLG   PIC X(01). source: :57
-    private string _cu02UsrSelFlg = "";
+    private string _userSelectFlag = "";              // CDEMO-CU02-USR-SEL-FLG
     // 10 CDEMO-CU02-USR-SELECTED  PIC X(08). source: :58
-    private string _cu02UsrSelected = "";
+    private string _selectedUserId = "";              // CDEMO-CU02-USR-SELECTED
 
     // =============================================================================================
     //  SEC-USER-DATA (CSUSR01Y) — the keyed record read for update. source: :324-326
     // =============================================================================================
     // SEC-USR-ID X(8) — the READ/REWRITE RID; the record buffer mutated by the change-detection MOVEs.
-    private string _secUsrId = "";
-    private UserSecurity? _secUserData;
+    private string _recordKey = "";                   // SEC-USR-ID
+    private UserSecurity? _userRecord;                // SEC-USER-DATA
 
     // =============================================================================================
     //  COMMAREA (typed view) + per-turn map + DB. source: :74-76,94,135-138
@@ -124,10 +124,10 @@ public sealed class UserUpdateProgram : ITransactionHandler
     public UserUpdateProgram() => _db = null!;
 
     /// <inheritdoc/>
-    public string ProgramName => WS_PGMNAME; // PROGRAM-ID. COUSR02C. source: :23
+    public string ProgramName => ProgramId; // PROGRAM-ID. COUSR02C. source: :23
 
     /// <inheritdoc/>
-    public string TransId => WS_TRANID;      // CSD: CU02 -> COUSR02C. source: CSD_TRANSACTIONS.md:86; cbl:37
+    public string TransId => TranId;      // CSD: CU02 -> COUSR02C. source: CSD_TRANSACTIONS.md:86; cbl:37
 
     // =============================================================================================
     //  MAIN-PARA — source: COUSR02C.cbl:82-138
@@ -140,11 +140,11 @@ public sealed class UserUpdateProgram : ITransactionHandler
         if (_db is not null) _users = new UserSecurityRepository(_db.Connection);
 
         // SET ERR-FLG-OFF TO TRUE / SET USR-MODIFIED-NO TO TRUE. source: :84-85
-        _errFlgOn = false;
+        _errorFlagOn = false;
         SetUsrModifiedNo();
 
         // MOVE SPACES TO WS-MESSAGE  ERRMSGO OF COUSR2AO. source: :87-88
-        _wsMessage = "";
+        _message = "";
         _map.Field("ERRMSG").SetValue("", setMdt: false);
 
         if (ctx.EibCalen == 0)
@@ -158,7 +158,7 @@ public sealed class UserUpdateProgram : ITransactionHandler
         {
             // MOVE DFHCOMMAREA(1:EIBCALEN) TO CARDDEMO-COMMAREA. source: :94
             _commArea = ctx.CommArea!;
-            RestoreCu02Info();
+            RestoreSelectionInfo();
 
             if (!_commArea.IsReenter)
             {
@@ -168,17 +168,17 @@ public sealed class UserUpdateProgram : ITransactionHandler
                 _map.Field("USRIDIN").CursorLength = -1; // MOVE -1 TO USRIDINL OF COUSR2AI. source: :98
 
                 // IF CDEMO-CU02-USR-SELECTED NOT = SPACES AND LOW-VALUES. source: :99-100
-                if (NotSpacesOrLow(_cu02UsrSelected))
+                if (NotSpacesOrLow(_selectedUserId))
                 {
                     // MOVE CDEMO-CU02-USR-SELECTED TO USRIDINI OF COUSR2AI. source: :101-102
-                    _map.Field("USRIDIN").SetValue(_cu02UsrSelected, setMdt: false);
+                    _map.Field("USRIDIN").SetValue(_selectedUserId, setMdt: false);
                     ProcessEnterKey(ctx);               // PERFORM PROCESS-ENTER-KEY. source: :103
                 }
-                SendUsrupdScreen(ctx);                  // PERFORM SEND-USRUPD-SCREEN. source: :105
+                SendUserUpdateScreen(ctx);                  // PERFORM SEND-USRUPD-SCREEN. source: :105
             }
             else
             {
-                ReceiveUsrupdScreen(ctx);               // PERFORM RECEIVE-USRUPD-SCREEN. source: :107
+                ReceiveUserUpdateScreen(ctx);               // PERFORM RECEIVE-USRUPD-SCREEN. source: :107
                 // EVALUATE EIBAID. source: :108-131
                 switch (ctx.EibAid)
                 {
@@ -206,9 +206,9 @@ public sealed class UserUpdateProgram : ITransactionHandler
                         break;
                     default:
                         // WHEN OTHER. source: :127-130
-                        _errFlgOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :128
-                        _wsMessage = CCDA_MSG_INVALID_KEY;             // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. source: :129
-                        SendUsrupdScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :130
+                        _errorFlagOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :128
+                        _message = InvalidKeyMessage;             // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. source: :129
+                        SendUserUpdateScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :130
                         break;
                 }
             }
@@ -217,8 +217,8 @@ public sealed class UserUpdateProgram : ITransactionHandler
         // EXEC CICS RETURN TRANSID(WS-TRANID) COMMAREA(CARDDEMO-COMMAREA). source: :135-138
         if (ctx.Outcome is null)
         {
-            SaveCu02Info();
-            ctx.ReturnTransId(WS_TRANID, _commArea);
+            SaveSelectionInfo();
+            ctx.ReturnTransId(TranId, _commArea);
         }
     }
 
@@ -231,10 +231,10 @@ public sealed class UserUpdateProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_map.Field("USRIDIN").Value))
         {
             // WHEN USRIDINI = SPACES OR LOW-VALUES. source: :146-151
-            _errFlgOn = true;                            // MOVE 'Y' TO WS-ERR-FLG. source: :147
-            _wsMessage = "User ID can NOT be empty...";  // source: :148-149
+            _errorFlagOn = true;                            // MOVE 'Y' TO WS-ERR-FLG. source: :147
+            _message = "User ID can NOT be empty...";  // source: :148-149
             _map.Field("USRIDIN").CursorLength = -1;      // MOVE -1 TO USRIDINL. source: :150
-            SendUsrupdScreen(ctx);                       // PERFORM SEND-USRUPD-SCREEN. source: :151
+            SendUserUpdateScreen(ctx);                       // PERFORM SEND-USRUPD-SCREEN. source: :151
         }
         else
         {
@@ -251,7 +251,7 @@ public sealed class UserUpdateProgram : ITransactionHandler
             _map.Field("PASSWD").SetValue("", setMdt: false);
             _map.Field("USRTYPE").SetValue("", setMdt: false);
             // MOVE USRIDINI OF COUSR2AI TO SEC-USR-ID. source: :162
-            _secUsrId = PadX(_map.Field("USRIDIN").Value, 8);
+            _recordKey = PadX(_map.Field("USRIDIN").Value, 8);
             ReadUserSecFile(ctx);                        // PERFORM READ-USER-SEC-FILE. source: :163
         }
 
@@ -259,11 +259,11 @@ public sealed class UserUpdateProgram : ITransactionHandler
         if (!ErrFlgOn)
         {
             // MOVE SEC-USR-FNAME/LNAME/PWD/TYPE TO the corresponding screen input fields. source: :167-170
-            _map.Field("FNAME").SetValue(SecUsrFname, setMdt: false);
-            _map.Field("LNAME").SetValue(SecUsrLname, setMdt: false);
-            _map.Field("PASSWD").SetValue(SecUsrPwd, setMdt: false);
-            _map.Field("USRTYPE").SetValue(SecUsrType, setMdt: false);
-            SendUsrupdScreen(ctx);                       // PERFORM SEND-USRUPD-SCREEN. source: :171
+            _map.Field("FNAME").SetValue(StoredFirstName, setMdt: false);
+            _map.Field("LNAME").SetValue(StoredLastName, setMdt: false);
+            _map.Field("PASSWD").SetValue(StoredPassword, setMdt: false);
+            _map.Field("USRTYPE").SetValue(StoredUserType, setMdt: false);
+            SendUserUpdateScreen(ctx);                       // PERFORM SEND-USRUPD-SCREEN. source: :171
         }
     }
 
@@ -276,42 +276,42 @@ public sealed class UserUpdateProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_map.Field("USRIDIN").Value))
         {
             // WHEN USRIDINI = SPACES OR LOW-VALUES. source: :180-185
-            _errFlgOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :181
-            _wsMessage = "User ID can NOT be empty...";    // source: :182-183
+            _errorFlagOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :181
+            _message = "User ID can NOT be empty...";    // source: :182-183
             _map.Field("USRIDIN").CursorLength = -1;        // MOVE -1 TO USRIDINL. source: :184
-            SendUsrupdScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :185
+            SendUserUpdateScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :185
         }
         else if (IsSpacesOrLowValues(_map.Field("FNAME").Value))
         {
             // WHEN FNAMEI = SPACES OR LOW-VALUES. source: :186-191
-            _errFlgOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :187
-            _wsMessage = "First Name can NOT be empty...";  // source: :188-189
+            _errorFlagOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :187
+            _message = "First Name can NOT be empty...";  // source: :188-189
             _map.Field("FNAME").CursorLength = -1;          // MOVE -1 TO FNAMEL. source: :190
-            SendUsrupdScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :191
+            SendUserUpdateScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :191
         }
         else if (IsSpacesOrLowValues(_map.Field("LNAME").Value))
         {
             // WHEN LNAMEI = SPACES OR LOW-VALUES. source: :192-197
-            _errFlgOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :193
-            _wsMessage = "Last Name can NOT be empty...";   // source: :194-195
+            _errorFlagOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :193
+            _message = "Last Name can NOT be empty...";   // source: :194-195
             _map.Field("LNAME").CursorLength = -1;          // MOVE -1 TO LNAMEL. source: :196
-            SendUsrupdScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :197
+            SendUserUpdateScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :197
         }
         else if (IsSpacesOrLowValues(_map.Field("PASSWD").Value))
         {
             // WHEN PASSWDI = SPACES OR LOW-VALUES. source: :198-203
-            _errFlgOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :199
-            _wsMessage = "Password can NOT be empty...";    // source: :200-201
+            _errorFlagOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :199
+            _message = "Password can NOT be empty...";    // source: :200-201
             _map.Field("PASSWD").CursorLength = -1;         // MOVE -1 TO PASSWDL. source: :202
-            SendUsrupdScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :203
+            SendUserUpdateScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :203
         }
         else if (IsSpacesOrLowValues(_map.Field("USRTYPE").Value))
         {
             // WHEN USRTYPEI = SPACES OR LOW-VALUES. source: :204-209
-            _errFlgOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :205
-            _wsMessage = "User Type can NOT be empty...";   // source: :206-207
+            _errorFlagOn = true;                              // MOVE 'Y' TO WS-ERR-FLG. source: :205
+            _message = "User Type can NOT be empty...";   // source: :206-207
             _map.Field("USRTYPE").CursorLength = -1;        // MOVE -1 TO USRTYPEL. source: :208
-            SendUsrupdScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :209
+            SendUserUpdateScreen(ctx);                         // PERFORM SEND-USRUPD-SCREEN. source: :209
         }
         else
         {
@@ -323,29 +323,29 @@ public sealed class UserUpdateProgram : ITransactionHandler
         if (!ErrFlgOn)
         {
             // MOVE USRIDINI OF COUSR2AI TO SEC-USR-ID; PERFORM READ-USER-SEC-FILE. source: :216-217
-            _secUsrId = PadX(_map.Field("USRIDIN").Value, 8);
+            _recordKey = PadX(_map.Field("USRIDIN").Value, 8);
             ReadUserSecFile(ctx);
 
             // Field-by-field change detection — fixed-width NOT = byte comparison; if differs, copy into
             // record buffer and SET USR-MODIFIED-YES. FB-4: USRTYPE is not value-validated. source: :219-234
-            if (FieldX(_map.Field("FNAME").Value, 20) != SecUsrFname)      // IF FNAMEI NOT = SEC-USR-FNAME. source: :219
+            if (FieldX(_map.Field("FNAME").Value, 20) != StoredFirstName)      // IF FNAMEI NOT = SEC-USR-FNAME. source: :219
             {
-                SecUsrFname = FieldX(_map.Field("FNAME").Value, 20);       // MOVE FNAMEI TO SEC-USR-FNAME. source: :220
+                StoredFirstName = FieldX(_map.Field("FNAME").Value, 20);       // MOVE FNAMEI TO SEC-USR-FNAME. source: :220
                 SetUsrModifiedYes();                                       // SET USR-MODIFIED-YES TO TRUE. source: :221
             }
-            if (FieldX(_map.Field("LNAME").Value, 20) != SecUsrLname)      // IF LNAMEI NOT = SEC-USR-LNAME. source: :223
+            if (FieldX(_map.Field("LNAME").Value, 20) != StoredLastName)      // IF LNAMEI NOT = SEC-USR-LNAME. source: :223
             {
-                SecUsrLname = FieldX(_map.Field("LNAME").Value, 20);       // MOVE LNAMEI TO SEC-USR-LNAME. source: :224
+                StoredLastName = FieldX(_map.Field("LNAME").Value, 20);       // MOVE LNAMEI TO SEC-USR-LNAME. source: :224
                 SetUsrModifiedYes();                                       // SET USR-MODIFIED-YES TO TRUE. source: :225
             }
-            if (FieldX(_map.Field("PASSWD").Value, 8) != SecUsrPwd)        // IF PASSWDI NOT = SEC-USR-PWD. source: :227
+            if (FieldX(_map.Field("PASSWD").Value, 8) != StoredPassword)        // IF PASSWDI NOT = SEC-USR-PWD. source: :227
             {
-                SecUsrPwd = FieldX(_map.Field("PASSWD").Value, 8);         // MOVE PASSWDI TO SEC-USR-PWD. source: :228
+                StoredPassword = FieldX(_map.Field("PASSWD").Value, 8);         // MOVE PASSWDI TO SEC-USR-PWD. source: :228
                 SetUsrModifiedYes();                                       // SET USR-MODIFIED-YES TO TRUE. source: :229
             }
-            if (FieldX(_map.Field("USRTYPE").Value, 1) != SecUsrType)      // IF USRTYPEI NOT = SEC-USR-TYPE. source: :231
+            if (FieldX(_map.Field("USRTYPE").Value, 1) != StoredUserType)      // IF USRTYPEI NOT = SEC-USR-TYPE. source: :231
             {
-                SecUsrType = FieldX(_map.Field("USRTYPE").Value, 1);       // MOVE USRTYPEI TO SEC-USR-TYPE. source: :232
+                StoredUserType = FieldX(_map.Field("USRTYPE").Value, 1);       // MOVE USRTYPEI TO SEC-USR-TYPE. source: :232
                 SetUsrModifiedYes();                                       // SET USR-MODIFIED-YES TO TRUE. source: :233
             }
 
@@ -356,9 +356,9 @@ public sealed class UserUpdateProgram : ITransactionHandler
             else
             {
                 // ELSE -> 'Please modify to update ...'; ERRMSGC = DFHRED; SEND. source: :238-242
-                _wsMessage = "Please modify to update ...";                // source: :239-240
+                _message = "Please modify to update ...";                // source: :239-240
                 _map.Field("ERRMSG").ColorOverride = BmsColor.Red;         // MOVE DFHRED TO ERRMSGC. source: :241
-                SendUsrupdScreen(ctx);                                     // PERFORM SEND-USRUPD-SCREEN. source: :242
+                SendUserUpdateScreen(ctx);                                     // PERFORM SEND-USRUPD-SCREEN. source: :242
             }
         }
     }
@@ -372,23 +372,23 @@ public sealed class UserUpdateProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_commArea.ToProgram))
             _commArea.ToProgram = "COSGN00C";
 
-        _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :255
-        _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :256
+        _commArea.FromTranId = TranId;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID. source: :255
+        _commArea.FromProgram = ProgramId; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :256
         _commArea.SetFirstEntry();          // MOVE ZEROS TO CDEMO-PGM-CONTEXT. source: :257
 
         // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). source: :258-261
-        SaveCu02Info();
+        SaveSelectionInfo();
         ctx.Xctl(_commArea.ToProgram.TrimEnd(), _commArea);
     }
 
     // =============================================================================================
     //  SEND-USRUPD-SCREEN — source: COUSR02C.cbl:266-278
     // =============================================================================================
-    private void SendUsrupdScreen(CicsContext ctx)
+    private void SendUserUpdateScreen(CicsContext ctx)             // COBOL paragraph: SEND-USRUPD-SCREEN
     {
         PopulateHeaderInfo(ctx);                                    // PERFORM POPULATE-HEADER-INFO. source: :268
 
-        _map.Field("ERRMSG").SetValue(_wsMessage, setMdt: false);  // MOVE WS-MESSAGE TO ERRMSGO. source: :270
+        _map.Field("ERRMSG").SetValue(_message, setMdt: false);  // MOVE WS-MESSAGE TO ERRMSGO. source: :270
 
         // EXEC CICS SEND MAP('COUSR2A') MAPSET('COUSR02') FROM(COUSR2AO) ERASE CURSOR. source: :272-278
         ctx.SendMap("COUSR2A", "COUSR02", _map, new SendMapOptions
@@ -397,19 +397,19 @@ public sealed class UserUpdateProgram : ITransactionHandler
             FreeKb = true,
             Cursor = -1, // CURSOR — honour the MOVE -1 TO xxxL the handler set this turn.
         });
-        _wsRespCd = (int)Resp.Normal;
+        _responseCode = (int)Resp.Normal;
     }
 
     // =============================================================================================
     //  RECEIVE-USRUPD-SCREEN — source: COUSR02C.cbl:283-291
     // =============================================================================================
-    private void ReceiveUsrupdScreen(CicsContext ctx)
+    private void ReceiveUserUpdateScreen(CicsContext ctx)         // COBOL paragraph: RECEIVE-USRUPD-SCREEN
     {
         // EXEC CICS RECEIVE MAP('COUSR2A') MAPSET('COUSR02') INTO(COUSR2AI) RESP RESP2. source: :285-291
         // (RESP/RESP2 captured but not inspected in this paragraph.)
         ctx.ReceiveMap("COUSR2A", "COUSR02", _map);
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
     }
 
     // =============================================================================================
@@ -420,10 +420,10 @@ public sealed class UserUpdateProgram : ITransactionHandler
         // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: :298
         DateTime now = ctx.Clock.Now;
 
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :300
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :301
-        _map.Field("TRNNAME").SetValue(WS_TRANID, setMdt: false);    // MOVE WS-TRANID  TO TRNNAMEO. source: :302
-        _map.Field("PGMNAME").SetValue(WS_PGMNAME, setMdt: false);   // MOVE WS-PGMNAME TO PGMNAMEO. source: :303
+        _map.Field("TITLE01").SetValue(Title01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :300
+        _map.Field("TITLE02").SetValue(Title02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :301
+        _map.Field("TRNNAME").SetValue(TranId, setMdt: false);    // MOVE WS-TRANID  TO TRNNAMEO. source: :302
+        _map.Field("PGMNAME").SetValue(ProgramId, setMdt: false);   // MOVE WS-PGMNAME TO PGMNAMEO. source: :303
 
         // CURDATEO = mm/dd/yy (year last two digits). source: :305-309
         _map.Field("CURDATE").SetValue(
@@ -442,35 +442,35 @@ public sealed class UserUpdateProgram : ITransactionHandler
         // EXEC CICS READ DATASET(WS-USRSEC-FILE) INTO(SEC-USER-DATA) RIDFLD(SEC-USR-ID) UPDATE RESP RESP2.
         // The UPDATE intent (record lock) is not required cross-turn: in UPDATE-USER-INFO the REWRITE
         // immediately follows this READ in the same invocation. source: :322-331
-        _ = WS_USRSEC_FILE; // dataset name (fixed) — repository is keyed by usr_id.
-        string fileStatus = _users.ReadByKey(_secUsrId, out _secUserData);
+        _ = UserSecFileName; // dataset name (fixed) — repository is keyed by usr_id.
+        string fileStatus = _users.ReadByKey(_recordKey, out _userRecord);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :333-353
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal:
                 // WHEN DFHRESP(NORMAL). FB-2: dead CONTINUE then the message MOVE. FB-1: this branch fires
                 // an extra SEND with "Press PF5..." BEFORE control returns to the caller (PROCESS-ENTER-KEY
                 // re-sends with data; UPDATE-USER-INFO sends this mid-update). source: :334-339
                 // (CONTINUE — no-op. source: :335)
-                _wsMessage = "Press PF5 key to save your updates ...";    // source: :336-337
+                _message = "Press PF5 key to save your updates ...";    // source: :336-337
                 _map.Field("ERRMSG").ColorOverride = BmsColor.Neutral;   // MOVE DFHNEUTR TO ERRMSGC. source: :338
-                SendUsrupdScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :339
+                SendUserUpdateScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :339
                 break;
             case Resp.NotFnd:
                 // WHEN DFHRESP(NOTFND). source: :340-345
-                _errFlgOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :341
-                _wsMessage = "User ID NOT found...";                     // source: :342-343
+                _errorFlagOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :341
+                _message = "User ID NOT found...";                     // source: :342-343
                 _map.Field("USRIDIN").CursorLength = -1;                  // MOVE -1 TO USRIDINL. source: :344
-                SendUsrupdScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :345
+                SendUserUpdateScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :345
                 break;
             default:
                 // WHEN OTHER. FB-5: DISPLAY 'RESP:'/'REAS:' -> job-log trace; no-op here. source: :346-352
-                _errFlgOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :348
-                _wsMessage = "Unable to lookup User...";                 // source: :349-350
+                _errorFlagOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :348
+                _message = "Unable to lookup User...";                 // source: :349-350
                 _map.Field("FNAME").CursorLength = -1;                    // MOVE -1 TO FNAMEL. source: :351
-                SendUsrupdScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :352
+                SendUserUpdateScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :352
                 break;
         }
     }
@@ -481,35 +481,35 @@ public sealed class UserUpdateProgram : ITransactionHandler
     private void UpdateUserSecFile(CicsContext ctx)
     {
         // EXEC CICS REWRITE DATASET(WS-USRSEC-FILE) FROM(SEC-USER-DATA) LENGTH RESP RESP2. source: :360-366
-        string fileStatus = _users.Update(_secUserData!);
+        string fileStatus = _users.Update(_userRecord!);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :368-390
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal:
                 // WHEN DFHRESP(NORMAL). source: :369-376
-                _wsMessage = "";                                         // MOVE SPACES TO WS-MESSAGE. source: :370
+                _message = "";                                         // MOVE SPACES TO WS-MESSAGE. source: :370
                 _map.Field("ERRMSG").ColorOverride = BmsColor.Green;     // MOVE DFHGREEN TO ERRMSGC. source: :371
                 // STRING 'User ' + SEC-USR-ID(DELIMITED BY SPACE) + ' has been updated ...'. source: :372-375
                 // DELIMITED BY SPACE copies SEC-USR-ID only up to its FIRST space (not just trailing).
-                string usrIdDelim = SecUsrId.Split(' ')[0];
-                _wsMessage = $"User {usrIdDelim} has been updated ...";
-                SendUsrupdScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :376
+                string userIdDelimited = StoredUserId.Split(' ')[0];
+                _message = $"User {userIdDelimited} has been updated ...";
+                SendUserUpdateScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :376
                 break;
             case Resp.NotFnd:
                 // WHEN DFHRESP(NOTFND). source: :377-382
-                _errFlgOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :378
-                _wsMessage = "User ID NOT found...";                     // source: :379-380
+                _errorFlagOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :378
+                _message = "User ID NOT found...";                     // source: :379-380
                 _map.Field("USRIDIN").CursorLength = -1;                  // MOVE -1 TO USRIDINL. source: :381
-                SendUsrupdScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :382
+                SendUserUpdateScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :382
                 break;
             default:
                 // WHEN OTHER. FB-5: DISPLAY 'RESP:'/'REAS:' -> job-log trace; no-op here. source: :383-389
-                _errFlgOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :385
-                _wsMessage = "Unable to Update User...";                 // source: :386-387
+                _errorFlagOn = true;                                        // MOVE 'Y' TO WS-ERR-FLG. source: :385
+                _message = "Unable to Update User...";                 // source: :386-387
                 _map.Field("FNAME").CursorLength = -1;                    // MOVE -1 TO FNAMEL. source: :388
-                SendUsrupdScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :389
+                SendUserUpdateScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :389
                 break;
         }
     }
@@ -520,7 +520,7 @@ public sealed class UserUpdateProgram : ITransactionHandler
     private void ClearCurrentScreen(CicsContext ctx)
     {
         InitializeAllFields();   // PERFORM INITIALIZE-ALL-FIELDS. source: :397
-        SendUsrupdScreen(ctx);   // PERFORM SEND-USRUPD-SCREEN. source: :398
+        SendUserUpdateScreen(ctx);   // PERFORM SEND-USRUPD-SCREEN. source: :398
     }
 
     // =============================================================================================
@@ -535,32 +535,32 @@ public sealed class UserUpdateProgram : ITransactionHandler
         _map.Field("LNAME").SetValue("", setMdt: false);    // LNAMEI
         _map.Field("PASSWD").SetValue("", setMdt: false);   // PASSWDI
         _map.Field("USRTYPE").SetValue("", setMdt: false);  // USRTYPEI
-        _wsMessage = "";                                    // WS-MESSAGE
+        _message = "";                                    // WS-MESSAGE
     }
 
     // =============================================================================================
     //  SEC-USER-DATA field accessors (CSUSR01Y), with COBOL fixed-width formatting.
     // =============================================================================================
-    private string SecUsrId => PadX(_secUserData?.UsrId, 8);          // SEC-USR-ID    X(8)
-    private string SecUsrFname
+    private string StoredUserId => PadX(_userRecord?.UsrId, 8);          // SEC-USR-ID    X(8)
+    private string StoredFirstName
     {
-        get => PadX(_secUserData?.FirstName, 20);                     // SEC-USR-FNAME X(20)
-        set { (_secUserData ??= new UserSecurity()).FirstName = value; }
+        get => PadX(_userRecord?.FirstName, 20);                     // SEC-USR-FNAME X(20)
+        set { (_userRecord ??= new UserSecurity()).FirstName = value; }
     }
-    private string SecUsrLname
+    private string StoredLastName
     {
-        get => PadX(_secUserData?.LastName, 20);                      // SEC-USR-LNAME X(20)
-        set { (_secUserData ??= new UserSecurity()).LastName = value; }
+        get => PadX(_userRecord?.LastName, 20);                      // SEC-USR-LNAME X(20)
+        set { (_userRecord ??= new UserSecurity()).LastName = value; }
     }
-    private string SecUsrPwd
+    private string StoredPassword
     {
-        get => PadX(_secUserData?.Pwd, 8);                            // SEC-USR-PWD   X(8)
-        set { (_secUserData ??= new UserSecurity()).Pwd = value; }
+        get => PadX(_userRecord?.Pwd, 8);                            // SEC-USR-PWD   X(8)
+        set { (_userRecord ??= new UserSecurity()).Pwd = value; }
     }
-    private string SecUsrType
+    private string StoredUserType
     {
-        get => PadX(_secUserData?.UsrType, 1);                        // SEC-USR-TYPE  X(1)
-        set { (_secUserData ??= new UserSecurity()).UsrType = value; }
+        get => PadX(_userRecord?.UsrType, 1);                        // SEC-USR-TYPE  X(1)
+        set { (_userRecord ??= new UserSecurity()).UsrType = value; }
     }
 
     /// <summary>MOVE LOW-VALUES TO COUSR2AO — blank every named output field + clear per-turn overrides. source: :97</summary>
@@ -578,7 +578,7 @@ public sealed class UserUpdateProgram : ITransactionHandler
     // =============================================================================================
     private void SetResp(string fileStatus)
     {
-        _wsRespCd = fileStatus switch
+        _responseCode = fileStatus switch
         {
             FileStatus.Ok => (int)Resp.Normal,                  // '00' -> DFHRESP(NORMAL)
             FileStatus.RecordNotFound => (int)Resp.NotFnd,      // '23' -> DFHRESP(NOTFND)
@@ -586,7 +586,7 @@ public sealed class UserUpdateProgram : ITransactionHandler
             FileStatus.DuplicateKey => (int)Resp.DupRec,        // '02' -> DFHRESP(DUPREC)
             _ => (int)Resp.Error,                               // any other -> WHEN OTHER (file error)
         };
-        _wsReasCd = 0; // RESP2 unavailable from the relational repo; 0 for parity.
+        _reasonCode = 0; // RESP2 unavailable from the relational repo; 0 for parity.
     }
 
     // =============================================================================================
@@ -597,32 +597,32 @@ public sealed class UserUpdateProgram : ITransactionHandler
     // selection round-trips losslessly with COUSR00C (which produced it). Pack layout into
     // CustFName(25)+CustMName(25)+CustLName(25) = 75 bytes:
     //   USRID-FIRST X(8) | USRID-LAST X(8) | PAGE-NUM 9(8) | NEXT X(1) | USR-SEL-FLG X(1) | USR-SELECTED X(8).
-    private void SaveCu02Info()
+    private void SaveSelectionInfo()                              // COBOL: CDEMO-CU02-INFO serialize
     {
         string packed =
-            PadX(_cu02UsridFirst, 8) +
-            PadX(_cu02UsridLast, 8) +
-            Zoned(_cu02PageNum, 8) +
-            (_cu02NextPageFlg == '\0' ? "N" : _cu02NextPageFlg.ToString()) +
-            PadX(_cu02UsrSelFlg, 1) +
-            PadX(_cu02UsrSelected, 8);
+            PadX(_firstUserId, 8) +
+            PadX(_lastUserId, 8) +
+            Zoned(_pageNumber, 8) +
+            (_nextPageFlag == '\0' ? "N" : _nextPageFlag.ToString()) +
+            PadX(_userSelectFlag, 1) +
+            PadX(_selectedUserId, 8);
         packed = PadX(packed, 75);
         _commArea.CustFName = packed.Substring(0, 25);
         _commArea.CustMName = packed.Substring(25, 25);
         _commArea.CustLName = packed.Substring(50, 25);
     }
 
-    private void RestoreCu02Info()
+    private void RestoreSelectionInfo()                          // COBOL: CDEMO-CU02-INFO deserialize
     {
         string packed = PadX(_commArea.CustFName, 25) + PadX(_commArea.CustMName, 25) + PadX(_commArea.CustLName, 25);
         if (packed.Length < 75) packed = PadX(packed, 75);
-        _cu02UsridFirst = packed.Substring(0, 8).TrimEnd();
-        _cu02UsridLast = packed.Substring(8, 8).TrimEnd();
-        _cu02PageNum = (int)ParseLong(packed.Substring(16, 8));
+        _firstUserId = packed.Substring(0, 8).TrimEnd();
+        _lastUserId = packed.Substring(8, 8).TrimEnd();
+        _pageNumber = (int)ParseLong(packed.Substring(16, 8));
         char nx = packed[24];
-        _cu02NextPageFlg = nx == 'Y' ? 'Y' : 'N';
-        _cu02UsrSelFlg = packed.Substring(25, 1).TrimEnd();
-        _cu02UsrSelected = packed.Substring(26, 8).TrimEnd();
+        _nextPageFlag = nx == 'Y' ? 'Y' : 'N';
+        _userSelectFlag = packed.Substring(25, 1).TrimEnd();
+        _selectedUserId = packed.Substring(26, 8).TrimEnd();
     }
 
     // =============================================================================================

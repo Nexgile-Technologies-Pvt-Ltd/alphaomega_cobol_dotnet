@@ -44,13 +44,13 @@ public sealed class CardXrefReportProgram
     // --- WORKING-STORAGE (CBACT03C lines 42-67) --------------------------------------------------
 
     /// <summary>XREFFILE-STATUS — the file-status of the CARD_XREF cursor (2 chars). // source: CBACT03C.cbl:46-48</summary>
-    private string _xreffileStatus = "00";
+    private string _fileStatus = "00"; // WS-XREFFILE-STATUS
 
     /// <summary>IO-STATUS — working copy of the status used by the display routine. // source: CBACT03C.cbl:50-52</summary>
-    private string _ioStatus = "00";
+    private string _ioStatusCode = "00"; // WS-IO-STATUS
 
     /// <summary>APPL-RESULT PIC S9(9) COMP. 0=ok(AOK), 16=EOF, 8=pre-op, 12=hard error. // source: CBACT03C.cbl:61-63</summary>
-    private int _applResult;
+    private int _appResult; // WS-APPL-RESULT
 
     /// <summary>END-OF-FILE PIC X(01) VALUE 'N' — main-loop sentinel. // source: CBACT03C.cbl:65</summary>
     private bool _endOfFile;
@@ -59,7 +59,7 @@ public sealed class CardXrefReportProgram
     private CardXref? _cardXrefRecord;
 
     /// <summary>The CARD_XREF master cursor (VSAM KSDS -&gt; relational CARD_XREF table). // source: CBACT03C.cbl:29-33</summary>
-    private CardXrefRepository _xreffile = null!;
+    private CardXrefRepository _xrefFile = null!; // WS-XREFFILE-FILE
 
     /// <summary>Optional flat report writer mirroring SYSOUT. // source: CBACT03C.cbl:71,168,172</summary>
     private FixedFileWriter? _writer;
@@ -67,10 +67,10 @@ public sealed class CardXrefReportProgram
     private readonly List<string> _sysout = [];
 
     /// <summary>88 APPL-AOK VALUE 0. // source: CBACT03C.cbl:62</summary>
-    private bool ApplAok => _applResult == 0;
+    private bool AppResultIsOk => _appResult == 0; // 88 APPL-AOK
 
     /// <summary>88 APPL-EOF VALUE 16. // source: CBACT03C.cbl:63</summary>
-    private bool ApplEof => _applResult == 16;
+    private bool AppResultIsEof => _appResult == 16; // 88 APPL-EOF
 
     /// <summary>The SYSOUT (DISPLAY) lines produced by the run, in order.</summary>
     public IReadOnlyList<string> Sysout => _sysout;
@@ -91,23 +91,23 @@ public sealed class CardXrefReportProgram
     /// <summary>
     /// Runs CBACT03C over an already-resolved <see cref="CardXrefRepository"/> (the relational XREFFILE).
     /// </summary>
-    public int Run(CardXrefRepository xreffile, string? sysoutPath = null)
+    public int Run(CardXrefRepository xrefFile, string? sysoutPath = null)
     {
-        _xreffile = xreffile;
+        _xrefFile = xrefFile;
         _writer = sysoutPath is null ? null : BatchSupport.OpenWriter(sysoutPath, HostKind.Ascii);
         try
         {
             // source: CBACT03C.cbl:71
             Display("START OF EXECUTION OF PROGRAM CBACT03C");
             // source: CBACT03C.cbl:72
-            XreffileOpen0000();
+            OpenXrefFile();
 
             // PERFORM UNTIL END-OF-FILE = 'Y'  // source: CBACT03C.cbl:74-81
             while (!_endOfFile)
             {
                 if (!_endOfFile) // IF END-OF-FILE = 'N' (redundant guard — bug #2)  // source: CBACT03C.cbl:75
                 {
-                    XreffileGetNext1000(); // source: CBACT03C.cbl:76
+                    GetNextXrefRecord(); // source: CBACT03C.cbl:76
                     if (!_endOfFile)       // IF END-OF-FILE = 'N' (redundant guard — bug #2)  // source: CBACT03C.cbl:77
                         // FAITHFUL BUG #1: this is the SECOND DISPLAY of the record (the first is inside
                         // 1000-XREFFILE-GET-NEXT, line 96), so every xref record prints twice, back-to-back.
@@ -116,7 +116,7 @@ public sealed class CardXrefReportProgram
             }
 
             // source: CBACT03C.cbl:83
-            XreffileClose9000();
+            CloseXrefFile();
             // source: CBACT03C.cbl:85
             Display("END OF EXECUTION OF PROGRAM CBACT03C");
 
@@ -137,38 +137,38 @@ public sealed class CardXrefReportProgram
     /// <summary>
     /// 1000-XREFFILE-GET-NEXT — sequential READ of the next cross-reference row. // source: CBACT03C.cbl:92-116
     /// </summary>
-    private void XreffileGetNext1000()
+    private void GetNextXrefRecord() // COBOL paragraph: 1000-XREFFILE-GET-NEXT
     {
         // READ XREFFILE-FILE INTO CARD-XREF-RECORD  // source: CBACT03C.cbl:93
-        _xreffileStatus = _xreffile.ReadNext(out CardXref? xref);
+        _fileStatus = _xrefFile.ReadNext(out CardXref? xref);
         if (xref is not null)
             _cardXrefRecord = xref; // READ ... INTO CARD-XREF-RECORD (only populated on a successful read)
 
-        if (_xreffileStatus == FileStatus.Ok)             // XREFFILE-STATUS = '00'  // source: CBACT03C.cbl:94
+        if (_fileStatus == FileStatus.Ok)                 // XREFFILE-STATUS = '00'  // source: CBACT03C.cbl:94
         {
-            _applResult = 0;                              // MOVE 0 TO APPL-RESULT  // source: CBACT03C.cbl:95
+            _appResult = 0;                               // MOVE 0 TO APPL-RESULT  // source: CBACT03C.cbl:95
             // FAITHFUL BUG #1: the FIRST DISPLAY of the record (the mainline loop, line 78, prints it again).
             Display(FormatCardXrefRecord(_cardXrefRecord!)); // DISPLAY CARD-XREF-RECORD  // source: CBACT03C.cbl:96
         }
-        else if (_xreffileStatus == FileStatus.EndOfFile) // '10'  // source: CBACT03C.cbl:98
-            _applResult = 16;                             // source: CBACT03C.cbl:99
+        else if (_fileStatus == FileStatus.EndOfFile)     // '10'  // source: CBACT03C.cbl:98
+            _appResult = 16;                              // source: CBACT03C.cbl:99
         else
-            _applResult = 12;                             // source: CBACT03C.cbl:101
+            _appResult = 12;                              // source: CBACT03C.cbl:101
 
-        if (ApplAok)                                      // source: CBACT03C.cbl:104
+        if (AppResultIsOk)                                // source: CBACT03C.cbl:104
         {
             // CONTINUE  // source: CBACT03C.cbl:105
         }
-        else if (ApplEof)                                 // source: CBACT03C.cbl:107
+        else if (AppResultIsEof)                          // source: CBACT03C.cbl:107
         {
             _endOfFile = true;                            // MOVE 'Y' TO END-OF-FILE  // source: CBACT03C.cbl:108
         }
         else
         {
             Display("ERROR READING XREFFILE");            // source: CBACT03C.cbl:110
-            _ioStatus = _xreffileStatus;                  // MOVE XREFFILE-STATUS TO IO-STATUS  // source: CBACT03C.cbl:111
-            DisplayIoStatus9910();                        // source: CBACT03C.cbl:112
-            AbendProgram9999();                           // source: CBACT03C.cbl:113
+            _ioStatusCode = _fileStatus;                  // MOVE XREFFILE-STATUS TO IO-STATUS  // source: CBACT03C.cbl:111
+            DisplayIoStatus();                            // source: CBACT03C.cbl:112
+            AbendProgram();                               // source: CBACT03C.cbl:113
         }
         // EXIT  // source: CBACT03C.cbl:116
     }
@@ -178,30 +178,30 @@ public sealed class CardXrefReportProgram
     /// 0000-XREFFILE-OPEN — OPEN INPUT the xref file (positions a forward, PK-ordered browse).
     /// // source: CBACT03C.cbl:118-134
     /// </summary>
-    private void XreffileOpen0000()
+    private void OpenXrefFile() // COBOL paragraph: 0000-XREFFILE-OPEN
     {
-        _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBACT03C.cbl:119
+        _appResult = 8;                                   // MOVE 8 TO APPL-RESULT  // source: CBACT03C.cbl:119
 
         // OPEN INPUT XREFFILE-FILE — relational: position the read cursor at the first row in PK order.
         // The SQLite-backed table is always openable, so OPEN succeeds with status '00'.
-        _xreffile.StartBrowse();                          // source: CBACT03C.cbl:120
-        _xreffileStatus = FileStatus.Ok;
+        _xrefFile.StartBrowse();                          // source: CBACT03C.cbl:120
+        _fileStatus = FileStatus.Ok;
 
-        if (_xreffileStatus == FileStatus.Ok)             // XREFFILE-STATUS = '00'  // source: CBACT03C.cbl:121
-            _applResult = 0;                              // source: CBACT03C.cbl:122
+        if (_fileStatus == FileStatus.Ok)                 // XREFFILE-STATUS = '00'  // source: CBACT03C.cbl:121
+            _appResult = 0;                               // source: CBACT03C.cbl:122
         else
-            _applResult = 12;                             // source: CBACT03C.cbl:124
+            _appResult = 12;                              // source: CBACT03C.cbl:124
 
-        if (ApplAok)                                      // source: CBACT03C.cbl:126
+        if (AppResultIsOk)                                // source: CBACT03C.cbl:126
         {
             // CONTINUE  // source: CBACT03C.cbl:127
         }
         else
         {
             Display("ERROR OPENING XREFFILE");            // source: CBACT03C.cbl:129
-            _ioStatus = _xreffileStatus;                  // source: CBACT03C.cbl:130
-            DisplayIoStatus9910();                        // source: CBACT03C.cbl:131
-            AbendProgram9999();                           // source: CBACT03C.cbl:132
+            _ioStatusCode = _fileStatus;                  // source: CBACT03C.cbl:130
+            DisplayIoStatus();                            // source: CBACT03C.cbl:131
+            AbendProgram();                               // source: CBACT03C.cbl:132
         }
         // EXIT  // source: CBACT03C.cbl:134
     }
@@ -210,29 +210,29 @@ public sealed class CardXrefReportProgram
     /// <summary>
     /// 9000-XREFFILE-CLOSE — CLOSE the xref file (ends the browse). // source: CBACT03C.cbl:136-152
     /// </summary>
-    private void XreffileClose9000()
+    private void CloseXrefFile() // COBOL paragraph: 9000-XREFFILE-CLOSE
     {
-        _applResult = 8;                                  // ADD 8 TO ZERO GIVING APPL-RESULT  // source: CBACT03C.cbl:137
+        _appResult = 8;                                   // ADD 8 TO ZERO GIVING APPL-RESULT  // source: CBACT03C.cbl:137
 
         // CLOSE XREFFILE-FILE — relational: dispose the read cursor; always succeeds with '00'.
-        _xreffile.EndBrowse();                            // source: CBACT03C.cbl:138
-        _xreffileStatus = FileStatus.Ok;
+        _xrefFile.EndBrowse();                            // source: CBACT03C.cbl:138
+        _fileStatus = FileStatus.Ok;
 
-        if (_xreffileStatus == FileStatus.Ok)             // XREFFILE-STATUS = '00'  // source: CBACT03C.cbl:139
-            _applResult = _applResult - _applResult;      // SUBTRACT APPL-RESULT FROM APPL-RESULT (-> 0)  // source: CBACT03C.cbl:140
+        if (_fileStatus == FileStatus.Ok)                 // XREFFILE-STATUS = '00'  // source: CBACT03C.cbl:139
+            _appResult = _appResult - _appResult;         // SUBTRACT APPL-RESULT FROM APPL-RESULT (-> 0)  // source: CBACT03C.cbl:140
         else
-            _applResult = 12;                             // ADD 12 TO ZERO GIVING APPL-RESULT  // source: CBACT03C.cbl:142
+            _appResult = 12;                              // ADD 12 TO ZERO GIVING APPL-RESULT  // source: CBACT03C.cbl:142
 
-        if (ApplAok)                                      // source: CBACT03C.cbl:144
+        if (AppResultIsOk)                                // source: CBACT03C.cbl:144
         {
             // CONTINUE  // source: CBACT03C.cbl:145
         }
         else
         {
             Display("ERROR CLOSING XREFFILE");            // source: CBACT03C.cbl:147
-            _ioStatus = _xreffileStatus;                  // source: CBACT03C.cbl:148
-            DisplayIoStatus9910();                        // source: CBACT03C.cbl:149
-            AbendProgram9999();                           // source: CBACT03C.cbl:150
+            _ioStatusCode = _fileStatus;                  // source: CBACT03C.cbl:148
+            DisplayIoStatus();                            // source: CBACT03C.cbl:149
+            AbendProgram();                               // source: CBACT03C.cbl:150
         }
         // EXIT  // source: CBACT03C.cbl:152
     }
@@ -240,12 +240,12 @@ public sealed class CardXrefReportProgram
     /// <summary>
     /// 9999-ABEND-PROGRAM — CALL 'CEE3ABD' USING ABCODE(999), TIMING(0). // source: CBACT03C.cbl:154-158
     /// </summary>
-    private void AbendProgram9999()
+    private void AbendProgram() // COBOL paragraph: 9999-ABEND-PROGRAM
     {
         Display("ABENDING PROGRAM");                      // source: CBACT03C.cbl:155
         // MOVE 0 TO TIMING; MOVE 999 TO ABCODE; CALL 'CEE3ABD' USING ABCODE, TIMING.
         // source: CBACT03C.cbl:156-158
-        throw new AbendException("999", $"CBACT03C abend; FILE STATUS '{_xreffileStatus}'.");
+        throw new AbendException("999", $"CBACT03C abend; FILE STATUS '{_fileStatus}'.");
     }
 
     // *****************************************************************
@@ -253,16 +253,16 @@ public sealed class CardXrefReportProgram
     /// 9910-DISPLAY-IO-STATUS — formats the 2-byte file status into a 4-char "NNNN" string and DISPLAYs
     /// <c>'FILE STATUS IS: NNNN' IO-STATUS-04</c>. // source: CBACT03C.cbl:161-174
     /// </summary>
-    private void DisplayIoStatus9910()
+    private void DisplayIoStatus() // COBOL paragraph: 9910-DISPLAY-IO-STATUS
     {
         // IO-STATUS-04 = IO-STATUS-0401 PIC 9 + IO-STATUS-0403 PIC 999  // source: CBACT03C.cbl:57-59
-        string ioStat1 = _ioStatus.Length > 0 ? _ioStatus[..1] : " ";
-        string ioStat2 = _ioStatus.Length > 1 ? _ioStatus.Substring(1, 1) : " ";
+        string ioStat1 = _ioStatusCode.Length > 0 ? _ioStatusCode[..1] : " ";
+        string ioStat2 = _ioStatusCode.Length > 1 ? _ioStatusCode.Substring(1, 1) : " ";
 
         string ioStatus04;
 
         // IF IO-STATUS NOT NUMERIC OR IO-STAT1 = '9'  // source: CBACT03C.cbl:162-163
-        if (!IsNumeric(_ioStatus) || ioStat1 == "9")
+        if (!IsNumeric(_ioStatusCode) || ioStat1 == "9")
         {
             // MOVE IO-STAT1 TO IO-STATUS-04(1:1) — first char is the stat1 byte as-is.  // source: CBACT03C.cbl:164
             char pos1 = ioStat1.Length > 0 ? ioStat1[0] : ' ';
@@ -281,7 +281,7 @@ public sealed class CardXrefReportProgram
         else
         {
             // MOVE '0000' TO IO-STATUS-04; MOVE IO-STATUS TO IO-STATUS-04(3:2).  // source: CBACT03C.cbl:170-171
-            ioStatus04 = "00" + _ioStatus.PadRight(2)[..2];
+            ioStatus04 = "00" + _ioStatusCode.PadRight(2)[..2];
         }
 
         // DISPLAY 'FILE STATUS IS: NNNN' IO-STATUS-04  // source: CBACT03C.cbl:168,172

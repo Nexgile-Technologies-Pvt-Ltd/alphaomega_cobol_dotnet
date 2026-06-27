@@ -57,14 +57,14 @@ public sealed class StatementGenerationProgram
     private TextWriter? _html;   // HTML-FILE
 
     // ----- COMP / COMP-3 / MISC working-storage. // source: CBSTM03A.cbl:59-70 ------------------------
-    private int _crCnt;                  // CR-CNT  S9(4) COMP VALUE 0
-    private int _trCnt;                  // TR-CNT  S9(4) COMP VALUE 0
-    private int _crJmp;                  // CR-JMP  S9(4) COMP VALUE 0
-    private int _trJmp;                  // TR-JMP  S9(4) COMP VALUE 0
-    private decimal _wsTotalAmt;         // WS-TOTAL-AMT COMP-3 S9(9)V99 VALUE 0
-    private string _wsFlDd = "TRNXFILE"; // WS-FL-DD X(8) VALUE 'TRNXFILE'
-    private decimal _wsTrnAmt;           // WS-TRN-AMT  S9(9)V99 VALUE 0
-    private string _wsSaveCard = new(' ', 16); // WS-SAVE-CARD X(16) VALUE SPACES
+    private int _cardCount;              // CR-CNT  S9(4) COMP VALUE 0
+    private int _tranCount;              // TR-CNT  S9(4) COMP VALUE 0
+    private int _cardIndex;              // CR-JMP  S9(4) COMP VALUE 0
+    private int _tranIndex;              // TR-JMP  S9(4) COMP VALUE 0
+    private decimal _totalAmount;        // WS-TOTAL-AMT COMP-3 S9(9)V99 VALUE 0
+    private string _fileDispatch = "TRNXFILE"; // WS-FL-DD X(8) VALUE 'TRNXFILE'
+    private decimal _transactionAmount;  // WS-TRN-AMT  S9(9)V99 VALUE 0
+    private string _savedCardNumber = new(' ', 16); // WS-SAVE-CARD X(16) VALUE SPACES
     private bool _endOfFile;             // END-OF-FILE X(01) VALUE 'N' (true == 'Y')
 
     // The WS-M03B-AREA the program fills before each CALL 'CBSTM03B'. // source: CBSTM03A.cbl:71-83
@@ -85,10 +85,10 @@ public sealed class StatementGenerationProgram
     private Account _account = new();     // ACCOUNT-RECORD (CVACT01Y)
 
     // ----- WS-TRNX-TABLE — 51 cards x (card-num + 10 trans). // source: CBSTM03A.cbl:225-233 ---------
-    private readonly string[] _wsCardNum = new string[MaxCards + 1];                 // WS-CARD-NUM (1..51)
-    private readonly string[,] _wsTranNum = new string[MaxCards + 1, MaxTrans + 1];  // WS-TRAN-NUM
-    private readonly string[,] _wsTranRest = new string[MaxCards + 1, MaxTrans + 1]; // WS-TRAN-REST
-    private readonly int[] _wsTrct = new int[MaxCards + 1];                          // WS-TRCT (1..51)
+    private readonly string[] _cardNumbers = new string[MaxCards + 1];                 // WS-CARD-NUM (1..51)
+    private readonly string[,] _tranNumbers = new string[MaxCards + 1, MaxTrans + 1];  // WS-TRAN-NUM
+    private readonly string[,] _tranRestTable = new string[MaxCards + 1, MaxTrans + 1]; // WS-TRAN-REST
+    private readonly int[] _tranCounts = new int[MaxCards + 1];                          // WS-TRCT (1..51)
 
     // ----- STATEMENT-LINES plain-text fields (the variable parts). // source: CBSTM03A.cbl:85-146 -----
     private string _stName = new(' ', 75);     // ST-NAME      X(75)
@@ -178,7 +178,7 @@ public sealed class StatementGenerationProgram
 
             // Fall through into 0000-START. The ALTER/GO-TO graph is driven by this dispatch loop until a
             // paragraph reaches 1000-MAINLINE or 9999-GOBACK.
-            Start0000();
+            Start();
         }
         finally
         {
@@ -192,7 +192,7 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 0000-START — EVALUATE WS-FL-DD with ALTER + GO TO. Driven as a dispatch loop. // source: CBSTM03A.cbl:296-314
     // =================================================================================================
-    private void Start0000()
+    private void Start() // COBOL paragraph: 0000-START
     {
         while (true)
         {
@@ -201,30 +201,30 @@ public sealed class StatementGenerationProgram
                 case "TRNXFILE":
                     // ALTER 8100-FILE-OPEN TO PROCEED TO 8100-TRNXFILE-OPEN; GO TO 8100-FILE-OPEN // source: CBSTM03A.cbl:300-301
                     _fileOpenTarget = FileOpenTarget.Trnx;
-                    if (FileOpen8100()) return; // reached 1000-MAINLINE / GOBACK
+                    if (OpenFile()) return; // reached 1000-MAINLINE / GOBACK
                     break;
                 case "XREFFILE":
                     // ALTER 8100-FILE-OPEN TO PROCEED TO 8200-XREFFILE-OPEN; GO TO 8100-FILE-OPEN // source: CBSTM03A.cbl:302-304
                     _fileOpenTarget = FileOpenTarget.Xref;
-                    if (FileOpen8100()) return;
+                    if (OpenFile()) return;
                     break;
                 case "CUSTFILE":
                     // ALTER 8100-FILE-OPEN TO PROCEED TO 8300-CUSTFILE-OPEN; GO TO 8100-FILE-OPEN // source: CBSTM03A.cbl:305-307
                     _fileOpenTarget = FileOpenTarget.Cust;
-                    if (FileOpen8100()) return;
+                    if (OpenFile()) return;
                     break;
                 case "ACCTFILE":
                     // ALTER 8100-FILE-OPEN TO PROCEED TO 8400-ACCTFILE-OPEN; GO TO 8100-FILE-OPEN // source: CBSTM03A.cbl:308-310
                     _fileOpenTarget = FileOpenTarget.Acct;
-                    if (FileOpen8100()) return;
+                    if (OpenFile()) return;
                     break;
                 case "READTRNX":
                     // GO TO 8500-READTRNX-READ // source: CBSTM03A.cbl:311-312
-                    if (Readtrnx8500Read()) return;
+                    if (BuildTransactionTable()) return;
                     break;
                 default:
                     // WHEN OTHER GO TO 9999-GOBACK // source: CBSTM03A.cbl:313-314
-                    Goback9999();
+                    Goback();
                     return;
             }
         }
@@ -234,14 +234,14 @@ public sealed class StatementGenerationProgram
     // 8100-FILE-OPEN — GO TO 8100-TRNXFILE-OPEN (ALTERed at run time). // source: CBSTM03A.cbl:726-728
     // Returns true if the chain reached 1000-MAINLINE (terminal), false to loop back to 0000-START.
     // -------------------------------------------------------------------------------------------------
-    private bool FileOpen8100()
+    private bool OpenFile() // COBOL paragraph: 8100-FILE-OPEN
     {
         switch (_fileOpenTarget) // the (ALTERed) GO TO target
         {
-            case FileOpenTarget.Trnx: return TrnxfileOpen8100();
+            case FileOpenTarget.Trnx: return OpenTrnxFile();
             case FileOpenTarget.Xref: TrnxXrefCustOpen(FileOpenTarget.Xref); return false;
             case FileOpenTarget.Cust: TrnxXrefCustOpen(FileOpenTarget.Cust); return false;
-            case FileOpenTarget.Acct: return AcctfileOpen8400();
+            case FileOpenTarget.Acct: return OpenAcctFile();
             default: return false;
         }
     }
@@ -249,44 +249,44 @@ public sealed class StatementGenerationProgram
     // Dispatch helper for the XREF/CUST open paragraphs (both end with GO TO 0000-START -> loop = false).
     private void TrnxXrefCustOpen(FileOpenTarget which)
     {
-        if (which == FileOpenTarget.Xref) XreffileOpen8200();
-        else CustfileOpen8300();
+        if (which == FileOpenTarget.Xref) OpenXrefFile();
+        else OpenCustFile();
     }
 
     // =================================================================================================
     // 1000-MAINLINE — the per-account statement loop. // source: CBSTM03A.cbl:316-342
     // =================================================================================================
-    private void Mainline1000()
+    private void RunMainline() // COBOL paragraph: 1000-MAINLINE
     {
         // PERFORM UNTIL END-OF-FILE = 'Y' // source: CBSTM03A.cbl:317
         while (!_endOfFile)
         {
             if (!_endOfFile)                          // IF END-OF-FILE = 'N' // source: CBSTM03A.cbl:318
             {
-                XreffileGetNext1000();                // source: CBSTM03A.cbl:319
+                GetNextXref();                // source: CBSTM03A.cbl:319
                 if (!_endOfFile)                      // IF END-OF-FILE = 'N' // source: CBSTM03A.cbl:320
                 {
-                    CustfileGet2000();                // source: CBSTM03A.cbl:321
-                    AcctfileGet3000();                // source: CBSTM03A.cbl:322
-                    CreateStatement5000();            // source: CBSTM03A.cbl:323
-                    _crJmp = 1;                       // MOVE 1 TO CR-JMP // source: CBSTM03A.cbl:324
-                    _wsTotalAmt = 0m;                 // MOVE ZERO TO WS-TOTAL-AMT // source: CBSTM03A.cbl:325
-                    TrnxfileGet4000();                // source: CBSTM03A.cbl:326
+                    GetCustomer();                // source: CBSTM03A.cbl:321
+                    GetAccount();                // source: CBSTM03A.cbl:322
+                    CreateStatement();            // source: CBSTM03A.cbl:323
+                    _cardIndex = 1;                       // MOVE 1 TO CR-JMP // source: CBSTM03A.cbl:324
+                    _totalAmount = 0m;                 // MOVE ZERO TO WS-TOTAL-AMT // source: CBSTM03A.cbl:325
+                    WriteAccountTransactions();                // source: CBSTM03A.cbl:326
                 }
             }
         }
 
-        TrnxfileClose9100();  // source: CBSTM03A.cbl:331
-        XreffileClose9200();  // source: CBSTM03A.cbl:333
-        CustfileClose9300();  // source: CBSTM03A.cbl:335
-        AcctfileClose9400();  // source: CBSTM03A.cbl:337
+        CloseTrnxFile();  // source: CBSTM03A.cbl:331
+        CloseXrefFile();  // source: CBSTM03A.cbl:333
+        CloseCustFile();  // source: CBSTM03A.cbl:335
+        CloseAcctFile();  // source: CBSTM03A.cbl:337
         CloseStmtHtml();      // CLOSE STMT-FILE HTML-FILE // source: CBSTM03A.cbl:339
         // fall into 9999-GOBACK // source: CBSTM03A.cbl:341
-        Goback9999();
+        Goback();
     }
 
     // 9999-GOBACK. GOBACK. // source: CBSTM03A.cbl:341-342
-    private static void Goback9999()
+    private static void Goback() // COBOL paragraph: 9999-GOBACK
     {
         // GOBACK
     }
@@ -294,7 +294,7 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 1000-XREFFILE-GET-NEXT — sequential read of CARD_XREF via CBSTM03B. // source: CBSTM03A.cbl:345-366
     // =================================================================================================
-    private void XreffileGetNext1000()
+    private void GetNextXref() // COBOL paragraph: 1000-XREFFILE-GET-NEXT
     {
         _m03b.Dd = "XREFFILE";                        // MOVE 'XREFFILE' TO WS-M03B-DD // source: CBSTM03A.cbl:347
         _m03b.Oper = 'R';                             // SET M03B-READ TO TRUE // source: CBSTM03A.cbl:348
@@ -312,7 +312,7 @@ public sealed class StatementGenerationProgram
             default:                                   // WHEN OTHER // source: CBSTM03A.cbl:358-361
                 Display("ERROR READING XREFFILE");
                 Display("RETURN CODE: " + _m03b.Rc);
-                AbendProgram9999();
+                AbendProgram();
                 break;
         }
 
@@ -324,7 +324,7 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 2000-CUSTFILE-GET — keyed read of CUSTOMER by XREF-CUST-ID via CBSTM03B. // source: CBSTM03A.cbl:368-390
     // =================================================================================================
-    private void CustfileGet2000()
+    private void GetCustomer() // COBOL paragraph: 2000-CUSTFILE-GET
     {
         _m03b.Dd = "CUSTFILE";                                  // source: CBSTM03A.cbl:370
         _m03b.Oper = 'K';                                       // SET M03B-READ-K TO TRUE // source: CBSTM03A.cbl:371
@@ -342,7 +342,7 @@ public sealed class StatementGenerationProgram
             default:                                             // WHEN OTHER // source: CBSTM03A.cbl:382-385
                 Display("ERROR READING CUSTFILE");
                 Display("RETURN CODE: " + _m03b.Rc);
-                AbendProgram9999();
+                AbendProgram();
                 break;
         }
 
@@ -354,7 +354,7 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 3000-ACCTFILE-GET — keyed read of ACCOUNT by XREF-ACCT-ID via CBSTM03B. // source: CBSTM03A.cbl:392-414
     // =================================================================================================
-    private void AcctfileGet3000()
+    private void GetAccount() // COBOL paragraph: 3000-ACCTFILE-GET
     {
         _m03b.Dd = "ACCTFILE";                                   // source: CBSTM03A.cbl:394
         _m03b.Oper = 'K';                                        // SET M03B-READ-K TO TRUE // source: CBSTM03A.cbl:395
@@ -372,7 +372,7 @@ public sealed class StatementGenerationProgram
             default:                                             // WHEN OTHER // source: CBSTM03A.cbl:406-409
                 Display("ERROR READING ACCTFILE");
                 Display("RETURN CODE: " + _m03b.Rc);
-                AbendProgram9999();
+                AbendProgram();
                 break;
         }
 
@@ -385,32 +385,32 @@ public sealed class StatementGenerationProgram
     // 4000-TRNXFILE-GET — emit each transaction for this card, then the per-account totals/footers.
     // source: CBSTM03A.cbl:416-456
     // =================================================================================================
-    private void TrnxfileGet4000()
+    private void WriteAccountTransactions() // COBOL paragraph: 4000-TRNXFILE-GET
     {
         // PERFORM VARYING CR-JMP FROM 1 BY 1 UNTIL CR-JMP > CR-CNT OR (WS-CARD-NUM(CR-JMP) > XREF-CARD-NUM)
         // source: CBSTM03A.cbl:417-419
-        for (_crJmp = 1;
-             !(_crJmp > _crCnt
-               || string.CompareOrdinal(CardNum(_crJmp), Alpha(_cardXref.XrefCardNum, 16)) > 0);
-             _crJmp++)
+        for (_cardIndex = 1;
+             !(_cardIndex > _cardCount
+               || string.CompareOrdinal(CardNum(_cardIndex), Alpha(_cardXref.XrefCardNum, 16)) > 0);
+             _cardIndex++)
         {
             // IF XREF-CARD-NUM = WS-CARD-NUM (CR-JMP) // source: CBSTM03A.cbl:420
-            if (string.Equals(Alpha(_cardXref.XrefCardNum, 16), CardNum(_crJmp), StringComparison.Ordinal))
+            if (string.Equals(Alpha(_cardXref.XrefCardNum, 16), CardNum(_cardIndex), StringComparison.Ordinal))
             {
-                _trnxCardNum = CardNum(_crJmp);   // MOVE WS-CARD-NUM (CR-JMP) TO TRNX-CARD-NUM // source: CBSTM03A.cbl:421
+                _trnxCardNum = CardNum(_cardIndex);   // MOVE WS-CARD-NUM (CR-JMP) TO TRNX-CARD-NUM // source: CBSTM03A.cbl:421
                 // PERFORM VARYING TR-JMP FROM 1 BY 1 UNTIL TR-JMP > WS-TRCT (CR-JMP) // source: CBSTM03A.cbl:422-423
-                for (_trJmp = 1; !(_trJmp > _wsTrct[_crJmp]); _trJmp++)
+                for (_tranIndex = 1; !(_tranIndex > _tranCounts[_cardIndex]); _tranIndex++)
                 {
-                    _trnxId = _wsTranNum[_crJmp, _trJmp] ?? new string(' ', 16);   // MOVE WS-TRAN-NUM TO TRNX-ID // source: CBSTM03A.cbl:424-425
-                    SetTrnxRest(_wsTranRest[_crJmp, _trJmp] ?? new string(' ', TrnxRestLen)); // MOVE WS-TRAN-REST TO TRNX-REST // source: CBSTM03A.cbl:426-427
-                    WriteTrans6000();             // source: CBSTM03A.cbl:428
-                    _wsTotalAmt = AddMoney(_wsTotalAmt, _trnxAmt); // ADD TRNX-AMT TO WS-TOTAL-AMT // source: CBSTM03A.cbl:429
+                    _trnxId = _tranNumbers[_cardIndex, _tranIndex] ?? new string(' ', 16);   // MOVE WS-TRAN-NUM TO TRNX-ID // source: CBSTM03A.cbl:424-425
+                    SetTrnxRest(_tranRestTable[_cardIndex, _tranIndex] ?? new string(' ', TrnxRestLen)); // MOVE WS-TRAN-REST TO TRNX-REST // source: CBSTM03A.cbl:426-427
+                    WriteTransaction();             // source: CBSTM03A.cbl:428
+                    _totalAmount = AddMoney(_totalAmount, _trnxAmt); // ADD TRNX-AMT TO WS-TOTAL-AMT // source: CBSTM03A.cbl:429
                 }
             }
         }
 
-        _wsTrnAmt = StoreMoney(_wsTotalAmt);          // MOVE WS-TOTAL-AMT TO WS-TRN-AMT // source: CBSTM03A.cbl:433
-        _stTotalTramt = EditZ9V99Trailing(_wsTrnAmt); // MOVE WS-TRN-AMT TO ST-TOTAL-TRAMT // source: CBSTM03A.cbl:434
+        _transactionAmount = StoreMoney(_totalAmount);          // MOVE WS-TOTAL-AMT TO WS-TRN-AMT // source: CBSTM03A.cbl:433
+        _stTotalTramt = EditZ9V99Trailing(_transactionAmount); // MOVE WS-TRN-AMT TO ST-TOTAL-TRAMT // source: CBSTM03A.cbl:434
         WriteStmt(BuildStLine12());                   // WRITE FD-STMTFILE-REC FROM ST-LINE12 // source: CBSTM03A.cbl:435
         WriteStmt(BuildStLine14A());                  // WRITE FD-STMTFILE-REC FROM ST-LINE14A // source: CBSTM03A.cbl:436
         WriteStmt(BuildStLine15());                   // WRITE FD-STMTFILE-REC FROM ST-LINE15 // source: CBSTM03A.cbl:437
@@ -429,11 +429,11 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 5000-CREATE-STATEMENT — build & write the statement header (plain text + HTML). // source: CBSTM03A.cbl:458-504
     // =================================================================================================
-    private void CreateStatement5000()
+    private void CreateStatement() // COBOL paragraph: 5000-CREATE-STATEMENT
     {
         InitializeStatementLines();                    // INITIALIZE STATEMENT-LINES // source: CBSTM03A.cbl:459
         WriteStmt(BuildStLine0());                     // WRITE FD-STMTFILE-REC FROM ST-LINE0 // source: CBSTM03A.cbl:460
-        WriteHtmlHeader5100();                         // PERFORM 5100-WRITE-HTML-HEADER // source: CBSTM03A.cbl:461
+        WriteHtmlHeader();                         // PERFORM 5100-WRITE-HTML-HEADER // source: CBSTM03A.cbl:461
 
         // STRING CUST-FIRST-NAME ' ' CUST-MIDDLE-NAME ' ' CUST-LAST-NAME ' ' INTO ST-NAME // source: CBSTM03A.cbl:462-469
         _stName = Alpha(StringDelimited(
@@ -462,7 +462,7 @@ public sealed class StatementGenerationProgram
         _stAcctId = Alpha(ZonedDigits(_account.AcctId, 11), 20);     // MOVE ACCT-ID TO ST-ACCT-ID // source: CBSTM03A.cbl:483
         _stCurrBal = Edit9V99Trailing(_account.CurrBal);            // MOVE ACCT-CURR-BAL TO ST-CURR-BAL // source: CBSTM03A.cbl:484
         _stFicoScore = Alpha(ZonedDigits(_customer.FicoCreditScore, 3), 20); // MOVE CUST-FICO-CREDIT-SCORE TO ST-FICO-SCORE // source: CBSTM03A.cbl:485
-        WriteHtmlNmadbs5200();                          // PERFORM 5200-WRITE-HTML-NMADBS // source: CBSTM03A.cbl:486
+        WriteHtmlNameAddressBasics();                          // PERFORM 5200-WRITE-HTML-NMADBS // source: CBSTM03A.cbl:486
 
         WriteStmt(BuildStLine1());   // source: CBSTM03A.cbl:488
         WriteStmt(BuildStLine2());   // source: CBSTM03A.cbl:489
@@ -485,7 +485,7 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 5100-WRITE-HTML-HEADER. // source: CBSTM03A.cbl:506-555
     // =================================================================================================
-    private void WriteHtmlHeader5100()
+    private void WriteHtmlHeader() // COBOL paragraph: 5100-WRITE-HTML-HEADER
     {
         WriteHtml(Html("<!DOCTYPE html>"));                                  // L01 // source: CBSTM03A.cbl:508-509
         WriteHtml(Html("<html lang=\"en\">"));                              // L02 // source: CBSTM03A.cbl:510-511
@@ -517,7 +517,7 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 5200-WRITE-HTML-NMADBS. // source: CBSTM03A.cbl:558-672
     // =================================================================================================
-    private void WriteHtmlNmadbs5200()
+    private void WriteHtmlNameAddressBasics() // COBOL paragraph: 5200-WRITE-HTML-NMADBS
     {
         _l23Name = Alpha(_stName, 50);                                       // MOVE ST-NAME TO L23-NAME // source: CBSTM03A.cbl:560
         // MOVE SPACES TO FD-HTMLFILE-REC; STRING '<p ...>' L23-NAME(del '  ') '  ' '</p>' INTO FD-HTMLFILE-REC
@@ -584,7 +584,7 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 6000-WRITE-TRANS — one transaction detail (plain text + HTML). // source: CBSTM03A.cbl:675-723
     // =================================================================================================
-    private void WriteTrans6000()
+    private void WriteTransaction() // COBOL paragraph: 6000-WRITE-TRANS
     {
         _stTranId = Alpha(_trnxId, 16);             // MOVE TRNX-ID TO ST-TRANID // source: CBSTM03A.cbl:676
         _stTranDt = Alpha(_trnxDesc, 49);           // MOVE TRNX-DESC TO ST-TRANDT // source: CBSTM03A.cbl:677
@@ -618,7 +618,7 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 8100-TRNXFILE-OPEN. // source: CBSTM03A.cbl:730-762  (returns true -> control transferred to 0000-START)
     // =================================================================================================
-    private bool TrnxfileOpen8100()
+    private bool OpenTrnxFile() // COBOL paragraph: 8100-TRNXFILE-OPEN
     {
         _m03b.Dd = "TRNXFILE";              // source: CBSTM03A.cbl:731
         _m03b.Oper = 'O';                   // SET M03B-OPEN TO TRUE // source: CBSTM03A.cbl:732
@@ -633,7 +633,7 @@ public sealed class StatementGenerationProgram
         {
             Display("ERROR OPENING TRNXFILE");
             Display("RETURN CODE: " + _m03b.Rc);
-            AbendProgram9999();
+            AbendProgram();
         }
 
         _m03b.Oper = 'R';                   // SET M03B-READ TO TRUE // source: CBSTM03A.cbl:744
@@ -648,14 +648,14 @@ public sealed class StatementGenerationProgram
         {
             Display("ERROR READING TRNXFILE");
             Display("RETURN CODE: " + _m03b.Rc);
-            AbendProgram9999();
+            AbendProgram();
         }
 
         SetTrnxRecord(_m03b.Fldt);          // MOVE WS-M03B-FLDT TO TRNX-RECORD // source: CBSTM03A.cbl:756
-        _wsSaveCard = _trnxCardNum;         // MOVE TRNX-CARD-NUM TO WS-SAVE-CARD // source: CBSTM03A.cbl:757
-        _crCnt = 1;                         // MOVE 1 TO CR-CNT // source: CBSTM03A.cbl:758
-        _trCnt = 0;                         // MOVE 0 TO TR-CNT // source: CBSTM03A.cbl:759
-        _wsFlDd = "READTRNX";               // MOVE 'READTRNX' TO WS-FL-DD // source: CBSTM03A.cbl:760
+        _savedCardNumber = _trnxCardNum;         // MOVE TRNX-CARD-NUM TO WS-SAVE-CARD // source: CBSTM03A.cbl:757
+        _cardCount = 1;                         // MOVE 1 TO CR-CNT // source: CBSTM03A.cbl:758
+        _tranCount = 0;                         // MOVE 0 TO TR-CNT // source: CBSTM03A.cbl:759
+        _fileDispatch = "READTRNX";               // MOVE 'READTRNX' TO WS-FL-DD // source: CBSTM03A.cbl:760
         // GO TO 0000-START // source: CBSTM03A.cbl:761
         return false; // re-dispatch via 0000-START
     }
@@ -663,7 +663,7 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 8200-XREFFILE-OPEN. // source: CBSTM03A.cbl:765-781
     // =================================================================================================
-    private void XreffileOpen8200()
+    private void OpenXrefFile() // COBOL paragraph: 8200-XREFFILE-OPEN
     {
         _m03b.Dd = "XREFFILE";              // source: CBSTM03A.cbl:766
         _m03b.Oper = 'O';                   // SET M03B-OPEN TO TRUE // source: CBSTM03A.cbl:767
@@ -678,17 +678,17 @@ public sealed class StatementGenerationProgram
         {
             Display("ERROR OPENING XREFFILE");
             Display("RETURN CODE: " + _m03b.Rc);
-            AbendProgram9999();
+            AbendProgram();
         }
 
-        _wsFlDd = "CUSTFILE";               // MOVE 'CUSTFILE' TO WS-FL-DD // source: CBSTM03A.cbl:779
+        _fileDispatch = "CUSTFILE";               // MOVE 'CUSTFILE' TO WS-FL-DD // source: CBSTM03A.cbl:779
         // GO TO 0000-START // source: CBSTM03A.cbl:780
     }
 
     // =================================================================================================
     // 8300-CUSTFILE-OPEN. // source: CBSTM03A.cbl:783-799
     // =================================================================================================
-    private void CustfileOpen8300()
+    private void OpenCustFile() // COBOL paragraph: 8300-CUSTFILE-OPEN
     {
         _m03b.Dd = "CUSTFILE";              // source: CBSTM03A.cbl:784
         _m03b.Oper = 'O';                   // SET M03B-OPEN TO TRUE // source: CBSTM03A.cbl:785
@@ -703,17 +703,17 @@ public sealed class StatementGenerationProgram
         {
             Display("ERROR OPENING CUSTFILE");
             Display("RETURN CODE: " + _m03b.Rc);
-            AbendProgram9999();
+            AbendProgram();
         }
 
-        _wsFlDd = "ACCTFILE";               // MOVE 'ACCTFILE' TO WS-FL-DD // source: CBSTM03A.cbl:797
+        _fileDispatch = "ACCTFILE";               // MOVE 'ACCTFILE' TO WS-FL-DD // source: CBSTM03A.cbl:797
         // GO TO 0000-START // source: CBSTM03A.cbl:798
     }
 
     // =================================================================================================
     // 8400-ACCTFILE-OPEN. // source: CBSTM03A.cbl:801-816
     // =================================================================================================
-    private bool AcctfileOpen8400()
+    private bool OpenAcctFile() // COBOL paragraph: 8400-ACCTFILE-OPEN
     {
         _m03b.Dd = "ACCTFILE";              // source: CBSTM03A.cbl:802
         _m03b.Oper = 'O';                   // SET M03B-OPEN TO TRUE // source: CBSTM03A.cbl:803
@@ -728,11 +728,11 @@ public sealed class StatementGenerationProgram
         {
             Display("ERROR OPENING ACCTFILE");
             Display("RETURN CODE: " + _m03b.Rc);
-            AbendProgram9999();
+            AbendProgram();
         }
 
         // GO TO 1000-MAINLINE // source: CBSTM03A.cbl:815
-        Mainline1000();
+        RunMainline();
         return true; // terminal — does not return to 0000-START
     }
 
@@ -740,26 +740,26 @@ public sealed class StatementGenerationProgram
     // 8500-READTRNX-READ — build the per-card transaction table from the sequential TRNXFILE.
     // source: CBSTM03A.cbl:818-853
     // =================================================================================================
-    private bool Readtrnx8500Read()
+    private bool BuildTransactionTable() // COBOL paragraph: 8500-READTRNX-READ
     {
         while (true)
         {
             // IF WS-SAVE-CARD = TRNX-CARD-NUM ... ELSE ... // source: CBSTM03A.cbl:819-825
-            if (string.Equals(_wsSaveCard, _trnxCardNum, StringComparison.Ordinal))
+            if (string.Equals(_savedCardNumber, _trnxCardNum, StringComparison.Ordinal))
             {
-                _trCnt += 1;                                 // ADD 1 TO TR-CNT // source: CBSTM03A.cbl:820
+                _tranCount += 1;                                 // ADD 1 TO TR-CNT // source: CBSTM03A.cbl:820
             }
             else
             {
-                _wsTrct[_crCnt] = _trCnt;                    // MOVE TR-CNT TO WS-TRCT (CR-CNT) // source: CBSTM03A.cbl:822
-                _crCnt += 1;                                 // ADD 1 TO CR-CNT // source: CBSTM03A.cbl:823
-                _trCnt = 1;                                  // MOVE 1 TO TR-CNT // source: CBSTM03A.cbl:824
+                _tranCounts[_cardCount] = _tranCount;                    // MOVE TR-CNT TO WS-TRCT (CR-CNT) // source: CBSTM03A.cbl:822
+                _cardCount += 1;                                 // ADD 1 TO CR-CNT // source: CBSTM03A.cbl:823
+                _tranCount = 1;                                  // MOVE 1 TO TR-CNT // source: CBSTM03A.cbl:824
             }
 
-            _wsCardNum[_crCnt] = _trnxCardNum;               // MOVE TRNX-CARD-NUM TO WS-CARD-NUM (CR-CNT) // source: CBSTM03A.cbl:827
-            _wsTranNum[_crCnt, _trCnt] = _trnxId;            // MOVE TRNX-ID TO WS-TRAN-NUM (CR-CNT, TR-CNT) // source: CBSTM03A.cbl:828
-            _wsTranRest[_crCnt, _trCnt] = _trnxRest;         // MOVE TRNX-REST TO WS-TRAN-REST (CR-CNT, TR-CNT) // source: CBSTM03A.cbl:829
-            _wsSaveCard = _trnxCardNum;                      // MOVE TRNX-CARD-NUM TO WS-SAVE-CARD // source: CBSTM03A.cbl:830
+            _cardNumbers[_cardCount] = _trnxCardNum;               // MOVE TRNX-CARD-NUM TO WS-CARD-NUM (CR-CNT) // source: CBSTM03A.cbl:827
+            _tranNumbers[_cardCount, _tranCount] = _trnxId;            // MOVE TRNX-ID TO WS-TRAN-NUM (CR-CNT, TR-CNT) // source: CBSTM03A.cbl:828
+            _tranRestTable[_cardCount, _tranCount] = _trnxRest;         // MOVE TRNX-REST TO WS-TRAN-REST (CR-CNT, TR-CNT) // source: CBSTM03A.cbl:829
+            _savedCardNumber = _trnxCardNum;                      // MOVE TRNX-CARD-NUM TO WS-SAVE-CARD // source: CBSTM03A.cbl:830
 
             _m03b.Dd = "TRNXFILE";                           // source: CBSTM03A.cbl:832
             _m03b.Oper = 'R';                                // SET M03B-READ TO TRUE // source: CBSTM03A.cbl:833
@@ -781,14 +781,14 @@ public sealed class StatementGenerationProgram
             {
                 Display("ERROR READING TRNXFILE");           // source: CBSTM03A.cbl:844
                 Display("RETURN CODE: " + _m03b.Rc);         // source: CBSTM03A.cbl:845
-                AbendProgram9999();                          // source: CBSTM03A.cbl:846
+                AbendProgram();                          // source: CBSTM03A.cbl:846
                 break;
             }
         }
 
         // 8599-EXIT. // source: CBSTM03A.cbl:849-853
-        _wsTrct[_crCnt] = _trCnt;                            // MOVE TR-CNT TO WS-TRCT (CR-CNT) // source: CBSTM03A.cbl:850
-        _wsFlDd = "XREFFILE";                                // MOVE 'XREFFILE' TO WS-FL-DD // source: CBSTM03A.cbl:851
+        _tranCounts[_cardCount] = _tranCount;                            // MOVE TR-CNT TO WS-TRCT (CR-CNT) // source: CBSTM03A.cbl:850
+        _fileDispatch = "XREFFILE";                                // MOVE 'XREFFILE' TO WS-FL-DD // source: CBSTM03A.cbl:851
         // GO TO 0000-START // source: CBSTM03A.cbl:852
         return false; // re-dispatch via 0000-START
     }
@@ -796,10 +796,10 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 9100/9200/9300/9400 — CLOSE each file via CBSTM03B. // source: CBSTM03A.cbl:856-919
     // =================================================================================================
-    private void TrnxfileClose9100() => CloseFile("TRNXFILE", "ERROR CLOSING TRNXFILE"); // source: CBSTM03A.cbl:856-870
-    private void XreffileClose9200() => CloseFile("XREFFILE", "ERROR CLOSING XREFFILE"); // source: CBSTM03A.cbl:873-887
-    private void CustfileClose9300() => CloseFile("CUSTFILE", "ERROR CLOSING CUSTFILE"); // source: CBSTM03A.cbl:889-903
-    private void AcctfileClose9400() => CloseFile("ACCTFILE", "ERROR CLOSING ACCTFILE"); // source: CBSTM03A.cbl:905-919
+    private void CloseTrnxFile() => CloseFile("TRNXFILE", "ERROR CLOSING TRNXFILE"); // source: CBSTM03A.cbl:856-870 // COBOL paragraph: 9100-TRNXFILE-CLOSE
+    private void CloseXrefFile() => CloseFile("XREFFILE", "ERROR CLOSING XREFFILE"); // source: CBSTM03A.cbl:873-887 // COBOL paragraph: 9200-XREFFILE-CLOSE
+    private void CloseCustFile() => CloseFile("CUSTFILE", "ERROR CLOSING CUSTFILE"); // source: CBSTM03A.cbl:889-903 // COBOL paragraph: 9300-CUSTFILE-CLOSE
+    private void CloseAcctFile() => CloseFile("ACCTFILE", "ERROR CLOSING ACCTFILE"); // source: CBSTM03A.cbl:905-919 // COBOL paragraph: 9400-ACCTFILE-CLOSE
 
     private void CloseFile(string dd, string errorMsg)
     {
@@ -816,7 +816,7 @@ public sealed class StatementGenerationProgram
         {
             Display(errorMsg);
             Display("RETURN CODE: " + _m03b.Rc);
-            AbendProgram9999();
+            AbendProgram();
         }
         // EXIT
     }
@@ -824,7 +824,7 @@ public sealed class StatementGenerationProgram
     // =================================================================================================
     // 9999-ABEND-PROGRAM — DISPLAY 'ABENDING PROGRAM'; CALL 'CEE3ABD'. // source: CBSTM03A.cbl:921-923
     // =================================================================================================
-    private void AbendProgram9999()
+    private void AbendProgram() // COBOL paragraph: 9999-ABEND-PROGRAM
     {
         Display("ABENDING PROGRAM");                              // source: CBSTM03A.cbl:922
         _stmt?.Flush();
@@ -947,12 +947,12 @@ public sealed class StatementGenerationProgram
     {
         for (int c = 0; c <= MaxCards; c++)
         {
-            _wsCardNum[c] = new string(' ', 16);
-            _wsTrct[c] = 0;
+            _cardNumbers[c] = new string(' ', 16);
+            _tranCounts[c] = 0;
             for (int t = 0; t <= MaxTrans; t++)
             {
-                _wsTranNum[c, t] = new string(' ', 16);
-                _wsTranRest[c, t] = new string(' ', TrnxRestLen);
+                _tranNumbers[c, t] = new string(' ', 16);
+                _tranRestTable[c, t] = new string(' ', TrnxRestLen);
             }
         }
     }
@@ -1176,14 +1176,14 @@ public sealed class StatementGenerationProgram
     }
 
     /// <summary>WS-FL-DD trimmed to its EVALUATE comparison value.</summary>
-    private string FlDd() => (_wsFlDd ?? "").PadRight(8).TrimEnd();
+    private string FlDd() => (_fileDispatch ?? "").PadRight(8).TrimEnd();
 
     // ADD into / store into a COMP-3 / display S9(9)V99 field (truncate-toward-zero, silent overflow).
     private static decimal AddMoney(decimal a, decimal b) => Decimals.Store(a + b, 9, 2, signed: true);
     private static decimal StoreMoney(decimal value) => Decimals.Store(value, 9, 2, signed: true);
 
     /// <summary>WS-CARD-NUM (n) — the saved card number for table slot n (space-filled when unset).</summary>
-    private string CardNum(int n) => _wsCardNum[n] ?? new string(' ', 16);
+    private string CardNum(int n) => _cardNumbers[n] ?? new string(' ', 16);
 
     /// <summary>COBOL alphanumeric MOVE of a PIC X(width): left-justify, space-pad / right-truncate.</summary>
     private static string Alpha(string? text, int width)

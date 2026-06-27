@@ -39,10 +39,10 @@ namespace CardDemo.Batch;
 public sealed class TimerWaitUtility
 {
     // 01 MVSWAIT-TIME PIC 9(8) COMP — unsigned binary count, range 0..99,999,999. // source: COBSWAIT.cbl:30
-    private const int MvswaitTimeDigits = 8;
+    private const int WaitTimeDigits = 8; // WS-MVSWAIT-TIME PIC 9(8) COMP
 
     // 01 PARM-VALUE PIC X(8). // source: COBSWAIT.cbl:31
-    private const int ParmValueWidth = 8;
+    private const int ParmWidth = 8; // WS-PARM-VALUE PIC X(8)
 
     /// <summary>
     /// Abstraction over <c>CALL 'MVSWAIT' USING MVSWAIT-TIME</c>: blocks the task for the given number of
@@ -128,13 +128,13 @@ public sealed class TimerWaitUtility
         // ACCEPT PARM-VALUE FROM SYSIN. // source: COBSWAIT.cbl:36
         // Read the first logical record (card) from the SYSIN stream into PARM-VALUE (X(8)): take the
         // first 8 chars; if shorter, COBOL left-justifies and space-fills to width 8.
-        string parmValue = AcceptParmValueFromSysin(sysin);
+        string parmCard = AcceptParmValueFromSysin(sysin); // WS-PARM-VALUE PIC X(8)
 
         // MOVE PARM-VALUE TO MVSWAIT-TIME. // source: COBSWAIT.cbl:37
         // Alphanumeric (X(8)) -> numeric (9(8) COMP) move: de-edit each character (zone-strip to its low
         // nibble), right-justify into the 8-digit receiver, truncate toward zero with silent high-order
         // overflow. No IS NUMERIC test, no validation (faithful bug #1, #3).
-        MvswaitTime = MoveAlphanumericToNumeric(parmValue, host);
+        MvswaitTime = MoveAlphanumericToNumeric(parmCard, host);
 
         // CALL 'MVSWAIT' USING MVSWAIT-TIME. // source: COBSWAIT.cbl:38
         // Pass the binary centisecond count BY REFERENCE; MVSWAIT only reads it (treated as input).
@@ -145,7 +145,7 @@ public sealed class TimerWaitUtility
     }
 
     /// <summary>
-    /// ACCEPT ... FROM SYSIN into PIC X(8): take the first <see cref="ParmValueWidth"/> characters of the
+    /// ACCEPT ... FROM SYSIN into PIC X(8): take the first <see cref="ParmWidth"/> characters of the
     /// first SYSIN card; if the card is shorter, left-justify and space-fill to width 8. // source:
     /// COBSWAIT.cbl:36
     /// </summary>
@@ -156,9 +156,9 @@ public sealed class TimerWaitUtility
         string card = nl >= 0 ? sysin[..nl] : sysin;
 
         // PIC X(8) receiving: left-justify, space-pad / right-truncate to exactly 8 characters.
-        return card.Length >= ParmValueWidth
-            ? card[..ParmValueWidth]
-            : card.PadRight(ParmValueWidth, ' ');
+        return card.Length >= ParmWidth
+            ? card[..ParmWidth]
+            : card.PadRight(ParmWidth, ' ');
     }
 
     /// <summary>
@@ -168,13 +168,13 @@ public sealed class TimerWaitUtility
     /// truncate-toward-zero and silent high-order overflow (no rounding, no sign, no validation). Faithful
     /// bugs #1 and #3. // source: COBSWAIT.cbl:37
     /// </summary>
-    private static int MoveAlphanumericToNumeric(string parmValue, HostKind host)
+    private static int MoveAlphanumericToNumeric(string parmCard, HostKind host) // parmCard = WS-PARM-VALUE PIC X(8)
     {
         // Source X(8) and receiver 9(8) are both 8 digits wide; the move is digit-for-digit (no shift).
-        byte[] bytes = HostEncoding.For(host).GetBytes(parmValue);
+        byte[] bytes = HostEncoding.For(host).GetBytes(parmCard);
 
         decimal assembled = 0m;
-        for (int i = 0; i < MvswaitTimeDigits; i++)
+        for (int i = 0; i < WaitTimeDigits; i++)
         {
             // De-edit: a numeric DISPLAY/alphanumeric MOVE keeps only the digit nibble (low 4 bits) of
             // each byte. For '0'-'9' this yields 0-9; for a space (EBCDIC 0x40 / ASCII 0x20) it yields 0;
@@ -186,7 +186,7 @@ public sealed class TimerWaitUtility
 
         // Store into 9(8) COMP: unsigned, scale 0, 8 integer digits. Truncate toward zero + silent
         // high-order overflow (modulo 10^8) per the Runtime decimal helper.
-        decimal stored = Decimals.Store(assembled, integerDigits: MvswaitTimeDigits, scale: 0, signed: false);
+        decimal stored = Decimals.Store(assembled, integerDigits: WaitTimeDigits, scale: 0, signed: false);
         return (int)stored;
     }
 }

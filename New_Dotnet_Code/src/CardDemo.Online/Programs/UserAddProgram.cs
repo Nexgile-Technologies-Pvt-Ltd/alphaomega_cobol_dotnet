@@ -60,34 +60,34 @@ public sealed class UserAddProgram : ITransactionHandler
     // =============================================================================================
     //  WS-VARIABLES — source: COUSR01C.cbl:35-44
     // =============================================================================================
-    private const string WS_PGMNAME = "COUSR01C";     // 05 WS-PGMNAME PIC X(08) VALUE 'COUSR01C'. source: :36
-    private const string WS_TRANID = "CU01";          // 05 WS-TRANID  PIC X(04) VALUE 'CU01'.     source: :37
-    private const string WS_USRSEC_FILE = "USRSEC  "; // 05 WS-USRSEC-FILE PIC X(08) VALUE 'USRSEC  '. source: :39
+    private const string ProgramId = "COUSR01C";      // WS-PGMNAME 05 WS-PGMNAME PIC X(08) VALUE 'COUSR01C'. source: :36
+    private const string TranId = "CU01";             // WS-TRANID 05 WS-TRANID  PIC X(04) VALUE 'CU01'.     source: :37
+    private const string UserSecFileName = "USRSEC  ";// WS-USRSEC-FILE 05 WS-USRSEC-FILE PIC X(08) VALUE 'USRSEC  '. source: :39
 
-    private string _wsMessage = "";                   // 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
+    private string _message = "";                     // WS-MESSAGE 05 WS-MESSAGE PIC X(80) VALUE SPACES. source: :38
 
     // 05 WS-ERR-FLG PIC X(01) VALUE 'N'. 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. source: :40-42
-    private bool _errFlgOn;
-    private bool ErrFlgOn => _errFlgOn;   // 88 ERR-FLG-ON
+    private bool _errorFlagOn;             // WS-ERR-FLG
+    private bool ErrFlgOn => _errorFlagOn; // 88 ERR-FLG-ON
 
     // 05 WS-RESP-CD / WS-REAS-CD PIC S9(09) COMP VALUE ZEROS. source: :43-44
-    private int _wsRespCd;
-    private int _wsReasCd;
+    private int _responseCode;             // WS-RESP-CD
+    private int _reasonCode;               // WS-REAS-CD
 
     // CCDA-TITLE01/02 (COTTL01Y) + CCDA-MSG-INVALID-KEY (CSMSG01Y) — shared screen header / messages.
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...         ";
+    private const string Title01 = "      AWS Mainframe Modernization       ";
+    private const string Title02 = "              CardDemo                  ";
+    private const string MsgInvalidKey = "Invalid key pressed. Please see below...         ";
 
     // =============================================================================================
     //  SEC-USER-DATA (CSUSR01Y) — the record built from the screen and WRITTEN to USRSEC. source: :53
     //  01 SEC-USER-DATA. 05 SEC-USR-ID X(08). FNAME X(20). LNAME X(20). PWD X(08). TYPE X(01). FILLER X(23).
     // =============================================================================================
-    private string _secUsrId = "";    // SEC-USR-ID    X(08) (also the WRITE RIDFLD)
-    private string _secUsrFname = ""; // SEC-USR-FNAME X(20)
-    private string _secUsrLname = ""; // SEC-USR-LNAME X(20)
-    private string _secUsrPwd = "";   // SEC-USR-PWD   X(08)
-    private string _secUsrType = "";  // SEC-USR-TYPE  X(01)
+    private string _userId = "";       // SEC-USR-ID    X(08) (also the WRITE RIDFLD)
+    private string _firstName = "";    // SEC-USR-FNAME X(20)
+    private string _lastName = "";     // SEC-USR-LNAME X(20)
+    private string _password = "";     // SEC-USR-PWD   X(08)
+    private string _userType = "";     // SEC-USR-TYPE  X(01)
 
     // =============================================================================================
     //  COMMAREA (typed view) + per-turn symbolic map + DB. source: :46,48,62-65
@@ -108,10 +108,10 @@ public sealed class UserAddProgram : ITransactionHandler
     public UserAddProgram() => _db = null!;
 
     /// <inheritdoc/>
-    public string ProgramName => WS_PGMNAME; // PROGRAM-ID. COUSR01C. source: :23
+    public string ProgramName => ProgramId; // PROGRAM-ID. COUSR01C. source: :23
 
     /// <inheritdoc/>
-    public string TransId => WS_TRANID;      // CSD: CU01 -> COUSR01C. source: CSD_TRANSACTIONS.md:85; cbl:37
+    public string TransId => TranId;         // CSD: CU01 -> COUSR01C. source: CSD_TRANSACTIONS.md:85; cbl:37
 
     // =============================================================================================
     //  MAIN-PARA — source: COUSR01C.cbl:71-110
@@ -124,10 +124,10 @@ public sealed class UserAddProgram : ITransactionHandler
         if (_db is not null) _users = new UserSecurityRepository(_db.Connection);
 
         // SET ERR-FLG-OFF TO TRUE. source: :73
-        _errFlgOn = false;
+        _errorFlagOn = false;
 
         // MOVE SPACES TO WS-MESSAGE  ERRMSGO OF COUSR1AO. source: :75-76
-        _wsMessage = "";
+        _message = "";
         _map.Field("ERRMSG").SetValue("", setMdt: false);
 
         if (ctx.EibCalen == 0)
@@ -168,9 +168,9 @@ public sealed class UserAddProgram : ITransactionHandler
                         break;
                     default:
                         // WHEN OTHER. source: :98-102
-                        _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :99
+                        _errorFlagOn = true;                               // MOVE 'Y' TO WS-ERR-FLG. source: :99
                         _map.Field("FNAME").CursorLength = -1;             // MOVE -1 TO FNAMEL. source: :100
-                        _wsMessage = CCDA_MSG_INVALID_KEY;                 // MOVE CCDA-MSG-INVALID-KEY. source: :101
+                        _message = MsgInvalidKey;                   // MOVE CCDA-MSG-INVALID-KEY. source: :101
                         SendUsraddScreen(ctx);                             // PERFORM SEND-USRADD-SCREEN. source: :102
                         break;
                 }
@@ -179,7 +179,7 @@ public sealed class UserAddProgram : ITransactionHandler
 
         // EXEC CICS RETURN TRANSID(WS-TRANID) COMMAREA(CARDDEMO-COMMAREA). source: :107-110
         if (ctx.Outcome is null)
-            ctx.ReturnTransId(WS_TRANID, _commArea);
+            ctx.ReturnTransId(TranId, _commArea);
     }
 
     // =============================================================================================
@@ -188,44 +188,44 @@ public sealed class UserAddProgram : ITransactionHandler
     private void ProcessEnterKey(CicsContext ctx)
     {
         // EVALUATE TRUE — first blank field wins; each sets its own message + cursor + SENDs. source: :117-151
-        if (IsSpacesOrLowValues(FnameIn))
+        if (IsSpacesOrLowValues(FirstNameInput))
         {
             // WHEN FNAMEI = SPACES OR LOW-VALUES. source: :118-123
-            _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :119
-            _wsMessage = "First Name can NOT be empty...";     // source: :120-121
+            _errorFlagOn = true;                               // MOVE 'Y' TO WS-ERR-FLG. source: :119
+            _message = "First Name can NOT be empty...";       // source: :120-121
             _map.Field("FNAME").CursorLength = -1;             // MOVE -1 TO FNAMEL. source: :122
             SendUsraddScreen(ctx);                             // PERFORM SEND-USRADD-SCREEN. source: :123
         }
-        else if (IsSpacesOrLowValues(LnameIn))
+        else if (IsSpacesOrLowValues(LastNameInput))
         {
             // WHEN LNAMEI = SPACES OR LOW-VALUES. source: :124-129
-            _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :125
-            _wsMessage = "Last Name can NOT be empty...";      // source: :126-127
+            _errorFlagOn = true;                               // MOVE 'Y' TO WS-ERR-FLG. source: :125
+            _message = "Last Name can NOT be empty...";        // source: :126-127
             _map.Field("LNAME").CursorLength = -1;             // MOVE -1 TO LNAMEL. source: :128
             SendUsraddScreen(ctx);                             // PERFORM SEND-USRADD-SCREEN. source: :129
         }
-        else if (IsSpacesOrLowValues(UseridIn))
+        else if (IsSpacesOrLowValues(UserIdInput))
         {
             // WHEN USERIDI = SPACES OR LOW-VALUES. source: :130-135
-            _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :131
-            _wsMessage = "User ID can NOT be empty...";        // source: :132-133
+            _errorFlagOn = true;                               // MOVE 'Y' TO WS-ERR-FLG. source: :131
+            _message = "User ID can NOT be empty...";          // source: :132-133
             _map.Field("USERID").CursorLength = -1;            // MOVE -1 TO USERIDL. source: :134
             SendUsraddScreen(ctx);                             // PERFORM SEND-USRADD-SCREEN. source: :135
         }
-        else if (IsSpacesOrLowValues(PasswdIn))
+        else if (IsSpacesOrLowValues(PasswordInput))
         {
             // WHEN PASSWDI = SPACES OR LOW-VALUES. source: :136-141
-            _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :137
-            _wsMessage = "Password can NOT be empty...";       // source: :138-139
+            _errorFlagOn = true;                               // MOVE 'Y' TO WS-ERR-FLG. source: :137
+            _message = "Password can NOT be empty...";         // source: :138-139
             _map.Field("PASSWD").CursorLength = -1;            // MOVE -1 TO PASSWDL. source: :140
             SendUsraddScreen(ctx);                             // PERFORM SEND-USRADD-SCREEN. source: :141
         }
-        else if (IsSpacesOrLowValues(UsrtypeIn))
+        else if (IsSpacesOrLowValues(UserTypeInput))
         {
             // WHEN USRTYPEI = SPACES OR LOW-VALUES. source: :142-147
             // B-1: ONLY a blank User Type is rejected; any non-blank char is accepted (no A/U check).
-            _errFlgOn = true;                                  // MOVE 'Y' TO WS-ERR-FLG. source: :143
-            _wsMessage = "User Type can NOT be empty...";      // source: :144-145
+            _errorFlagOn = true;                               // MOVE 'Y' TO WS-ERR-FLG. source: :143
+            _message = "User Type can NOT be empty...";        // source: :144-145
             _map.Field("USRTYPE").CursorLength = -1;           // MOVE -1 TO USRTYPEL. source: :146
             SendUsraddScreen(ctx);                             // PERFORM SEND-USRADD-SCREEN. source: :147
         }
@@ -241,11 +241,11 @@ public sealed class UserAddProgram : ITransactionHandler
         {
             // B-2: no length/format validation — straight MOVE of the symbolic input cells (X-width) into
             //   the fixed-width record fields.
-            _secUsrId = PadX(UseridIn, 8);    // MOVE USERIDI  TO SEC-USR-ID.    source: :154
-            _secUsrFname = PadX(FnameIn, 20); // MOVE FNAMEI   TO SEC-USR-FNAME. source: :155
-            _secUsrLname = PadX(LnameIn, 20); // MOVE LNAMEI   TO SEC-USR-LNAME. source: :156
-            _secUsrPwd = PadX(PasswdIn, 8);   // MOVE PASSWDI  TO SEC-USR-PWD.   source: :157
-            _secUsrType = PadX(UsrtypeIn, 1); // MOVE USRTYPEI TO SEC-USR-TYPE.  source: :158
+            _userId = PadX(UserIdInput, 8);       // MOVE USERIDI  TO SEC-USR-ID.    source: :154
+            _firstName = PadX(FirstNameInput, 20);// MOVE FNAMEI   TO SEC-USR-FNAME. source: :155
+            _lastName = PadX(LastNameInput, 20);  // MOVE LNAMEI   TO SEC-USR-LNAME. source: :156
+            _password = PadX(PasswordInput, 8);   // MOVE PASSWDI  TO SEC-USR-PWD.   source: :157
+            _userType = PadX(UserTypeInput, 1);   // MOVE USRTYPEI TO SEC-USR-TYPE.  source: :158
             WriteUserSecFile(ctx);            // PERFORM WRITE-USER-SEC-FILE.    source: :159
         }
     }
@@ -259,8 +259,8 @@ public sealed class UserAddProgram : ITransactionHandler
         if (IsSpacesOrLowValues(_commArea.ToProgram))
             _commArea.ToProgram = "COSGN00C";
 
-        _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID  TO CDEMO-FROM-TRANID.  source: :170
-        _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :171
+        _commArea.FromTranId = TranId;      // MOVE WS-TRANID  TO CDEMO-FROM-TRANID.  source: :170
+        _commArea.FromProgram = ProgramId;  // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :171
         // B-6: MOVE WS-USER-ID TO CDEMO-USER-ID and MOVE SEC-USR-TYPE TO CDEMO-USER-TYPE are commented out
         //   in the COBOL; the COMMAREA user identity is left as inherited. source: :172-173
         _commArea.SetFirstEntry();          // MOVE ZEROS TO CDEMO-PGM-CONTEXT. source: :174
@@ -276,7 +276,7 @@ public sealed class UserAddProgram : ITransactionHandler
     {
         PopulateHeaderInfo(ctx);                                   // PERFORM POPULATE-HEADER-INFO. source: :186
 
-        _map.Field("ERRMSG").SetValue(_wsMessage, setMdt: false); // MOVE WS-MESSAGE TO ERRMSGO. source: :188
+        _map.Field("ERRMSG").SetValue(_message, setMdt: false); // MOVE WS-MESSAGE TO ERRMSGO. source: :188
 
         // EXEC CICS SEND MAP('COUSR1A') MAPSET('COUSR01') FROM(COUSR1AO) ERASE CURSOR. source: :190-196
         ctx.SendMap(MapName, MapsetName, _map, new SendMapOptions
@@ -285,7 +285,7 @@ public sealed class UserAddProgram : ITransactionHandler
             FreeKb = true, // DFHMSD CTRL=(ALARM,FREEKB) -> keyboard unlocked on SEND.
             Cursor = -1,   // CURSOR — honour the MOVE -1 TO xxxL set on the in-error / IC field.
         });
-        _wsRespCd = (int)Resp.Normal;
+        _responseCode = (int)Resp.Normal;
     }
 
     // =============================================================================================
@@ -295,8 +295,8 @@ public sealed class UserAddProgram : ITransactionHandler
     {
         // EXEC CICS RECEIVE MAP('COUSR1A') MAPSET('COUSR01') INTO(COUSR1AI) RESP(WS-RESP-CD) RESP2. source: :203-209
         ctx.ReceiveMap(MapName, MapsetName, _map);
-        _wsRespCd = (int)Resp.Normal;
-        _wsReasCd = 0;
+        _responseCode = (int)Resp.Normal;
+        _reasonCode = 0;
     }
 
     // =============================================================================================
@@ -307,10 +307,10 @@ public sealed class UserAddProgram : ITransactionHandler
         // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: :216
         DateTime now = ctx.Clock.Now;
 
-        _map.Field("TITLE01").SetValue(CCDA_TITLE01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :218
-        _map.Field("TITLE02").SetValue(CCDA_TITLE02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :219
-        _map.Field("TRNNAME").SetValue(WS_TRANID, setMdt: false);    // MOVE WS-TRANID  TO TRNNAMEO. source: :220
-        _map.Field("PGMNAME").SetValue(WS_PGMNAME, setMdt: false);   // MOVE WS-PGMNAME TO PGMNAMEO. source: :221
+        _map.Field("TITLE01").SetValue(Title01, setMdt: false); // MOVE CCDA-TITLE01 TO TITLE01O. source: :218
+        _map.Field("TITLE02").SetValue(Title02, setMdt: false); // MOVE CCDA-TITLE02 TO TITLE02O. source: :219
+        _map.Field("TRNNAME").SetValue(TranId, setMdt: false);       // MOVE WS-TRANID  TO TRNNAMEO. source: :220
+        _map.Field("PGMNAME").SetValue(ProgramId, setMdt: false);    // MOVE WS-PGMNAME TO PGMNAMEO. source: :221
 
         // CURDATEO = mm/dd/yy (year last two digits). source: :223-227
         _map.Field("CURDATE").SetValue($"{Two(now.Month)}/{Two(now.Day)}/{Four(now.Year).Substring(2, 2)}", setMdt: false);
@@ -325,42 +325,42 @@ public sealed class UserAddProgram : ITransactionHandler
     private void WriteUserSecFile(CicsContext ctx)
     {
         // EXEC CICS WRITE DATASET(WS-USRSEC-FILE) FROM(SEC-USER-DATA) RIDFLD(SEC-USR-ID) RESP. source: :240-248
-        _ = WS_USRSEC_FILE; // dataset name (fixed) — repository is keyed by usr_id.
+        _ = UserSecFileName; // dataset name (fixed) — repository is keyed by usr_id.
         var rec = new UserSecurity
         {
-            UsrId = _secUsrId,        // SEC-USR-ID    X(08)
-            FirstName = _secUsrFname, // SEC-USR-FNAME X(20)
-            LastName = _secUsrLname,  // SEC-USR-LNAME X(20)
-            Pwd = _secUsrPwd,         // SEC-USR-PWD   X(08)
-            UsrType = _secUsrType,    // SEC-USR-TYPE  X(01)
+            UsrId = _userId,          // SEC-USR-ID    X(08)
+            FirstName = _firstName,   // SEC-USR-FNAME X(20)
+            LastName = _lastName,     // SEC-USR-LNAME X(20)
+            Pwd = _password,          // SEC-USR-PWD   X(08)
+            UsrType = _userType,      // SEC-USR-TYPE  X(01)
         };
         string fileStatus = _users.Insert(rec);
         SetResp(fileStatus);
 
         // EVALUATE WS-RESP-CD. source: :250-274
-        switch ((Resp)_wsRespCd)
+        switch ((Resp)_responseCode)
         {
             case Resp.Normal: // WHEN DFHRESP(NORMAL). source: :251-259
                 InitializeAllFields();                          // PERFORM INITIALIZE-ALL-FIELDS. source: :252
-                _wsMessage = "";                                // MOVE SPACES TO WS-MESSAGE. source: :253
+                _message = "";                                  // MOVE SPACES TO WS-MESSAGE. source: :253
                 _map.Field("ERRMSG").ColorOverride = BmsColor.Green; // MOVE DFHGREEN TO ERRMSGC. source: :254
                 // STRING 'User ' SEC-USR-ID(DELIMITED BY SPACE) ' has been added ...' INTO WS-MESSAGE. source: :255-258
                 // B-4: SEC-USR-ID is delimited by the first SPACE, truncating an id with an embedded space.
-                _wsMessage = "User " + DelimitedBySpace(_secUsrId) + " has been added ...";
+                _message = "User " + DelimitedBySpace(_userId) + " has been added ...";
                 SendUsraddScreen(ctx);                          // PERFORM SEND-USRADD-SCREEN. source: :259
                 break;
 
             case Resp.DupKey: // WHEN DFHRESP(DUPKEY). source: :260
             case Resp.DupRec: // WHEN DFHRESP(DUPREC). source: :261-266
-                _errFlgOn = true;                               // MOVE 'Y' TO WS-ERR-FLG. source: :262
-                _wsMessage = "User ID already exist...";        // source: :263-264
+                _errorFlagOn = true;                            // MOVE 'Y' TO WS-ERR-FLG. source: :262
+                _message = "User ID already exist...";          // source: :263-264
                 _map.Field("USERID").CursorLength = -1;         // MOVE -1 TO USERIDL. source: :265
                 SendUsraddScreen(ctx);                          // PERFORM SEND-USRADD-SCREEN. source: :266
                 break;
 
             default: // WHEN OTHER. source: :267-273
-                _errFlgOn = true;                               // MOVE 'Y' TO WS-ERR-FLG. source: :269
-                _wsMessage = "Unable to Add User...";           // source: :270-271
+                _errorFlagOn = true;                            // MOVE 'Y' TO WS-ERR-FLG. source: :269
+                _message = "Unable to Add User...";             // source: :270-271
                 _map.Field("FNAME").CursorLength = -1;          // MOVE -1 TO FNAMEL. source: :272
                 SendUsraddScreen(ctx);                          // PERFORM SEND-USRADD-SCREEN. source: :273
                 break;
@@ -392,17 +392,17 @@ public sealed class UserAddProgram : ITransactionHandler
         _map.Field("LNAME").SetValue(" ", setMdt: false);
         _map.Field("PASSWD").SetValue(" ", setMdt: false);
         _map.Field("USRTYPE").SetValue(" ", setMdt: false);
-        _wsMessage = "";
+        _message = "";
     }
 
     // =============================================================================================
     //  Symbolic-map input readers — FNAMEI / LNAMEI / USERIDI / PASSWDI / USRTYPEI.
     // =============================================================================================
-    private string FnameIn => _map.Field("FNAME").Value;     // FNAMEI   OF COUSR1AI
-    private string LnameIn => _map.Field("LNAME").Value;     // LNAMEI   OF COUSR1AI
-    private string UseridIn => _map.Field("USERID").Value;   // USERIDI  OF COUSR1AI
-    private string PasswdIn => _map.Field("PASSWD").Value;   // PASSWDI  OF COUSR1AI
-    private string UsrtypeIn => _map.Field("USRTYPE").Value; // USRTYPEI OF COUSR1AI
+    private string FirstNameInput => _map.Field("FNAME").Value;   // FNAMEI   OF COUSR1AI
+    private string LastNameInput => _map.Field("LNAME").Value;    // LNAMEI   OF COUSR1AI
+    private string UserIdInput => _map.Field("USERID").Value;     // USERIDI  OF COUSR1AI
+    private string PasswordInput => _map.Field("PASSWD").Value;   // PASSWDI  OF COUSR1AI
+    private string UserTypeInput => _map.Field("USRTYPE").Value;  // USRTYPEI OF COUSR1AI
 
     /// <summary>MOVE LOW-VALUES TO COUSR1AO — blank every named output field + clear per-turn overrides. source: :85</summary>
     private void MoveLowValuesToMapOut()
@@ -419,7 +419,7 @@ public sealed class UserAddProgram : ITransactionHandler
     // =============================================================================================
     private void SetResp(string fileStatus)
     {
-        _wsRespCd = fileStatus switch
+        _responseCode = fileStatus switch
         {
             FileStatus.Ok => (int)Resp.Normal,                 // '00' -> DFHRESP(NORMAL)
             FileStatus.DuplicateKey => (int)Resp.DupRec,       // '02' -> DFHRESP(DUPREC)
@@ -428,7 +428,7 @@ public sealed class UserAddProgram : ITransactionHandler
             FileStatus.EndOfFile => (int)Resp.EndFile,         // '10' -> DFHRESP(ENDFILE)
             _ => (int)Resp.Error,                              // any other -> WHEN OTHER (file error)
         };
-        _wsReasCd = 0; // RESP2 unavailable from the relational repo; 0 for parity.
+        _reasonCode = 0; // RESP2 unavailable from the relational repo; 0 for parity.
     }
 
     // =============================================================================================

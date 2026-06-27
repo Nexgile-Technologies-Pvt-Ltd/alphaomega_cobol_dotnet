@@ -200,3 +200,38 @@ adversarial verify stage so no finding survived unrefuted:
 (no DB2 SQLCODE in the relational store — branch is unreachable); COPAUS0C WS-MESSAGE STRING residual tail.
 
 **Result: build 0 errors; 104/104 tests pass, verified 3× deterministically.**
+
+## Business-context / C#-standard identifier rename
+
+The 45 program-port classes carried their COBOL program-id as the type name (`Cosgn00c`, `Cbact04c`,
+`Coactupc`, …) and their internals carried COBOL-derived identifiers (`_wsMessage`, `WS_TRANID`, the
+`88`-level `WsReturnMsgOff`, copybook consts `CCDA_TITLE01`, sequence-numbered paragraph methods
+`ReadAcct9000`). These were renamed to business-context, C#-standard names while **preserving COBOL
+traceability in comments**.
+
+- **Stage 1 — classes + files (commit after):** 45 COBOL-named classes → business names
+  (`SignOnProgram`, `InterestCalculationProgram`, `AccountUpdateProgram`, `TransactionPostingProgram`,
+  `PendingAuthPurgeProgram`, `AccountInquiryService`, `DateFormatConverter`, …); files + the 9
+  `OnlineTests.<cobol>` split files `git mv`-ed to match; all cross-file references (registries,
+  dispatchers, job factories, tests, inter-program calls) updated in lock-step. The functional CICS
+  routing literals (`ProgramName => "COSGN00C"`, `Xctl("COMEN01C", …)`) and `// source: X.cbl:NNN`
+  citations are kept **verbatim**.
+- **Stage 2 — internals (45-agent workflow, one per file):** 1,288 file-local private identifiers
+  renamed to idiomatic C# — fields (`_wsMessage`→`_message`), consts (`WS_TRANID`→`TranId`), locals
+  (`useridi`→`userIdInput`), and sequence-numbered private paragraph methods
+  (`ReadAcct9000`→`ReadAccount`). Each keeps the COBOL original in a trailing comment
+  (`// WS-MESSAGE`, `// COBOL paragraph: 9000-READ-ACCT`). No public/internal member, type name, or
+  string literal was touched.
+- **Stage 3 — coordinated stragglers:** cross-file type `WsFraudData`→`FraudData`; 13 private
+  `88`-condition properties (`WsReturnMsgOff`→`ReturnMessageIsBlank`, …); copybook/message consts
+  SCREAMING_SNAKE→PascalCase (`CCDA_TITLE01`→`Title01`, message text consts → `Msg…`-prefixed, kept
+  distinct from the same-named bool condition properties); `Finalize`→`FinalizeExport` (avoid the
+  `object.Finalize` collision); `OpenFiles1100`→`OpenFiles`; stale `0000-TRANFILE-OPEN` comment
+  references repointed to `OpenTransactionFile`.
+
+**Verification of zero behavior change:** the Stage-2+3 diff is **45 files, +5,767 / −5,767** (perfectly
+symmetric — every changed line is an identifier swap, no net add/remove). A clean rebuild's warning set
+is **byte-identical** to the pre-rename baseline (no new unused-variable / self-assignment / unreachable
+warnings → no structural change). Full-tree scan confirms **0** sequence-numbered identifiers, **0**
+`_ws` fields, **0** SCREAMING_SNAKE const declarations remain (only deliberate commented-out `// …
+WsPgmName` doc lines). **Build 0 errors; 104/104 tests pass, verified 3× deterministically.**

@@ -67,24 +67,24 @@ public sealed class TransactionPostingProgram
     private HostKind _host;
 
     // ---- WORKING-STORAGE (CBTRN02C lines 99-190) ----------------------------------------------------
-    private string _dalytranStatus = "00"; // DALYTRAN-STATUS
-    private string _tcatbalfStatus = "00"; // TCATBALF-STATUS
+    private string _dalyTranStatus = "00"; // DALYTRAN-STATUS
+    private string _tcatBalStatus = "00"; // TCATBALF-STATUS
     private int _applResult;               // APPL-RESULT S9(9) COMP (88 APPL-AOK=0, APPL-EOF=16)
     private bool _endOfFile;               // END-OF-FILE X(1) VALUE 'N'
 
     // WS-VALIDATION-TRAILER (lines 180-182): reason 9(4) + desc X(76).
-    private int _wsValidationFailReason;            // WS-VALIDATION-FAIL-REASON 9(4)
-    private string _wsValidationFailReasonDesc = new(' ', 76); // WS-VALIDATION-FAIL-REASON-DESC X(76)
+    private int _validationFailReason;            // WS-VALIDATION-FAIL-REASON 9(4)
+    private string _validationFailReasonDesc = new(' ', 76); // WS-VALIDATION-FAIL-REASON-DESC X(76)
 
     // WS-COUNTERS (lines 184-187).
-    private long _wsTransactionCount;      // WS-TRANSACTION-COUNT 9(9)
-    private long _wsRejectCount;           // WS-REJECT-COUNT 9(9)
+    private long _transactionCount;      // WS-TRANSACTION-COUNT 9(9)
+    private long _rejectCount;           // WS-REJECT-COUNT 9(9)
 
     // WS-FLAGS (lines 189-190).
-    private bool _wsCreateTrancatRec;      // WS-CREATE-TRANCAT-REC X(1) VALUE 'N'
+    private bool _createTranCatRec;      // WS-CREATE-TRANCAT-REC X(1) VALUE 'N'
 
     // The records READ ... INTO populate (null before a successful read).
-    private DailyTransaction _dalytranRecord = null!; // DALYTRAN-RECORD (CVTRA06Y)
+    private DailyTransaction _dalyTranRecord = null!; // DALYTRAN-RECORD (CVTRA06Y)
     private CardXref? _cardXrefRecord;                 // CARD-XREF-RECORD (CVACT03Y)
     private Account? _accountRecord;                   // ACCOUNT-RECORD (CVACT01Y)
     private TranCatBalance? _tranCatBalRecord;         // TRAN-CAT-BAL-RECORD (CVTRA01Y)
@@ -104,10 +104,10 @@ public sealed class TransactionPostingProgram
     public IReadOnlyList<string> Sysout => _sysout;
 
     /// <summary>Transactions read from the daily file (WS-TRANSACTION-COUNT at end of run).</summary>
-    public long TransactionsProcessed => _wsTransactionCount;
+    public long TransactionsProcessed => _transactionCount;
 
     /// <summary>Transactions rejected (WS-REJECT-COUNT at end of run).</summary>
-    public long TransactionsRejected => _wsRejectCount;
+    public long TransactionsRejected => _rejectCount;
 
     /// <summary>
     /// Runs CBTRN02C over the relational <paramref name="db"/>, writing rejects to
@@ -177,51 +177,51 @@ public sealed class TransactionPostingProgram
     private int Execute()
     {
         _sysout.Add("START OF EXECUTION OF PROGRAM CBTRN02C");   // source: CBTRN02C.cbl:194
-        DalytranOpen0000();                                      // source: CBTRN02C.cbl:195
-        TranfileOpen0100();                                      // source: CBTRN02C.cbl:196
-        XreffileOpen0200();                                      // source: CBTRN02C.cbl:197
-        DalyrejsOpen0300();                                      // source: CBTRN02C.cbl:198
-        AcctfileOpen0400();                                      // source: CBTRN02C.cbl:199
-        TcatbalfOpen0500();                                      // source: CBTRN02C.cbl:200
+        OpenDailyTransactionFile();                                      // source: CBTRN02C.cbl:195
+        OpenTransactionFile();                                      // source: CBTRN02C.cbl:196
+        OpenXrefFile();                                      // source: CBTRN02C.cbl:197
+        OpenDailyRejectsFile();                                      // source: CBTRN02C.cbl:198
+        OpenAccountFile();                                      // source: CBTRN02C.cbl:199
+        OpenTranCatBalanceFile();                                      // source: CBTRN02C.cbl:200
 
         // PERFORM UNTIL END-OF-FILE = 'Y' // source: CBTRN02C.cbl:202-219
         while (!_endOfFile)
         {
             if (!_endOfFile)                                     // IF END-OF-FILE = 'N' // source: CBTRN02C.cbl:203
             {
-                DalytranGetNext1000();                          // source: CBTRN02C.cbl:204
+                GetNextDailyTransaction();                          // source: CBTRN02C.cbl:204
                 if (!_endOfFile)                                // IF END-OF-FILE = 'N' // source: CBTRN02C.cbl:205
                 {
-                    _wsTransactionCount++;                      // ADD 1 TO WS-TRANSACTION-COUNT // source: CBTRN02C.cbl:206
-                    _wsValidationFailReason = 0;               // MOVE 0 TO WS-VALIDATION-FAIL-REASON // source: CBTRN02C.cbl:208
-                    _wsValidationFailReasonDesc = new string(' ', 76); // MOVE SPACES TO ...-DESC // source: CBTRN02C.cbl:209
-                    ValidateTran1500();                        // source: CBTRN02C.cbl:210
+                    _transactionCount++;                      // ADD 1 TO WS-TRANSACTION-COUNT // source: CBTRN02C.cbl:206
+                    _validationFailReason = 0;               // MOVE 0 TO WS-VALIDATION-FAIL-REASON // source: CBTRN02C.cbl:208
+                    _validationFailReasonDesc = new string(' ', 76); // MOVE SPACES TO ...-DESC // source: CBTRN02C.cbl:209
+                    ValidateTransaction();                        // source: CBTRN02C.cbl:210
 
-                    if (_wsValidationFailReason == 0)          // source: CBTRN02C.cbl:211
+                    if (_validationFailReason == 0)          // source: CBTRN02C.cbl:211
                     {
-                        PostTransaction2000();                 // source: CBTRN02C.cbl:212
+                        PostTransaction();                 // source: CBTRN02C.cbl:212
                     }
                     else
                     {
-                        _wsRejectCount++;                      // ADD 1 TO WS-REJECT-COUNT // source: CBTRN02C.cbl:214
-                        WriteRejectRec2500();                  // source: CBTRN02C.cbl:215
+                        _rejectCount++;                      // ADD 1 TO WS-REJECT-COUNT // source: CBTRN02C.cbl:214
+                        WriteRejectRecord();                  // source: CBTRN02C.cbl:215
                     }
                 }
             }
         }
 
-        DalytranClose9000();                                    // source: CBTRN02C.cbl:221
-        TranfileClose9100();                                    // source: CBTRN02C.cbl:222
-        XreffileClose9200();                                    // source: CBTRN02C.cbl:223
-        DalyrejsClose9300();                                    // source: CBTRN02C.cbl:224
-        AcctfileClose9400();                                    // source: CBTRN02C.cbl:225
-        TcatbalfClose9500();                                    // source: CBTRN02C.cbl:226
+        CloseDailyTransactionFile();                                    // source: CBTRN02C.cbl:221
+        CloseTransactionFile();                                    // source: CBTRN02C.cbl:222
+        CloseXrefFile();                                    // source: CBTRN02C.cbl:223
+        CloseDailyRejectsFile();                                    // source: CBTRN02C.cbl:224
+        CloseAccountFile();                                    // source: CBTRN02C.cbl:225
+        CloseTranCatBalanceFile();                                    // source: CBTRN02C.cbl:226
 
-        _sysout.Add("TRANSACTIONS PROCESSED :" + _wsTransactionCount.ToString("D9")); // source: CBTRN02C.cbl:227
-        _sysout.Add("TRANSACTIONS REJECTED  :" + _wsRejectCount.ToString("D9"));      // source: CBTRN02C.cbl:228
+        _sysout.Add("TRANSACTIONS PROCESSED :" + _transactionCount.ToString("D9")); // source: CBTRN02C.cbl:227
+        _sysout.Add("TRANSACTIONS REJECTED  :" + _rejectCount.ToString("D9"));      // source: CBTRN02C.cbl:228
 
         int returnCode = 0;
-        if (_wsRejectCount > 0)                                 // source: CBTRN02C.cbl:229
+        if (_rejectCount > 0)                                 // source: CBTRN02C.cbl:229
             returnCode = 4;                                     // MOVE 4 TO RETURN-CODE // source: CBTRN02C.cbl:230
 
         _sysout.Add("END OF EXECUTION OF PROGRAM CBTRN02C");    // source: CBTRN02C.cbl:232
@@ -230,25 +230,25 @@ public sealed class TransactionPostingProgram
 
     // -------------------------------------------------------------------------------------------------
     // 0000-DALYTRAN-OPEN // source: CBTRN02C.cbl:236-252
-    private void DalytranOpen0000()
+    private void OpenDailyTransactionFile() // COBOL paragraph: 0000-DALYTRAN-OPEN
     {
         _applResult = 8;                                        // source: CBTRN02C.cbl:237
         // OPEN INPUT DALYTRAN-FILE -> position the sequential read cursor at the first row (tran_id order).
         _dalyTran.StartBrowse();
-        _dalytranStatus = FileStatus.Ok;                        // a present table always opens '00'.
-        if (_dalytranStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:239-243
+        _dalyTranStatus = FileStatus.Ok;                        // a present table always opens '00'.
+        if (_dalyTranStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:239-243
         if (ApplAok) { /* CONTINUE */ }                         // source: CBTRN02C.cbl:244-245
         else
         {
             _sysout.Add("ERROR OPENING DALYTRAN");              // source: CBTRN02C.cbl:247
-            DisplayIoStatus9910(_dalytranStatus);              // source: CBTRN02C.cbl:248-249
-            AbendProgram9999();                                // source: CBTRN02C.cbl:250
+            DisplayIoStatus(_dalyTranStatus);              // source: CBTRN02C.cbl:248-249
+            AbendProgram();                                // source: CBTRN02C.cbl:250
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 0100-TRANFILE-OPEN // source: CBTRN02C.cbl:254-270
-    private void TranfileOpen0100()
+    private void OpenTransactionFile() // COBOL paragraph: 0100-TRANFILE-OPEN
     {
         _applResult = 8;                                        // source: CBTRN02C.cbl:255
         // OPEN OUTPUT TRANSACT-FILE -> truncate-then-load: the transaction master is rebuilt each run.
@@ -260,14 +260,14 @@ public sealed class TransactionPostingProgram
         else
         {
             _sysout.Add("ERROR OPENING TRANSACTION FILE");      // source: CBTRN02C.cbl:265
-            DisplayIoStatus9910(status);                       // source: CBTRN02C.cbl:266-267
-            AbendProgram9999();                                // source: CBTRN02C.cbl:268
+            DisplayIoStatus(status);                       // source: CBTRN02C.cbl:266-267
+            AbendProgram();                                // source: CBTRN02C.cbl:268
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 0200-XREFFILE-OPEN // source: CBTRN02C.cbl:272-289
-    private void XreffileOpen0200()
+    private void OpenXrefFile() // COBOL paragraph: 0200-XREFFILE-OPEN
     {
         _applResult = 8;                                        // source: CBTRN02C.cbl:274
         string status = FileStatus.Ok;                          // OPEN INPUT XREF-FILE (random) — always '00'.
@@ -276,14 +276,14 @@ public sealed class TransactionPostingProgram
         else
         {
             _sysout.Add("ERROR OPENING CROSS REF FILE");        // source: CBTRN02C.cbl:284
-            DisplayIoStatus9910(status);                       // source: CBTRN02C.cbl:285-286
-            AbendProgram9999();                                // source: CBTRN02C.cbl:287
+            DisplayIoStatus(status);                       // source: CBTRN02C.cbl:285-286
+            AbendProgram();                                // source: CBTRN02C.cbl:287
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 0300-DALYREJS-OPEN // source: CBTRN02C.cbl:291-307
-    private void DalyrejsOpen0300()
+    private void OpenDailyRejectsFile() // COBOL paragraph: 0300-DALYREJS-OPEN
     {
         _applResult = 8;                                        // source: CBTRN02C.cbl:292
         // OPEN OUTPUT DALYREJS-FILE — the writer was created over an emptied dataset in Run().
@@ -293,14 +293,14 @@ public sealed class TransactionPostingProgram
         else
         {
             _sysout.Add("ERROR OPENING DALY REJECTS FILE");     // source: CBTRN02C.cbl:302
-            DisplayIoStatus9910(status);                       // source: CBTRN02C.cbl:303-304
-            AbendProgram9999();                                // source: CBTRN02C.cbl:305
+            DisplayIoStatus(status);                       // source: CBTRN02C.cbl:303-304
+            AbendProgram();                                // source: CBTRN02C.cbl:305
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 0400-ACCTFILE-OPEN // source: CBTRN02C.cbl:309-325
-    private void AcctfileOpen0400()
+    private void OpenAccountFile() // COBOL paragraph: 0400-ACCTFILE-OPEN
     {
         _applResult = 8;                                        // source: CBTRN02C.cbl:310
         string status = FileStatus.Ok;                          // OPEN I-O ACCOUNT-FILE (random) — '00'.
@@ -309,39 +309,39 @@ public sealed class TransactionPostingProgram
         else
         {
             _sysout.Add("ERROR OPENING ACCOUNT MASTER FILE");   // source: CBTRN02C.cbl:320
-            DisplayIoStatus9910(status);                       // source: CBTRN02C.cbl:321-322
-            AbendProgram9999();                                // source: CBTRN02C.cbl:323
+            DisplayIoStatus(status);                       // source: CBTRN02C.cbl:321-322
+            AbendProgram();                                // source: CBTRN02C.cbl:323
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 0500-TCATBALF-OPEN // source: CBTRN02C.cbl:327-343
-    private void TcatbalfOpen0500()
+    private void OpenTranCatBalanceFile() // COBOL paragraph: 0500-TCATBALF-OPEN
     {
         _applResult = 8;                                        // source: CBTRN02C.cbl:328
-        _tcatbalfStatus = FileStatus.Ok;                        // OPEN I-O TCATBAL-FILE (random) — '00'.
-        if (_tcatbalfStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:330-334
+        _tcatBalStatus = FileStatus.Ok;                        // OPEN I-O TCATBAL-FILE (random) — '00'.
+        if (_tcatBalStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:330-334
         if (ApplAok) { /* CONTINUE */ }                         // source: CBTRN02C.cbl:335-336
         else
         {
             _sysout.Add("ERROR OPENING TRANSACTION BALANCE FILE"); // source: CBTRN02C.cbl:338
-            DisplayIoStatus9910(_tcatbalfStatus);              // source: CBTRN02C.cbl:339-340
-            AbendProgram9999();                                // source: CBTRN02C.cbl:341
+            DisplayIoStatus(_tcatBalStatus);              // source: CBTRN02C.cbl:339-340
+            AbendProgram();                                // source: CBTRN02C.cbl:341
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 1000-DALYTRAN-GET-NEXT // source: CBTRN02C.cbl:345-369
-    private void DalytranGetNext1000()
+    private void GetNextDailyTransaction() // COBOL paragraph: 1000-DALYTRAN-GET-NEXT
     {
         // READ DALYTRAN-FILE INTO DALYTRAN-RECORD (sequential next). // source: CBTRN02C.cbl:346
-        _dalytranStatus = _dalyTran.ReadNext(out DailyTransaction? next);
-        if (_dalytranStatus == FileStatus.Ok)                  // source: CBTRN02C.cbl:347
+        _dalyTranStatus = _dalyTran.ReadNext(out DailyTransaction? next);
+        if (_dalyTranStatus == FileStatus.Ok)                  // source: CBTRN02C.cbl:347
         {
-            _dalytranRecord = next!;
+            _dalyTranRecord = next!;
             _applResult = 0;                                   // MOVE 0 TO APPL-RESULT // source: CBTRN02C.cbl:348
         }
-        else if (_dalytranStatus == FileStatus.EndOfFile)      // '10' // source: CBTRN02C.cbl:351
+        else if (_dalyTranStatus == FileStatus.EndOfFile)      // '10' // source: CBTRN02C.cbl:351
         {
             _applResult = 16;                                  // MOVE 16 TO APPL-RESULT // source: CBTRN02C.cbl:352
         }
@@ -358,33 +358,33 @@ public sealed class TransactionPostingProgram
         else
         {
             _sysout.Add("ERROR READING DALYTRAN FILE");         // source: CBTRN02C.cbl:363
-            DisplayIoStatus9910(_dalytranStatus);              // source: CBTRN02C.cbl:364-365
-            AbendProgram9999();                                // source: CBTRN02C.cbl:366
+            DisplayIoStatus(_dalyTranStatus);              // source: CBTRN02C.cbl:364-365
+            AbendProgram();                                // source: CBTRN02C.cbl:366
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 1500-VALIDATE-TRAN // source: CBTRN02C.cbl:370-378
-    private void ValidateTran1500()
+    private void ValidateTransaction() // COBOL paragraph: 1500-VALIDATE-TRAN
     {
-        LookupXref1500A();                                     // source: CBTRN02C.cbl:371
-        if (_wsValidationFailReason == 0)                      // source: CBTRN02C.cbl:372
-            LookupAcct1500B();                                 // source: CBTRN02C.cbl:373
+        LookupXref();                                     // source: CBTRN02C.cbl:371
+        if (_validationFailReason == 0)                      // source: CBTRN02C.cbl:372
+            LookupAccount();                                 // source: CBTRN02C.cbl:373
         // ELSE CONTINUE // source: CBTRN02C.cbl:374-375
         // * ADD MORE VALIDATIONS HERE // source: CBTRN02C.cbl:377
     }
 
     // -------------------------------------------------------------------------------------------------
     // 1500-A-LOOKUP-XREF // source: CBTRN02C.cbl:380-392
-    private void LookupXref1500A()
+    private void LookupXref() // COBOL paragraph: 1500-A-LOOKUP-XREF
     {
         // MOVE DALYTRAN-CARD-NUM TO FD-XREF-CARD-NUM; READ XREF-FILE INTO CARD-XREF-RECORD.
         // source: CBTRN02C.cbl:382-383
-        string status = _xref.ReadByKey(_dalytranRecord.CardNum, out CardXref? xref);
+        string status = _xref.ReadByKey(_dalyTranRecord.CardNum, out CardXref? xref);
         if (status != FileStatus.Ok)                           // INVALID KEY // source: CBTRN02C.cbl:384
         {
-            _wsValidationFailReason = 100;                     // source: CBTRN02C.cbl:385
-            _wsValidationFailReasonDesc = "INVALID CARD NUMBER FOUND"; // source: CBTRN02C.cbl:386-387
+            _validationFailReason = 100;                     // source: CBTRN02C.cbl:385
+            _validationFailReasonDesc = "INVALID CARD NUMBER FOUND"; // source: CBTRN02C.cbl:386-387
         }
         else
         {
@@ -395,14 +395,14 @@ public sealed class TransactionPostingProgram
 
     // -------------------------------------------------------------------------------------------------
     // 1500-B-LOOKUP-ACCT // source: CBTRN02C.cbl:393-422
-    private void LookupAcct1500B()
+    private void LookupAccount() // COBOL paragraph: 1500-B-LOOKUP-ACCT
     {
         // MOVE XREF-ACCT-ID TO FD-ACCT-ID; READ ACCOUNT-FILE INTO ACCOUNT-RECORD. // source: CBTRN02C.cbl:394-395
         string status = _account.ReadByKey(_cardXrefRecord!.AcctId, out Account? acct);
         if (status != FileStatus.Ok)                           // INVALID KEY // source: CBTRN02C.cbl:396
         {
-            _wsValidationFailReason = 101;                     // source: CBTRN02C.cbl:397
-            _wsValidationFailReasonDesc = "ACCOUNT RECORD NOT FOUND"; // source: CBTRN02C.cbl:398-399
+            _validationFailReason = 101;                     // source: CBTRN02C.cbl:397
+            _validationFailReasonDesc = "ACCOUNT RECORD NOT FOUND"; // source: CBTRN02C.cbl:398-399
             return;
         }
 
@@ -413,78 +413,78 @@ public sealed class TransactionPostingProgram
         // WS-TEMP-BAL is S9(9)V99 (FAITHFUL BUG #5: truncated to 9 integer digits, toward zero, silent
         // overflow); the credit-limit check uses cycle figures, NOT ACCT-CURR-BAL (FAITHFUL BUG #4).
         // source: CBTRN02C.cbl:403-405
-        decimal wsTempBal = Decimals.Store(
-            _accountRecord.CurrCycCredit - _accountRecord.CurrCycDebit + _dalytranRecord.Amt,
+        decimal tempBalance = Decimals.Store( // WS-TEMP-BAL
+            _accountRecord.CurrCycCredit - _accountRecord.CurrCycDebit + _dalyTranRecord.Amt,
             TempBalDigits, MoneyScale, signed: true);
 
         // IF ACCT-CREDIT-LIMIT >= WS-TEMP-BAL CONTINUE ELSE reason 102. // source: CBTRN02C.cbl:407-413
-        if (_accountRecord.CreditLimit >= wsTempBal)
+        if (_accountRecord.CreditLimit >= tempBalance)
         {
             // CONTINUE
         }
         else
         {
-            _wsValidationFailReason = 102;                     // source: CBTRN02C.cbl:410
-            _wsValidationFailReasonDesc = "OVERLIMIT TRANSACTION"; // source: CBTRN02C.cbl:411-412
+            _validationFailReason = 102;                     // source: CBTRN02C.cbl:410
+            _validationFailReasonDesc = "OVERLIMIT TRANSACTION"; // source: CBTRN02C.cbl:411-412
         }
 
         // IF ACCT-EXPIRAION-DATE >= DALYTRAN-ORIG-TS (1:10) CONTINUE ELSE reason 103.
         // FAITHFUL BUG #1: this is an independent sequential IF (no ELSE on the 102 check), so an
         // over-limit AND expired record has 102 overwritten by 103. Ordinal (alphanumeric) date compare:
         // ACCT-EXPIRAION-DATE X(10) vs the first 10 chars of DALYTRAN-ORIG-TS X(26). // source: CBTRN02C.cbl:414-420
-        string acctExpir = _accountRecord.ExpirationDate;
-        string origDate = Ref(_dalytranRecord.OrigTs, 1, 10);
-        if (string.CompareOrdinal(acctExpir, origDate) >= 0)
+        string accountExpirationDate = _accountRecord.ExpirationDate;
+        string originationDate = Ref(_dalyTranRecord.OrigTs, 1, 10);
+        if (string.CompareOrdinal(accountExpirationDate, originationDate) >= 0)
         {
             // CONTINUE
         }
         else
         {
-            _wsValidationFailReason = 103;                     // source: CBTRN02C.cbl:417
-            _wsValidationFailReasonDesc = "TRANSACTION RECEIVED AFTER ACCT EXPIRATION"; // source: CBTRN02C.cbl:418-419
+            _validationFailReason = 103;                     // source: CBTRN02C.cbl:417
+            _validationFailReasonDesc = "TRANSACTION RECEIVED AFTER ACCT EXPIRATION"; // source: CBTRN02C.cbl:418-419
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 2000-POST-TRANSACTION // source: CBTRN02C.cbl:424-444
-    private void PostTransaction2000()
+    private void PostTransaction() // COBOL paragraph: 2000-POST-TRANSACTION
     {
         // Build TRAN-RECORD from DALYTRAN-RECORD field-by-field. // source: CBTRN02C.cbl:425-436
         _tranRecord = new Transaction
         {
-            TranId = _dalytranRecord.TranId,                   // MOVE DALYTRAN-ID TO TRAN-ID
-            TypeCd = _dalytranRecord.TypeCd,                   // MOVE DALYTRAN-TYPE-CD TO TRAN-TYPE-CD
-            CatCd = _dalytranRecord.CatCd,                     // MOVE DALYTRAN-CAT-CD TO TRAN-CAT-CD
-            Source = _dalytranRecord.Source,                   // MOVE DALYTRAN-SOURCE TO TRAN-SOURCE
-            Desc = _dalytranRecord.Desc,                       // MOVE DALYTRAN-DESC TO TRAN-DESC
-            Amt = _dalytranRecord.Amt,                         // MOVE DALYTRAN-AMT TO TRAN-AMT
-            MerchantId = _dalytranRecord.MerchantId,           // MOVE DALYTRAN-MERCHANT-ID TO TRAN-MERCHANT-ID
-            MerchantName = _dalytranRecord.MerchantName,       // MOVE DALYTRAN-MERCHANT-NAME TO TRAN-MERCHANT-NAME
-            MerchantCity = _dalytranRecord.MerchantCity,       // MOVE DALYTRAN-MERCHANT-CITY TO TRAN-MERCHANT-CITY
-            MerchantZip = _dalytranRecord.MerchantZip,         // MOVE DALYTRAN-MERCHANT-ZIP TO TRAN-MERCHANT-ZIP
-            CardNum = _dalytranRecord.CardNum,                 // MOVE DALYTRAN-CARD-NUM TO TRAN-CARD-NUM
-            OrigTs = _dalytranRecord.OrigTs,                   // MOVE DALYTRAN-ORIG-TS TO TRAN-ORIG-TS
+            TranId = _dalyTranRecord.TranId,                   // MOVE DALYTRAN-ID TO TRAN-ID
+            TypeCd = _dalyTranRecord.TypeCd,                   // MOVE DALYTRAN-TYPE-CD TO TRAN-TYPE-CD
+            CatCd = _dalyTranRecord.CatCd,                     // MOVE DALYTRAN-CAT-CD TO TRAN-CAT-CD
+            Source = _dalyTranRecord.Source,                   // MOVE DALYTRAN-SOURCE TO TRAN-SOURCE
+            Desc = _dalyTranRecord.Desc,                       // MOVE DALYTRAN-DESC TO TRAN-DESC
+            Amt = _dalyTranRecord.Amt,                         // MOVE DALYTRAN-AMT TO TRAN-AMT
+            MerchantId = _dalyTranRecord.MerchantId,           // MOVE DALYTRAN-MERCHANT-ID TO TRAN-MERCHANT-ID
+            MerchantName = _dalyTranRecord.MerchantName,       // MOVE DALYTRAN-MERCHANT-NAME TO TRAN-MERCHANT-NAME
+            MerchantCity = _dalyTranRecord.MerchantCity,       // MOVE DALYTRAN-MERCHANT-CITY TO TRAN-MERCHANT-CITY
+            MerchantZip = _dalyTranRecord.MerchantZip,         // MOVE DALYTRAN-MERCHANT-ZIP TO TRAN-MERCHANT-ZIP
+            CardNum = _dalyTranRecord.CardNum,                 // MOVE DALYTRAN-CARD-NUM TO TRAN-CARD-NUM
+            OrigTs = _dalyTranRecord.OrigTs,                   // MOVE DALYTRAN-ORIG-TS TO TRAN-ORIG-TS
             // FAITHFUL BUG #7: TRAN-PROC-TS is the current run clock, NOT DALYTRAN-PROC-TS.
-            ProcTs = GetDb2FormatTimestampZ(),                 // source: CBTRN02C.cbl:437-438
+            ProcTs = GetDb2FormatTimestamp(),                 // source: CBTRN02C.cbl:437-438
         };
 
-        UpdateTcatbal2700();                                   // source: CBTRN02C.cbl:440
-        UpdateAccountRec2800();                                // source: CBTRN02C.cbl:441
-        WriteTransactionFile2900();                            // source: CBTRN02C.cbl:442
+        UpdateTranCatBalance();                                   // source: CBTRN02C.cbl:440
+        UpdateAccountRecord();                                // source: CBTRN02C.cbl:441
+        WriteTransactionFile();                            // source: CBTRN02C.cbl:442
         // FAITHFUL BUG #2: WS-VALIDATION-FAIL-REASON (possibly 109 from 2800) is never re-checked here,
         // so the transaction is written regardless and no reject is produced. // source: CBTRN02C.cbl:424-444
     }
 
     // -------------------------------------------------------------------------------------------------
     // 2500-WRITE-REJECT-REC // source: CBTRN02C.cbl:446-465
-    private void WriteRejectRec2500()
+    private void WriteRejectRecord() // COBOL paragraph: 2500-WRITE-REJECT-REC
     {
         // MOVE DALYTRAN-RECORD TO REJECT-TRAN-DATA (X350); MOVE WS-VALIDATION-TRAILER TO VALIDATION-TRAILER
         // (X80 = reason 9(4) + desc X(76)). The full record is 430 bytes. // source: CBTRN02C.cbl:447-451
         var reject = new byte[430];
-        SerializeDalytranRecord(_dalytranRecord).CopyTo(reject, 0);              // REJECT-TRAN-DATA (350)
-        ZonedDecimalCodec.Encode(_wsValidationFailReason, reject.AsSpan(350, 4), 4, 0, false, _host); // 9(4)
-        HostEncoding.For(_host).GetBytes(Alpha(_wsValidationFailReasonDesc, 76)).CopyTo(reject, 354);  // X(76)
+        SerializeDalytranRecord(_dalyTranRecord).CopyTo(reject, 0);              // REJECT-TRAN-DATA (350)
+        ZonedDecimalCodec.Encode(_validationFailReason, reject.AsSpan(350, 4), 4, 0, false, _host); // 9(4)
+        HostEncoding.For(_host).GetBytes(Alpha(_validationFailReasonDesc, 76)).CopyTo(reject, 354);  // X(76)
 
         _applResult = 8;                                       // MOVE 8 TO APPL-RESULT // source: CBTRN02C.cbl:450
         // WRITE FD-REJS-RECORD FROM REJECT-RECORD. // source: CBTRN02C.cbl:451
@@ -494,28 +494,28 @@ public sealed class TransactionPostingProgram
         else
         {
             _sysout.Add("ERROR WRITING TO REJECTS FILE");       // source: CBTRN02C.cbl:460
-            DisplayIoStatus9910(status);                       // source: CBTRN02C.cbl:461-462
-            AbendProgram9999();                                // source: CBTRN02C.cbl:463
+            DisplayIoStatus(status);                       // source: CBTRN02C.cbl:461-462
+            AbendProgram();                                // source: CBTRN02C.cbl:463
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 2700-UPDATE-TCATBAL // source: CBTRN02C.cbl:467-501
-    private void UpdateTcatbal2700()
+    private void UpdateTranCatBalance() // COBOL paragraph: 2700-UPDATE-TCATBAL
     {
         // MOVE XREF-ACCT-ID / DALYTRAN-TYPE-CD / DALYTRAN-CAT-CD into FD-TRAN-CAT-KEY. // source: CBTRN02C.cbl:469-471
         long acctId = _cardXrefRecord!.AcctId;
-        string typeCd = _dalytranRecord.TypeCd;
-        int catCd = _dalytranRecord.CatCd;
+        string typeCd = _dalyTranRecord.TypeCd;
+        int catCd = _dalyTranRecord.CatCd;
 
-        _wsCreateTrancatRec = false;                           // MOVE 'N' TO WS-CREATE-TRANCAT-REC // source: CBTRN02C.cbl:473
+        _createTranCatRec = false;                           // MOVE 'N' TO WS-CREATE-TRANCAT-REC // source: CBTRN02C.cbl:473
 
         // READ TCATBAL-FILE INTO TRAN-CAT-BAL-RECORD; INVALID KEY -> display + flag create. // source: CBTRN02C.cbl:474-479
-        _tcatbalfStatus = _tcatBal.ReadByKey(acctId, typeCd, catCd, out TranCatBalance? bal);
-        if (_tcatbalfStatus == FileStatus.RecordNotFound)      // INVALID KEY
+        _tcatBalStatus = _tcatBal.ReadByKey(acctId, typeCd, catCd, out TranCatBalance? bal);
+        if (_tcatBalStatus == FileStatus.RecordNotFound)      // INVALID KEY
         {
             _sysout.Add("TCATBAL record not found for key : " + FormatTranCatKey(acctId, typeCd, catCd) + ".. Creating.");
-            _wsCreateTrancatRec = true;                        // MOVE 'Y' TO WS-CREATE-TRANCAT-REC // source: CBTRN02C.cbl:478
+            _createTranCatRec = true;                        // MOVE 'Y' TO WS-CREATE-TRANCAT-REC // source: CBTRN02C.cbl:478
         }
         else
         {
@@ -523,7 +523,7 @@ public sealed class TransactionPostingProgram
         }
 
         // IF TCATBALF-STATUS = '00' OR '23' -> AOK ELSE 12 (the '23' is tolerated). // source: CBTRN02C.cbl:481-485
-        if (_tcatbalfStatus == FileStatus.Ok || _tcatbalfStatus == FileStatus.RecordNotFound)
+        if (_tcatBalStatus == FileStatus.Ok || _tcatBalStatus == FileStatus.RecordNotFound)
             _applResult = 0;
         else
             _applResult = 12;
@@ -531,19 +531,19 @@ public sealed class TransactionPostingProgram
         else
         {
             _sysout.Add("ERROR READING TRANSACTION BALANCE FILE"); // source: CBTRN02C.cbl:489
-            DisplayIoStatus9910(_tcatbalfStatus);              // source: CBTRN02C.cbl:490-491
-            AbendProgram9999();                                // source: CBTRN02C.cbl:492
+            DisplayIoStatus(_tcatBalStatus);              // source: CBTRN02C.cbl:490-491
+            AbendProgram();                                // source: CBTRN02C.cbl:492
         }
 
-        if (_wsCreateTrancatRec)                               // source: CBTRN02C.cbl:495
-            CreateTcatbalRec2700A(acctId, typeCd, catCd);      // source: CBTRN02C.cbl:496
+        if (_createTranCatRec)                               // source: CBTRN02C.cbl:495
+            CreateTranCatBalanceRecord(acctId, typeCd, catCd);      // source: CBTRN02C.cbl:496
         else
-            UpdateTcatbalRec2700B();                           // source: CBTRN02C.cbl:498
+            UpdateTranCatBalanceRecord();                           // source: CBTRN02C.cbl:498
     }
 
     // -------------------------------------------------------------------------------------------------
     // 2700-A-CREATE-TCATBAL-REC // source: CBTRN02C.cbl:503-524
-    private void CreateTcatbalRec2700A(long acctId, string typeCd, int catCd)
+    private void CreateTranCatBalanceRecord(long acctId, string typeCd, int catCd) // COBOL paragraph: 2700-A-CREATE-TCATBAL-REC
     {
         // INITIALIZE TRAN-CAT-BAL-RECORD (all elementary fields to zero/spaces). // source: CBTRN02C.cbl:504
         var rec = new TranCatBalance
@@ -552,48 +552,48 @@ public sealed class TransactionPostingProgram
             TypeCd = typeCd,                                   // MOVE DALYTRAN-TYPE-CD TO TRANCAT-TYPE-CD // source: CBTRN02C.cbl:506
             CatCd = catCd,                                     // MOVE DALYTRAN-CAT-CD TO TRANCAT-CD // source: CBTRN02C.cbl:507
             // ADD DALYTRAN-AMT TO TRAN-CAT-BAL (from 0) -> = DALYTRAN-AMT, stored S9(9)V99. // source: CBTRN02C.cbl:508
-            TranCatBal = Decimals.Store(0m + _dalytranRecord.Amt, DalyAmtDigits, MoneyScale, signed: true),
+            TranCatBal = Decimals.Store(0m + _dalyTranRecord.Amt, DalyAmtDigits, MoneyScale, signed: true),
         };
         _tranCatBalRecord = rec;
 
         // WRITE FD-TRAN-CAT-BAL-RECORD FROM TRAN-CAT-BAL-RECORD. // source: CBTRN02C.cbl:510
-        _tcatbalfStatus = _tcatBal.Insert(rec);
-        if (_tcatbalfStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:512-516
+        _tcatBalStatus = _tcatBal.Insert(rec);
+        if (_tcatBalStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:512-516
         if (ApplAok) { /* CONTINUE */ }                        // source: CBTRN02C.cbl:517-518
         else
         {
             _sysout.Add("ERROR WRITING TRANSACTION BALANCE FILE"); // source: CBTRN02C.cbl:520
-            DisplayIoStatus9910(_tcatbalfStatus);              // source: CBTRN02C.cbl:521-522
-            AbendProgram9999();                                // source: CBTRN02C.cbl:523
+            DisplayIoStatus(_tcatBalStatus);              // source: CBTRN02C.cbl:521-522
+            AbendProgram();                                // source: CBTRN02C.cbl:523
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 2700-B-UPDATE-TCATBAL-REC // source: CBTRN02C.cbl:526-542
-    private void UpdateTcatbalRec2700B()
+    private void UpdateTranCatBalanceRecord() // COBOL paragraph: 2700-B-UPDATE-TCATBAL-REC
     {
         // ADD DALYTRAN-AMT TO TRAN-CAT-BAL (accumulate into existing S9(9)V99 balance, silent overflow).
         // source: CBTRN02C.cbl:527
         _tranCatBalRecord!.TranCatBal = Decimals.Store(
-            _tranCatBalRecord.TranCatBal + _dalytranRecord.Amt, DalyAmtDigits, MoneyScale, signed: true);
+            _tranCatBalRecord.TranCatBal + _dalyTranRecord.Amt, DalyAmtDigits, MoneyScale, signed: true);
 
         // REWRITE FD-TRAN-CAT-BAL-RECORD FROM TRAN-CAT-BAL-RECORD. // source: CBTRN02C.cbl:528
-        _tcatbalfStatus = _tcatBal.Update(_tranCatBalRecord);
-        if (_tcatbalfStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:530-534
+        _tcatBalStatus = _tcatBal.Update(_tranCatBalRecord);
+        if (_tcatBalStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:530-534
         if (ApplAok) { /* CONTINUE */ }                        // source: CBTRN02C.cbl:535-536
         else
         {
             _sysout.Add("ERROR REWRITING TRANSACTION BALANCE FILE"); // source: CBTRN02C.cbl:538
-            DisplayIoStatus9910(_tcatbalfStatus);              // source: CBTRN02C.cbl:539-540
-            AbendProgram9999();                                // source: CBTRN02C.cbl:541
+            DisplayIoStatus(_tcatBalStatus);              // source: CBTRN02C.cbl:539-540
+            AbendProgram();                                // source: CBTRN02C.cbl:541
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 2800-UPDATE-ACCOUNT-REC // source: CBTRN02C.cbl:545-560
-    private void UpdateAccountRec2800()
+    private void UpdateAccountRecord() // COBOL paragraph: 2800-UPDATE-ACCOUNT-REC
     {
-        decimal amt = _dalytranRecord.Amt;
+        decimal amt = _dalyTranRecord.Amt;
 
         // ADD DALYTRAN-AMT TO ACCT-CURR-BAL (S9(10)V99). // source: CBTRN02C.cbl:547
         _accountRecord!.CurrBal = Decimals.Store(_accountRecord.CurrBal + amt, CycleDigits, MoneyScale, signed: true);
@@ -609,14 +609,14 @@ public sealed class TransactionPostingProgram
         string status = _account.Update(_accountRecord);
         if (status != FileStatus.Ok)                           // INVALID KEY
         {
-            _wsValidationFailReason = 109;                     // source: CBTRN02C.cbl:556
-            _wsValidationFailReasonDesc = "ACCOUNT RECORD NOT FOUND"; // source: CBTRN02C.cbl:557-558
+            _validationFailReason = 109;                     // source: CBTRN02C.cbl:556
+            _validationFailReasonDesc = "ACCOUNT RECORD NOT FOUND"; // source: CBTRN02C.cbl:557-558
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 2900-WRITE-TRANSACTION-FILE // source: CBTRN02C.cbl:562-579
-    private void WriteTransactionFile2900()
+    private void WriteTransactionFile() // COBOL paragraph: 2900-WRITE-TRANSACTION-FILE
     {
         _applResult = 8;                                       // MOVE 8 TO APPL-RESULT // source: CBTRN02C.cbl:563
         // WRITE FD-TRANFILE-REC FROM TRAN-RECORD. // source: CBTRN02C.cbl:564
@@ -626,31 +626,31 @@ public sealed class TransactionPostingProgram
         else
         {
             _sysout.Add("ERROR WRITING TO TRANSACTION FILE");   // source: CBTRN02C.cbl:574
-            DisplayIoStatus9910(status);                       // source: CBTRN02C.cbl:575-576
-            AbendProgram9999();                                // source: CBTRN02C.cbl:577
+            DisplayIoStatus(status);                       // source: CBTRN02C.cbl:575-576
+            AbendProgram();                                // source: CBTRN02C.cbl:577
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 9000-DALYTRAN-CLOSE // source: CBTRN02C.cbl:582-598
-    private void DalytranClose9000()
+    private void CloseDailyTransactionFile() // COBOL paragraph: 9000-DALYTRAN-CLOSE
     {
         _applResult = 8;                                       // source: CBTRN02C.cbl:583
         _dalyTran.EndBrowse();                                 // CLOSE DALYTRAN-FILE
-        _dalytranStatus = FileStatus.Ok;
-        if (_dalytranStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:585-589
+        _dalyTranStatus = FileStatus.Ok;
+        if (_dalyTranStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:585-589
         if (ApplAok) { /* CONTINUE */ }                        // source: CBTRN02C.cbl:590-591
         else
         {
             _sysout.Add("ERROR CLOSING DALYTRAN FILE");         // source: CBTRN02C.cbl:593
-            DisplayIoStatus9910(_dalytranStatus);              // source: CBTRN02C.cbl:594-595
-            AbendProgram9999();                                // source: CBTRN02C.cbl:596
+            DisplayIoStatus(_dalyTranStatus);              // source: CBTRN02C.cbl:594-595
+            AbendProgram();                                // source: CBTRN02C.cbl:596
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 9100-TRANFILE-CLOSE // source: CBTRN02C.cbl:600-616
-    private void TranfileClose9100()
+    private void CloseTransactionFile() // COBOL paragraph: 9100-TRANFILE-CLOSE
     {
         _applResult = 8;                                       // source: CBTRN02C.cbl:601
         string status = FileStatus.Ok;                          // CLOSE TRANSACT-FILE
@@ -659,14 +659,14 @@ public sealed class TransactionPostingProgram
         else
         {
             _sysout.Add("ERROR CLOSING TRANSACTION FILE");      // source: CBTRN02C.cbl:611
-            DisplayIoStatus9910(status);                       // source: CBTRN02C.cbl:612-613
-            AbendProgram9999();                                // source: CBTRN02C.cbl:614
+            DisplayIoStatus(status);                       // source: CBTRN02C.cbl:612-613
+            AbendProgram();                                // source: CBTRN02C.cbl:614
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 9200-XREFFILE-CLOSE // source: CBTRN02C.cbl:619-635
-    private void XreffileClose9200()
+    private void CloseXrefFile() // COBOL paragraph: 9200-XREFFILE-CLOSE
     {
         _applResult = 8;                                       // source: CBTRN02C.cbl:620
         string status = FileStatus.Ok;                          // CLOSE XREF-FILE
@@ -675,31 +675,31 @@ public sealed class TransactionPostingProgram
         else
         {
             _sysout.Add("ERROR CLOSING CROSS REF FILE");        // source: CBTRN02C.cbl:630
-            DisplayIoStatus9910(status);                       // source: CBTRN02C.cbl:631-632
-            AbendProgram9999();                                // source: CBTRN02C.cbl:633
+            DisplayIoStatus(status);                       // source: CBTRN02C.cbl:631-632
+            AbendProgram();                                // source: CBTRN02C.cbl:633
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 9300-DALYREJS-CLOSE // source: CBTRN02C.cbl:637-653
-    private void DalyrejsClose9300()
+    private void CloseDailyRejectsFile() // COBOL paragraph: 9300-DALYREJS-CLOSE
     {
         _applResult = 8;                                       // source: CBTRN02C.cbl:638
-        string dalyrejsStatus = FileStatus.Ok;                  // CLOSE DALYREJS-FILE
-        if (dalyrejsStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:640-644
+        string dailyRejectsStatus = FileStatus.Ok;                  // CLOSE DALYREJS-FILE
+        if (dailyRejectsStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:640-644
         if (ApplAok) { /* CONTINUE */ }                        // source: CBTRN02C.cbl:645-646
         else
         {
             _sysout.Add("ERROR CLOSING DAILY REJECTS FILE");    // source: CBTRN02C.cbl:648
             // FAITHFUL BUG #6: displays XREFFILE-STATUS instead of DALYREJS-STATUS (copy/paste).
-            DisplayIoStatus9910(FileStatus.Ok /* XREFFILE-STATUS */); // source: CBTRN02C.cbl:649-650
-            AbendProgram9999();                                // source: CBTRN02C.cbl:651
+            DisplayIoStatus(FileStatus.Ok /* XREFFILE-STATUS */); // source: CBTRN02C.cbl:649-650
+            AbendProgram();                                // source: CBTRN02C.cbl:651
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 9400-ACCTFILE-CLOSE // source: CBTRN02C.cbl:655-671
-    private void AcctfileClose9400()
+    private void CloseAccountFile() // COBOL paragraph: 9400-ACCTFILE-CLOSE
     {
         _applResult = 8;                                       // source: CBTRN02C.cbl:656
         string status = FileStatus.Ok;                          // CLOSE ACCOUNT-FILE
@@ -708,24 +708,24 @@ public sealed class TransactionPostingProgram
         else
         {
             _sysout.Add("ERROR CLOSING ACCOUNT FILE");          // source: CBTRN02C.cbl:666
-            DisplayIoStatus9910(status);                       // source: CBTRN02C.cbl:667-668
-            AbendProgram9999();                                // source: CBTRN02C.cbl:669
+            DisplayIoStatus(status);                       // source: CBTRN02C.cbl:667-668
+            AbendProgram();                                // source: CBTRN02C.cbl:669
         }
     }
 
     // -------------------------------------------------------------------------------------------------
     // 9500-TCATBALF-CLOSE // source: CBTRN02C.cbl:674-690
-    private void TcatbalfClose9500()
+    private void CloseTranCatBalanceFile() // COBOL paragraph: 9500-TCATBALF-CLOSE
     {
         _applResult = 8;                                       // source: CBTRN02C.cbl:675
-        _tcatbalfStatus = FileStatus.Ok;                        // CLOSE TCATBAL-FILE
-        if (_tcatbalfStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:677-681
+        _tcatBalStatus = FileStatus.Ok;                        // CLOSE TCATBAL-FILE
+        if (_tcatBalStatus == FileStatus.Ok) _applResult = 0; else _applResult = 12; // source: CBTRN02C.cbl:677-681
         if (ApplAok) { /* CONTINUE */ }                        // source: CBTRN02C.cbl:682-683
         else
         {
             _sysout.Add("ERROR CLOSING TRANSACTION BALANCE FILE"); // source: CBTRN02C.cbl:685
-            DisplayIoStatus9910(_tcatbalfStatus);              // source: CBTRN02C.cbl:686-687
-            AbendProgram9999();                                // source: CBTRN02C.cbl:688
+            DisplayIoStatus(_tcatBalStatus);              // source: CBTRN02C.cbl:686-687
+            AbendProgram();                                // source: CBTRN02C.cbl:688
         }
     }
 
@@ -733,7 +733,7 @@ public sealed class TransactionPostingProgram
     // Z-GET-DB2-FORMAT-TIMESTAMP // source: CBTRN02C.cbl:692-705
     // Builds 'YYYY-MM-DD-HH.MM.SS.mmmm0000' from FUNCTION CURRENT-DATE. DB2-MIL is 9(02) (2 digits of
     // hundredths), DB2-REST is hardcoded '0000'.
-    private string GetDb2FormatTimestampZ()
+    private string GetDb2FormatTimestamp() // COBOL paragraph: Z-GET-DB2-FORMAT-TIMESTAMP
     {
         DateTime now = _clock.Now;
         int hundredths = now.Millisecond / 10;                 // COB-MIL = hundredths of a second (2 digits)
@@ -742,7 +742,7 @@ public sealed class TransactionPostingProgram
 
     // -------------------------------------------------------------------------------------------------
     // 9999-ABEND-PROGRAM // source: CBTRN02C.cbl:707-711
-    private void AbendProgram9999()
+    private void AbendProgram() // COBOL paragraph: 9999-ABEND-PROGRAM
     {
         _sysout.Add("ABENDING PROGRAM");                       // source: CBTRN02C.cbl:708
         // MOVE 0 TO TIMING; MOVE 999 TO ABCODE; CALL 'CEE3ABD' USING ABCODE, TIMING.
@@ -754,7 +754,7 @@ public sealed class TransactionPostingProgram
     // Renders the 2-byte file status as a 4-digit "NNNN" number. On the non-numeric / IO-STAT1='9' branch
     // the second byte is read as the low byte of a big-endian halfword (so the char's code point, e.g.
     // '0'->240, in the host encoding).
-    private void DisplayIoStatus9910(string ioStatus)
+    private void DisplayIoStatus(string ioStatus) // COBOL paragraph: 9910-DISPLAY-IO-STATUS
     {
         string s = ioStatus.Length >= 2 ? ioStatus[..2] : ioStatus.PadRight(2);
         char stat1 = s[0], stat2 = s[1];

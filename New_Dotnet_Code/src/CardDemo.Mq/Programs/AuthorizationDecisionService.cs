@@ -80,59 +80,59 @@ public sealed class AuthorizationDecisionService : IMqServer
     // =================================================================================================
     //  WS-VARIABLES — source: COPAUA0C.cbl:32-67
     // =================================================================================================
-    private const string WsPgmAuth = "COPAUA0C";                                       // :33
-    private const string WsCicsTranid = "CP00";                                        // :34
-    private const string WsCcxrefFile = "CCXREF  ";                                    // :39  (logical, info only)
-    private const short WsReqstsProcessLimit = 500;                                    // :40
+    private const string ProgramId = "COPAUA0C";                                       // :33  WS-PGM-AUTH PIC X(8)
+    private const string TranId = "CP00";                                              // :34  WS-CICS-TRANID PIC X(4)
+    private const string CardXrefFileName = "CCXREF  ";                                // :39  WS-CCXREF-FILE PIC X(8)  (logical, info only)
+    private const short MessageProcessLimit = 500;                                     // :40  WS-REQSTS-PROCESS-LIMIT PIC S9(4) COMP
 
-    private short _wsMsgProcessed;                                                     // :42 S9(4) COMP
-    private string _wsRequestQname = "";                                              // :43 X(48)
-    private string _wsReplyQname = "";                                                // :44 X(48)
-    private byte[] _wsSaveCorrelid = MqConstants.MqciNone;                            // :45 X(24)
+    private short _messagesProcessed;                                                 // :42 WS-MSG-PROCESSED S9(4) COMP
+    private string _requestQueueName = "";                                            // :43 WS-REQUEST-QNAME X(48)
+    private string _replyQueueName = "";                                              // :44 WS-REPLY-QNAME X(48)
+    private byte[] _savedCorrelId = MqConstants.MqciNone;                             // :45 WS-SAVE-CORRELID X(24)
 
     // WS-RESP-LENGTH PIC S9(4) VALUE 1 — the STRING pointer. NOT reset per message (FB-6). source: :46
-    private short _wsRespLength = 1;
+    private short _replyLength = 1;                                                    // WS-RESP-LENGTH
 
-    private int _wsWaitInterval;                                                       // :60 ms (set 5000)
-    private decimal _wsAvailableAmt;                                                   // :62 S9(9)V99 COMP-3
-    private string _wsTransactionAmtAn = "";                                          // :63 X(13)
-    private decimal _wsTransactionAmt;                                                 // :64 S9(10)V99
-    private decimal _wsApprovedAmt;                                                    // :65 S9(10)V99
-    private string _wsApprovedAmtDis = "";                                            // :66 -zzzzzzzzz9.99
-    private string _wsTriggerData = "";                                              // :67 X(64)
+    private int _waitInterval;                                                         // :60 WS-WAIT-INTERVAL ms (set 5000)
+    private decimal _availableAmount;                                                  // :62 WS-AVAILABLE-AMT S9(9)V99 COMP-3
+    private string _transactionAmountText = "";                                       // :63 WS-TRANSACTION-AMT-AN X(13)
+    private decimal _transactionAmount;                                                // :64 WS-TRANSACTION-AMT S9(10)V99
+    private decimal _approvedAmount;                                                   // :65 WS-APPROVED-AMT S9(10)V99
+    private string _approvedAmountDisplay = "";                                       // :66 WS-APPROVED-AMT-DIS -zzzzzzzzz9.99
+    private string _triggerData = "";                                                // :67 WS-TRIGGER-DATA X(64)
 
     // MQ work fields (W01 = request GET; W02 = reply PUT). source: :99-108
-    private string _w01GetBuffer = "";          // X(500) — the raw GET payload (sub-stringed by DATALEN)
-    private int _w01DataLen;                     // length of the message actually returned by GET
+    private string _getBuffer = "";             // W01-GET-BUFFER X(500) — the raw GET payload (sub-stringed by DATALEN)
+    private int _getDataLength;                  // W01-DATALEN — length of the message actually returned by GET
 
     // MQGET / MQPUT completion + reason (WS-COMPCODE / WS-REASON). source: :58-59
-    private int _wsCompCode;
-    private int _wsReason;
+    private int _completionCode;                 // WS-COMPCODE
+    private int _reasonCode;                      // WS-REASON
 
     // Time work fields. source: :50-56
-    private string _wsCurDateX6 = "";           // FORMATTIME YYDDD (8500) / YYMMDD (9500)
-    private string _wsCurTimeX6 = "";           // FORMATTIME TIME (HHMMSS)
-    private int _wsCurTimeN6;                    // 9(6) numeric HHMMSS
-    private int _wsCurTimeMs;                    // S9(8) COMP — milliseconds 0..999
-    private int _wsYyddd;                        // 9(5)
-    private long _wsTimeWithMs;                  // S9(9) COMP-3
+    private string _currentDateText = "";       // WS-CUR-DATE-X6 — FORMATTIME YYDDD (8500) / YYMMDD (9500)
+    private string _currentTimeText = "";       // WS-CUR-TIME-X6 — FORMATTIME TIME (HHMMSS)
+    private int _currentTimeNumeric;            // WS-CUR-TIME-N6 9(6) numeric HHMMSS
+    private int _currentTimeMillis;             // WS-CUR-TIME-MS S9(8) COMP — milliseconds 0..999
+    private int _julianDate;                    // WS-YYDDD 9(5)
+    private long _timeWithMillis;               // WS-TIME-WITH-MS S9(9) COMP-3
 
     // =================================================================================================
     //  WS-SWITCHES — source: COPAUA0C.cbl:110-145
     // =================================================================================================
-    private char _authRespFlg;                  // 'A' approved / 'D' declined
-    private char _msgLoopFlg = 'N';             // 88 WS-LOOP-END = 'E'
-    private char _msgAvailableFlg = 'M';        // 88 NO-MORE-MSG-AVAILABLE = 'N' / MORE = 'M'
-    private char _requestMqFlg = 'C';           // 88 WS-REQUEST-MQ-OPEN = 'O' / CLSE = 'C'
-    private char _xrefReadFlg;                   // 88 CARD-FOUND-XREF = 'Y' / NFOUND = 'N'
-    private char _acctMasterReadFlg;            // 88 FOUND-ACCT-IN-MSTR = 'Y' / NFOUND = 'N'
-    private char _custMasterReadFlg;            // 88 FOUND-CUST-IN-MSTR = 'Y' / NFOUND = 'N'
-    private char _pautSmrySegFlg;               // 88 FOUND-PAUT-SMRY-SEG = 'Y' / NFOUND = 'N'
-    private char _declineFlg;                   // 88 APPROVE-AUTH = 'A' / DECLINE-AUTH = 'D'
-    private char _declineReasonFlg;             // 88 INSUFFICIENT-FUND='I' / CARD-NOT-ACTIVE='A' / ...
+    private char _authResponseFlag;             // WS-AUTH-RESP-FLG — 'A' approved / 'D' declined
+    private char _loopFlag = 'N';               // WS-LOOP-FLG — 88 WS-LOOP-END = 'E'
+    private char _messageAvailableFlag = 'M';   // WS-MSG-AVAILABLE-FLG — 88 NO-MORE-MSG-AVAILABLE = 'N' / MORE = 'M'
+    private char _requestMqFlag = 'C';          // WS-REQUEST-MQ-FLG — 88 WS-REQUEST-MQ-OPEN = 'O' / CLSE = 'C'
+    private char _xrefReadFlag;                  // WS-XREF-READ-FLG — 88 CARD-FOUND-XREF = 'Y' / NFOUND = 'N'
+    private char _accountReadFlag;              // WS-ACCT-READ-FLG — 88 FOUND-ACCT-IN-MSTR = 'Y' / NFOUND = 'N'
+    private char _customerReadFlag;             // WS-CUST-READ-FLG — 88 FOUND-CUST-IN-MSTR = 'Y' / NFOUND = 'N'
+    private char _summarySegmentFlag;           // WS-PAUT-SMRY-SEG-FLG — 88 FOUND-PAUT-SMRY-SEG = 'Y' / NFOUND = 'N'
+    private char _decisionFlag;                 // WS-DECISION-FLG — 88 APPROVE-AUTH = 'A' / DECLINE-AUTH = 'D'
+    private char _declineReasonFlag;            // WS-DECLINE-REASON-FLG — 88 INSUFFICIENT-FUND='I' / CARD-NOT-ACTIVE='A' / ...
 
     // IMS scheduling flag (WS-IMS-PSB-SCHD-FLG). source: :95-97
-    private char _imsPsbSchdFlg;                // 88 IMS-PSB-SCHD = 'Y' / NOT = 'N'
+    private char _imsPsbScheduledFlag;          // 88 IMS-PSB-SCHD = 'Y' / NOT = 'N'
 
     // =================================================================================================
     //  Staging records (the parsed request, the built reply, the IMS segments). The COBOL keeps one of
@@ -140,10 +140,10 @@ public sealed class AuthorizationDecisionService : IMqServer
     //  does NOT re-INITIALIZE them between messages either — fields persist their prior values). source:
     //  CCPAURQY / CCPAURLY / CIPAUSMY / CIPAUDTY.
     // =================================================================================================
-    private readonly PendingAuthRequest _rq = new();      // PENDING-AUTH-REQUEST  (CCPAURQY)
-    private readonly PendingAuthResponse _rl = new();      // PENDING-AUTH-RESPONSE (CCPAURLY)
-    private PautSummary _paSummary = new();                // PENDING-AUTH-SUMMARY  (CIPAUSMY)
-    private readonly PautDetail _paDetail = new();         // PENDING-AUTH-DETAILS  (CIPAUDTY)
+    private readonly PendingAuthRequest _request = new();      // PENDING-AUTH-REQUEST  (CCPAURQY)
+    private readonly PendingAuthResponse _response = new();      // PENDING-AUTH-RESPONSE (CCPAURLY)
+    private PautSummary _authSummary = new();                // PENDING-AUTH-SUMMARY  (CIPAUSMY)
+    private readonly PautDetail _authDetail = new();         // PENDING-AUTH-DETAILS  (CIPAUDTY)
 
     // VSAM record buffers (read from the masters). source: CVACT03Y / CVACT01Y / CVCUS01Y.
     private CardXref? _cardXref;
@@ -153,13 +153,13 @@ public sealed class AuthorizationDecisionService : IMqServer
     // =================================================================================================
     //  ERROR-LOG-RECORD — source: CCPAUERY.cpy (ERR-* fields, 122 bytes).
     // =================================================================================================
-    private string _errLocation = "";
-    private char _errLevel;                     // 'L'/'I'/'W'/'C'
-    private char _errSubsystem;                 // 'A'/'C'/'I'/'D'/'M'/'F'
-    private string _errCode1 = "";
-    private string _errCode2 = "";
-    private string _errMessage = "";
-    private string _errEventKey = "";
+    private string _errorLocation = "";         // ERR-LOCATION
+    private char _errorLevel;                    // ERR-LEVEL — 'L'/'I'/'W'/'C'
+    private char _errorSubsystem;               // ERR-SUBSYSTEM — 'A'/'C'/'I'/'D'/'M'/'F'
+    private string _errorCode1 = "";            // ERR-CODE-1
+    private string _errorCode2 = "";            // ERR-CODE-2
+    private string _errorMessage = "";          // ERR-MESSAGE
+    private string _errorEventKey = "";         // ERR-EVENT-KEY
 
     /// <summary>Signals the COBOL 9990-END-ROUTINE hard exit (critical error → TERM + EXEC CICS RETURN).</summary>
     private sealed class EndRoutineSignal : Exception { }
@@ -198,64 +198,64 @@ public sealed class AuthorizationDecisionService : IMqServer
         _mq = mq;
         try
         {
-            Initialize1000(trigger);          // PERFORM 1000-INITIALIZE
-            MainProcess2000();                // PERFORM 2000-MAIN-PROCESS
-            Terminate9000();                  // PERFORM 9000-TERMINATE
+            Initialize(trigger);          // PERFORM 1000-INITIALIZE
+            MainProcess();                // PERFORM 2000-MAIN-PROCESS
+            Terminate();                  // PERFORM 9000-TERMINATE
         }
         catch (EndRoutineSignal)
         {
             // 9990-END-ROUTINE already performed 9000-TERMINATE; EXEC CICS RETURN ends the transaction.
         }
         // EXEC CICS RETURN. source: :226-227
-        return _wsMsgProcessed;
+        return _messagesProcessed;
     }
 
     // =================================================================================================
     //  1000-INITIALIZE — source: COPAUA0C.cbl:230-250
     // =================================================================================================
-    private void Initialize1000(TriggerMessage trigger)
+    private void Initialize(TriggerMessage trigger)  // COBOL paragraph: 1000-INITIALIZE
     {
         // EXEC CICS RETRIEVE INTO(MQTM) NOHANDLE; if NORMAL move MQTM-QNAME/TRIGGERDATA. source: :233-240
         // The shim always supplies the trigger (RETRIEVE succeeds).
-        _wsRequestQname = trigger.QueueName;
-        _wsTriggerData = trigger.TriggerData;
+        _requestQueueName = trigger.QueueName;
+        _triggerData = trigger.TriggerData;
 
-        _wsWaitInterval = 5000;                                 // MOVE 5000 TO WS-WAIT-INTERVAL. source: :242
+        _waitInterval = 5000;                                 // MOVE 5000 TO WS-WAIT-INTERVAL. source: :242
 
-        OpenRequestQueue1100();                                 // PERFORM 1100-OPEN-REQUEST-QUEUE. source: :244
-        ReadRequestMq3100();                                   // PERFORM 3100-READ-REQUEST-MQ (prime). source: :246
+        OpenRequestQueue();                                 // PERFORM 1100-OPEN-REQUEST-QUEUE. source: :244
+        ReadRequestMq();                                   // PERFORM 3100-READ-REQUEST-MQ (prime). source: :246
     }
 
     // =================================================================================================
     //  1100-OPEN-REQUEST-QUEUE — source: COPAUA0C.cbl:255-287
     // =================================================================================================
-    private void OpenRequestQueue1100()
+    private void OpenRequestQueue()  // COBOL paragraph: 1100-OPEN-REQUEST-QUEUE
     {
         // MQOD-OBJECTTYPE = MQOT-Q; MQOD-OBJECTNAME = WS-REQUEST-QNAME; WS-OPTIONS = MQOO-INPUT-SHARED.
         // CALL 'MQOPEN'. source: :257-268
-        _requestHandle = _mq.Open(_wsRequestQname, MqooInputShared);
-        _wsCompCode = MqConstants.MqccOk;                       // the in-proc Open always succeeds
-        _wsReason = MqConstants.MqrcNone;
+        _requestHandle = _mq.Open(_requestQueueName, MqooInputShared);
+        _completionCode = MqConstants.MqccOk;                       // the in-proc Open always succeeds
+        _reasonCode = MqConstants.MqrcNone;
 
-        if (_wsCompCode == MqConstants.MqccOk)                  // IF WS-COMPCODE = MQCC-OK. source: :270
+        if (_completionCode == MqConstants.MqccOk)                  // IF WS-COMPCODE = MQCC-OK. source: :270
         {
             SetRequestMqOpen();                                // SET WS-REQUEST-MQ-OPEN TO TRUE
         }
         else
         {
-            _errLocation = "M001";                             // source: :273-282
-            _errLevel = 'C'; _errSubsystem = 'M';
-            _errCode1 = CodeDisplay(_wsCompCode);
-            _errCode2 = CodeDisplay(_wsReason);
-            _errMessage = "REQ MQ OPEN ERROR";
-            LogError9500();
+            _errorLocation = "M001";                             // source: :273-282
+            _errorLevel = 'C'; _errorSubsystem = 'M';
+            _errorCode1 = CodeDisplay(_completionCode);
+            _errorCode2 = CodeDisplay(_reasonCode);
+            _errorMessage = "REQ MQ OPEN ERROR";
+            LogError();
         }
     }
 
     // =================================================================================================
     //  1200-SCHEDULE-PSB — source: COPAUA0C.cbl:292-321
     // =================================================================================================
-    private void SchedulePsb1200()
+    private void SchedulePsb()  // COBOL paragraph: 1200-SCHEDULE-PSB
     {
         // EXEC DLI SCHD PSB(PSBPAUTB) NODHABEND; MOVE DIBSTAT TO IMS-RETURN-CODE.
         // The relational re-host opens a unit of work; SCHD always succeeds (status spaces = OK).
@@ -268,38 +268,38 @@ public sealed class AuthorizationDecisionService : IMqServer
         }
         else
         {
-            _errLocation = "I001";                             // source: :311-316
-            _errLevel = 'C'; _errSubsystem = 'I';
-            _errCode1 = imsReturnCode;
-            _errMessage = "IMS SCHD FAILED";
-            LogError9500();
+            _errorLocation = "I001";                             // source: :311-316
+            _errorLevel = 'C'; _errorSubsystem = 'I';
+            _errorCode1 = imsReturnCode;
+            _errorMessage = "IMS SCHD FAILED";
+            LogError();
         }
     }
 
     // =================================================================================================
     //  2000-MAIN-PROCESS — source: COPAUA0C.cbl:323-348
     // =================================================================================================
-    private void MainProcess2000()
+    private void MainProcess()  // COBOL paragraph: 2000-MAIN-PROCESS
     {
         // PERFORM UNTIL NO-MORE-MSG-AVAILABLE OR WS-LOOP-END
         while (!IsNoMoreMsgAvailable() && !IsLoopEnd())
         {
-            ExtractRequestMsg2100();                           // PERFORM 2100-EXTRACT-REQUEST-MSG. source: :328
-            ProcessAuth5000();                                 // PERFORM 5000-PROCESS-AUTH. source: :330
+            ExtractRequestMessage();                           // PERFORM 2100-EXTRACT-REQUEST-MSG. source: :328
+            ProcessAuthorization();                                 // PERFORM 5000-PROCESS-AUTH. source: :330
 
-            _wsMsgProcessed++;                                 // ADD 1 TO WS-MSG-PROCESSED. source: :332
+            _messagesProcessed++;                                 // ADD 1 TO WS-MSG-PROCESSED. source: :332
 
             // EXEC CICS SYNCPOINT (COMMIT). In-proc the repository writes are already committed; the
             // syncpoint boundary is the implicit per-statement commit on the shared connection. source: :334-336
             SetImsPsbNotSchd();                                // SET IMS-PSB-NOT-SCHD TO TRUE. source: :337
 
-            if (_wsMsgProcessed > WsReqstsProcessLimit)        // IF WS-MSG-PROCESSED > 500. source: :339
+            if (_messagesProcessed > MessageProcessLimit)        // IF WS-MSG-PROCESSED > 500. source: :339
             {
                 SetLoopEnd();                                  // SET WS-LOOP-END TO TRUE
             }
             else
             {
-                ReadRequestMq3100();                           // PERFORM 3100-READ-REQUEST-MQ (next). source: :342
+                ReadRequestMq();                           // PERFORM 3100-READ-REQUEST-MQ (next). source: :342
             }
         }
     }
@@ -307,81 +307,81 @@ public sealed class AuthorizationDecisionService : IMqServer
     // =================================================================================================
     //  2100-EXTRACT-REQUEST-MSG — source: COPAUA0C.cbl:351-383
     // =================================================================================================
-    private void ExtractRequestMsg2100()
+    private void ExtractRequestMessage()  // COBOL paragraph: 2100-EXTRACT-REQUEST-MSG
     {
         // UNSTRING W01-GET-BUFFER(1:W01-DATALEN) DELIMITED BY ',' INTO the 18 request receivers.
         // COBOL UNSTRING: a value longer than its receiver truncates to the receiver size; fewer commas
         // leave trailing receivers UNCHANGED (their prior value persists — faithful). source: :354-374
-        string buffer = _w01DataLen <= 0
+        string buffer = _getDataLength <= 0
             ? ""
-            : _w01GetBuffer.Substring(0, Math.Min(_w01DataLen, _w01GetBuffer.Length));
+            : _getBuffer.Substring(0, Math.Min(_getDataLength, _getBuffer.Length));
         string[] parts = buffer.Split(',');
 
         int i = 0;
-        Unstring(parts, ref i, 6, v => _rq.AuthDate = v);                 // 1  PA-RQ-AUTH-DATE X(6)
-        Unstring(parts, ref i, 6, v => _rq.AuthTime = v);                 // 2  PA-RQ-AUTH-TIME X(6)
-        Unstring(parts, ref i, 16, v => _rq.CardNum = v);                 // 3  PA-RQ-CARD-NUM X(16)
-        Unstring(parts, ref i, 4, v => _rq.AuthType = v);                 // 4  PA-RQ-AUTH-TYPE X(4)
-        Unstring(parts, ref i, 4, v => _rq.CardExpiryDate = v);           // 5  PA-RQ-CARD-EXPIRY-DATE X(4)
-        Unstring(parts, ref i, 6, v => _rq.MessageType = v);              // 6  PA-RQ-MESSAGE-TYPE X(6)
-        Unstring(parts, ref i, 6, v => _rq.MessageSource = v);            // 7  PA-RQ-MESSAGE-SOURCE X(6)
-        Unstring(parts, ref i, 6, v => _rq.ProcessingCode = ToNum6(v));   // 8  PA-RQ-PROCESSING-CODE 9(6)
-        Unstring(parts, ref i, 13, v => _wsTransactionAmtAn = v);         // 9  -> WS-TRANSACTION-AMT-AN X(13)
-        Unstring(parts, ref i, 4, v => _rq.MerchantCatagoryCode = v);     // 10 PA-RQ-MERCHANT-CATAGORY-CODE X(4)
-        Unstring(parts, ref i, 3, v => _rq.AcqrCountryCode = v);          // 11 PA-RQ-ACQR-COUNTRY-CODE X(3)
-        Unstring(parts, ref i, 2, v => _rq.PosEntryMode = ToNum2(v));     // 12 PA-RQ-POS-ENTRY-MODE 9(2)
-        Unstring(parts, ref i, 15, v => _rq.MerchantId = v);              // 13 PA-RQ-MERCHANT-ID X(15)
-        Unstring(parts, ref i, 22, v => _rq.MerchantName = v);            // 14 PA-RQ-MERCHANT-NAME X(22)
-        Unstring(parts, ref i, 13, v => _rq.MerchantCity = v);            // 15 PA-RQ-MERCHANT-CITY X(13)
-        Unstring(parts, ref i, 2, v => _rq.MerchantState = v);            // 16 PA-RQ-MERCHANT-STATE X(2)
-        Unstring(parts, ref i, 9, v => _rq.MerchantZip = v);              // 17 PA-RQ-MERCHANT-ZIP X(9)
-        Unstring(parts, ref i, 15, v => _rq.TransactionId = v);           // 18 PA-RQ-TRANSACTION-ID X(15)
+        Unstring(parts, ref i, 6, v => _request.AuthDate = v);                 // 1  PA-RQ-AUTH-DATE X(6)
+        Unstring(parts, ref i, 6, v => _request.AuthTime = v);                 // 2  PA-RQ-AUTH-TIME X(6)
+        Unstring(parts, ref i, 16, v => _request.CardNum = v);                 // 3  PA-RQ-CARD-NUM X(16)
+        Unstring(parts, ref i, 4, v => _request.AuthType = v);                 // 4  PA-RQ-AUTH-TYPE X(4)
+        Unstring(parts, ref i, 4, v => _request.CardExpiryDate = v);           // 5  PA-RQ-CARD-EXPIRY-DATE X(4)
+        Unstring(parts, ref i, 6, v => _request.MessageType = v);              // 6  PA-RQ-MESSAGE-TYPE X(6)
+        Unstring(parts, ref i, 6, v => _request.MessageSource = v);            // 7  PA-RQ-MESSAGE-SOURCE X(6)
+        Unstring(parts, ref i, 6, v => _request.ProcessingCode = ToNum6(v));   // 8  PA-RQ-PROCESSING-CODE 9(6)
+        Unstring(parts, ref i, 13, v => _transactionAmountText = v);         // 9  -> WS-TRANSACTION-AMT-AN X(13)
+        Unstring(parts, ref i, 4, v => _request.MerchantCatagoryCode = v);     // 10 PA-RQ-MERCHANT-CATAGORY-CODE X(4)
+        Unstring(parts, ref i, 3, v => _request.AcqrCountryCode = v);          // 11 PA-RQ-ACQR-COUNTRY-CODE X(3)
+        Unstring(parts, ref i, 2, v => _request.PosEntryMode = ToNum2(v));     // 12 PA-RQ-POS-ENTRY-MODE 9(2)
+        Unstring(parts, ref i, 15, v => _request.MerchantId = v);              // 13 PA-RQ-MERCHANT-ID X(15)
+        Unstring(parts, ref i, 22, v => _request.MerchantName = v);            // 14 PA-RQ-MERCHANT-NAME X(22)
+        Unstring(parts, ref i, 13, v => _request.MerchantCity = v);            // 15 PA-RQ-MERCHANT-CITY X(13)
+        Unstring(parts, ref i, 2, v => _request.MerchantState = v);            // 16 PA-RQ-MERCHANT-STATE X(2)
+        Unstring(parts, ref i, 9, v => _request.MerchantZip = v);              // 17 PA-RQ-MERCHANT-ZIP X(9)
+        Unstring(parts, ref i, 15, v => _request.TransactionId = v);           // 18 PA-RQ-TRANSACTION-ID X(15)
 
         // COMPUTE PA-RQ-TRANSACTION-AMT = FUNCTION NUMVAL(WS-TRANSACTION-AMT-AN). source: :376-377
         // PA-RQ-TRANSACTION-AMT is edited PIC +9(10).99 (10 int digits, 2 frac, signed). Store truncates.
-        _rq.TransactionAmt = Decimals.Store(NumVal(_wsTransactionAmtAn), 10, 2, signed: true);
+        _request.TransactionAmt = Decimals.Store(NumVal(_transactionAmountText), 10, 2, signed: true);
 
         // MOVE PA-RQ-TRANSACTION-AMT TO WS-TRANSACTION-AMT (S9(10)V99 working copy). source: :379
-        _wsTransactionAmt = Decimals.Store(_rq.TransactionAmt, 10, 2, signed: true);
+        _transactionAmount = Decimals.Store(_request.TransactionAmt, 10, 2, signed: true);
     }
 
     // =================================================================================================
     //  3100-READ-REQUEST-MQ — source: COPAUA0C.cbl:386-435
     // =================================================================================================
-    private void ReadRequestMq3100()
+    private void ReadRequestMq()  // COBOL paragraph: 3100-READ-REQUEST-MQ
     {
         // MQGMO-OPTIONS = NO-SYNCPOINT + WAIT + CONVERT + FAIL-IF-QUIESCING; WAITINTERVAL = 5000.
         // MD MSGID=MQMI-NONE, CORRELID=MQCI-NONE, FORMAT=MQFMT-STRING; W01-BUFFLEN = 500.
         // CALL 'MQGET'. source: :389-409
         MqResult r = _mq.Get(_requestHandle!, out MqMessage? msg);
-        _wsCompCode = r.CompletionCode;
-        _wsReason = r.ReasonCode;
+        _completionCode = r.CompletionCode;
+        _reasonCode = r.ReasonCode;
 
-        if (_wsCompCode == MqConstants.MqccOk && msg is not null)   // IF WS-COMPCODE = MQCC-OK. source: :410
+        if (_completionCode == MqConstants.MqccOk && msg is not null)   // IF WS-COMPCODE = MQCC-OK. source: :410
         {
             // GET buffer is X(500): the COBOL truncates a longer payload to 500 bytes; DATALEN is the
             // returned length (capped at the 500-byte buffer). source: :398,406
-            _w01GetBuffer = msg.Body.Length > 500 ? msg.Body.Substring(0, 500) : msg.Body;
-            _w01DataLen = Math.Min(msg.Body.Length, 500);
+            _getBuffer = msg.Body.Length > 500 ? msg.Body.Substring(0, 500) : msg.Body;
+            _getDataLength = Math.Min(msg.Body.Length, 500);
 
-            _wsSaveCorrelid = msg.CorrelId;                          // MOVE MQMD-CORRELID -> WS-SAVE-CORRELID. :411
-            _wsReplyQname = msg.ReplyToQueue;                        // MOVE MQMD-REPLYTOQ -> WS-REPLY-QNAME. :413
+            _savedCorrelId = msg.CorrelId;                          // MOVE MQMD-CORRELID -> WS-SAVE-CORRELID. :411
+            _replyQueueName = msg.ReplyToQueue;                        // MOVE MQMD-REPLYTOQ -> WS-REPLY-QNAME. :413
         }
         else
         {
-            if (_wsReason == MqConstants.MqrcNoMsgAvailable)         // IF WS-REASON = MQRC-NO-MSG-AVAILABLE. :416
+            if (_reasonCode == MqConstants.MqrcNoMsgAvailable)         // IF WS-REASON = MQRC-NO-MSG-AVAILABLE. :416
             {
                 SetNoMoreMsgAvailable();                            // SET NO-MORE-MSG-AVAILABLE TO TRUE
             }
             else
             {
-                _errLocation = "M003";                             // source: :419-429
-                _errLevel = 'C'; _errSubsystem = 'C';              // FB-4: subsystem set CICS, not MQ
-                _errCode1 = CodeDisplay(_wsCompCode);
-                _errCode2 = CodeDisplay(_wsReason);
-                _errMessage = "FAILED TO READ REQUEST MQ";
-                _errEventKey = _paDetail.CardNum;                  // MOVE PA-CARD-NUM TO ERR-EVENT-KEY
-                LogError9500();
+                _errorLocation = "M003";                             // source: :419-429
+                _errorLevel = 'C'; _errorSubsystem = 'C';              // FB-4: subsystem set CICS, not MQ
+                _errorCode1 = CodeDisplay(_completionCode);
+                _errorCode2 = CodeDisplay(_reasonCode);
+                _errorMessage = "FAILED TO READ REQUEST MQ";
+                _errorEventKey = _authDetail.CardNum;                  // MOVE PA-CARD-NUM TO ERR-EVENT-KEY
+                LogError();
             }
         }
     }
@@ -389,42 +389,42 @@ public sealed class AuthorizationDecisionService : IMqServer
     // =================================================================================================
     //  5000-PROCESS-AUTH — source: COPAUA0C.cbl:438-469
     // =================================================================================================
-    private void ProcessAuth5000()
+    private void ProcessAuthorization()  // COBOL paragraph: 5000-PROCESS-AUTH
     {
         SetApproveAuth();                                          // SET APPROVE-AUTH TO TRUE. source: :441
 
-        SchedulePsb1200();                                        // PERFORM 1200-SCHEDULE-PSB. source: :443
+        SchedulePsb();                                        // PERFORM 1200-SCHEDULE-PSB. source: :443
 
         SetCardFoundXref();                                       // SET CARD-FOUND-XREF (optimistic). :445
         SetFoundAcctInMstr();                                     // SET FOUND-ACCT-IN-MSTR (optimistic). :446
 
-        ReadXrefRecord5100();                                    // PERFORM 5100-READ-XREF-RECORD. source: :448
+        ReadXrefRecord();                                    // PERFORM 5100-READ-XREF-RECORD. source: :448
 
         if (IsCardFoundXref())                                    // IF CARD-FOUND-XREF. source: :450
         {
-            ReadAcctRecord5200();                               // PERFORM 5200-READ-ACCT-RECORD. source: :451
-            ReadCustRecord5300();                               // PERFORM 5300-READ-CUST-RECORD. source: :452
-            ReadAuthSummry5500();                               // PERFORM 5500-READ-AUTH-SUMMRY. source: :454
-            ReadProfileData5600();                              // PERFORM 5600-READ-PROFILE-DATA. source: :456
+            ReadAccountRecord();                               // PERFORM 5200-READ-ACCT-RECORD. source: :451
+            ReadCustomerRecord();                               // PERFORM 5300-READ-CUST-RECORD. source: :452
+            ReadAuthSummary();                               // PERFORM 5500-READ-AUTH-SUMMRY. source: :454
+            ReadProfileData();                              // PERFORM 5600-READ-PROFILE-DATA. source: :456
         }
 
-        MakeDecision6000();                                     // PERFORM 6000-MAKE-DECISION. source: :459
-        SendResponse7100();                                    // PERFORM 7100-SEND-RESPONSE. source: :461
+        MakeDecision();                                     // PERFORM 6000-MAKE-DECISION. source: :459
+        SendResponse();                                    // PERFORM 7100-SEND-RESPONSE. source: :461
 
         if (IsCardFoundXref())                                  // IF CARD-FOUND-XREF. source: :463
         {
-            WriteAuthToDb8000();                               // PERFORM 8000-WRITE-AUTH-TO-DB. source: :464
+            WriteAuthToDb();                               // PERFORM 8000-WRITE-AUTH-TO-DB. source: :464
         }
     }
 
     // =================================================================================================
     //  5100-READ-XREF-RECORD — source: COPAUA0C.cbl:472-517
     // =================================================================================================
-    private void ReadXrefRecord5100()
+    private void ReadXrefRecord()  // COBOL paragraph: 5100-READ-XREF-RECORD
     {
         // MOVE PA-RQ-CARD-NUM TO XREF-CARD-NUM; EXEC CICS READ DATASET(CCXREF) RIDFLD(XREF-CARD-NUM).
         // source: :475-485
-        string xrefCardNum = _rq.CardNum;
+        string xrefCardNum = _request.CardNum;
         string resp = _xref.ReadByKey(xrefCardNum, out _cardXref);
 
         switch (resp)                                              // EVALUATE WS-RESP-CD. source: :487
@@ -436,21 +436,21 @@ public sealed class AuthorizationDecisionService : IMqServer
             case FileStatus.RecordNotFound:                       // WHEN DFHRESP(NOTFND). source: :490
                 SetCardNfoundXref();
                 SetNfoundAcctInMstr();                            // SET NFOUND-ACCT-IN-MSTR TO TRUE. :492
-                _errLocation = "A001";                            // source: :494-500
-                _errLevel = 'W'; _errSubsystem = 'A';
-                _errMessage = "CARD NOT FOUND IN XREF";
-                _errEventKey = xrefCardNum;
-                LogError9500();
+                _errorLocation = "A001";                            // source: :494-500
+                _errorLevel = 'W'; _errorSubsystem = 'A';
+                _errorMessage = "CARD NOT FOUND IN XREF";
+                _errorEventKey = xrefCardNum;
+                LogError();
                 break;
 
             default:                                              // WHEN OTHER. source: :501
-                _errLocation = "C001";                            // source: :502-512
-                _errLevel = 'C'; _errSubsystem = 'C';
-                _errCode1 = CodeDisplay(RespToCode(resp));
-                _errCode2 = CodeDisplay(0);
-                _errMessage = "FAILED TO READ XREF FILE";
-                _errEventKey = xrefCardNum;
-                LogError9500();
+                _errorLocation = "C001";                            // source: :502-512
+                _errorLevel = 'C'; _errorSubsystem = 'C';
+                _errorCode1 = CodeDisplay(RespToCode(resp));
+                _errorCode2 = CodeDisplay(0);
+                _errorMessage = "FAILED TO READ XREF FILE";
+                _errorEventKey = xrefCardNum;
+                LogError();
                 break;
         }
     }
@@ -458,7 +458,7 @@ public sealed class AuthorizationDecisionService : IMqServer
     // =================================================================================================
     //  5200-READ-ACCT-RECORD — source: COPAUA0C.cbl:520-565
     // =================================================================================================
-    private void ReadAcctRecord5200()
+    private void ReadAccountRecord()  // COBOL paragraph: 5200-READ-ACCT-RECORD
     {
         // MOVE XREF-ACCT-ID TO WS-CARD-RID-ACCT-ID (numeric redefine; X-alias is the RIDFLD).
         // EXEC CICS READ DATASET(ACCTDAT). source: :523-533
@@ -473,21 +473,21 @@ public sealed class AuthorizationDecisionService : IMqServer
 
             case FileStatus.RecordNotFound:                       // WHEN DFHRESP(NOTFND). source: :538
                 SetNfoundAcctInMstr();
-                _errLocation = "A002";                            // source: :541-547
-                _errLevel = 'W'; _errSubsystem = 'A';
-                _errMessage = "ACCT NOT FOUND IN XREF";          // FB-5: text says XREF; it is ACCT
-                _errEventKey = AcctIdKey(acctId);
-                LogError9500();
+                _errorLocation = "A002";                            // source: :541-547
+                _errorLevel = 'W'; _errorSubsystem = 'A';
+                _errorMessage = "ACCT NOT FOUND IN XREF";          // FB-5: text says XREF; it is ACCT
+                _errorEventKey = AcctIdKey(acctId);
+                LogError();
                 break;
 
             default:                                              // WHEN OTHER. source: :549
-                _errLocation = "C002";                            // source: :550-560
-                _errLevel = 'C'; _errSubsystem = 'C';
-                _errCode1 = CodeDisplay(RespToCode(resp));
-                _errCode2 = CodeDisplay(0);
-                _errMessage = "FAILED TO READ ACCT FILE";
-                _errEventKey = AcctIdKey(acctId);
-                LogError9500();
+                _errorLocation = "C002";                            // source: :550-560
+                _errorLevel = 'C'; _errorSubsystem = 'C';
+                _errorCode1 = CodeDisplay(RespToCode(resp));
+                _errorCode2 = CodeDisplay(0);
+                _errorMessage = "FAILED TO READ ACCT FILE";
+                _errorEventKey = AcctIdKey(acctId);
+                LogError();
                 break;
         }
     }
@@ -495,7 +495,7 @@ public sealed class AuthorizationDecisionService : IMqServer
     // =================================================================================================
     //  5300-READ-CUST-RECORD — source: COPAUA0C.cbl:568-613  (FB-2: result never used by the decision)
     // =================================================================================================
-    private void ReadCustRecord5300()
+    private void ReadCustomerRecord()  // COBOL paragraph: 5300-READ-CUST-RECORD
     {
         // MOVE XREF-CUST-ID TO WS-CARD-RID-CUST-ID; EXEC CICS READ DATASET(CUSTDAT). source: :571-581
         long custId = _cardXref?.CustId ?? 0L;
@@ -509,21 +509,21 @@ public sealed class AuthorizationDecisionService : IMqServer
 
             case FileStatus.RecordNotFound:                       // WHEN DFHRESP(NOTFND). source: :586
                 SetNfoundCustInMstr();
-                _errLocation = "A003";                            // source: :589-595
-                _errLevel = 'W'; _errSubsystem = 'A';
-                _errMessage = "CUST NOT FOUND IN XREF";          // FB-5: text says XREF; it is CUST
-                _errEventKey = CustIdKey(custId);
-                LogError9500();
+                _errorLocation = "A003";                            // source: :589-595
+                _errorLevel = 'W'; _errorSubsystem = 'A';
+                _errorMessage = "CUST NOT FOUND IN XREF";          // FB-5: text says XREF; it is CUST
+                _errorEventKey = CustIdKey(custId);
+                LogError();
                 break;
 
             default:                                              // WHEN OTHER. source: :597
-                _errLocation = "C003";                            // source: :598-608
-                _errLevel = 'C'; _errSubsystem = 'C';
-                _errCode1 = CodeDisplay(RespToCode(resp));
-                _errCode2 = CodeDisplay(0);
-                _errMessage = "FAILED TO READ CUST FILE";
-                _errEventKey = CustIdKey(custId);
-                LogError9500();
+                _errorLocation = "C003";                            // source: :598-608
+                _errorLevel = 'C'; _errorSubsystem = 'C';
+                _errorCode1 = CodeDisplay(RespToCode(resp));
+                _errorCode2 = CodeDisplay(0);
+                _errorMessage = "FAILED TO READ CUST FILE";
+                _errorEventKey = CustIdKey(custId);
+                LogError();
                 break;
         }
     }
@@ -531,19 +531,19 @@ public sealed class AuthorizationDecisionService : IMqServer
     // =================================================================================================
     //  5500-READ-AUTH-SUMMRY — source: COPAUA0C.cbl:616-644
     // =================================================================================================
-    private void ReadAuthSummry5500()
+    private void ReadAuthSummary()  // COBOL paragraph: 5500-READ-AUTH-SUMMRY
     {
         // MOVE XREF-ACCT-ID TO PA-ACCT-ID; EXEC DLI GU SEGMENT(PAUTSUM0) WHERE(ACCNTID = PA-ACCT-ID).
         // MOVE DIBSTAT TO IMS-RETURN-CODE. source: :619-626
         long acctId = _cardXref?.AcctId ?? 0L;
-        _paSummary.AcctId = acctId;
+        _authSummary.AcctId = acctId;
         string status = _summary.ReadByKey(acctId, out PautSummary? found);
         string imsReturnCode = SqlToIms(status);                 // '00' -> '  '; '23' -> 'GE'
 
         // EVALUATE TRUE. source: :627
         if (IsStatusOk(imsReturnCode))                           // WHEN STATUS-OK. source: :628
         {
-            _paSummary = found!;                                 // INTO(PENDING-AUTH-SUMMARY)
+            _authSummary = found!;                                 // INTO(PENDING-AUTH-SUMMARY)
             SetFoundPautSmrySeg();
         }
         else if (IsSegmentNotFound(imsReturnCode))               // WHEN SEGMENT-NOT-FOUND. source: :630
@@ -552,19 +552,19 @@ public sealed class AuthorizationDecisionService : IMqServer
         }
         else                                                     // WHEN OTHER. source: :632
         {
-            _errLocation = "I002";                                // source: :633-639
-            _errLevel = 'C'; _errSubsystem = 'I';
-            _errCode1 = imsReturnCode;
-            _errMessage = "IMS GET SUMMARY FAILED";
-            _errEventKey = _paDetail.CardNum;                    // MOVE PA-CARD-NUM TO ERR-EVENT-KEY
-            LogError9500();
+            _errorLocation = "I002";                                // source: :633-639
+            _errorLevel = 'C'; _errorSubsystem = 'I';
+            _errorCode1 = imsReturnCode;
+            _errorMessage = "IMS GET SUMMARY FAILED";
+            _errorEventKey = _authDetail.CardNum;                    // MOVE PA-CARD-NUM TO ERR-EVENT-KEY
+            LogError();
         }
     }
 
     // =================================================================================================
     //  5600-READ-PROFILE-DATA — source: COPAUA0C.cbl:647-654  (CONTINUE — stub; fraud profile not impl.)
     // =================================================================================================
-    private void ReadProfileData5600()
+    private void ReadProfileData()  // COBOL paragraph: 5600-READ-PROFILE-DATA
     {
         // CONTINUE. source: :650
     }
@@ -572,20 +572,20 @@ public sealed class AuthorizationDecisionService : IMqServer
     // =================================================================================================
     //  6000-MAKE-DECISION — source: COPAUA0C.cbl:657-735
     // =================================================================================================
-    private void MakeDecision6000()
+    private void MakeDecision()  // COBOL paragraph: 6000-MAKE-DECISION
     {
         // Echo into reply. source: :660-662
-        _rl.CardNum = _rq.CardNum;                               // PA-RQ-CARD-NUM -> PA-RL-CARD-NUM
-        _rl.TransactionId = _rq.TransactionId;                  // PA-RQ-TRANSACTION-ID -> PA-RL-TRANSACTION-ID
-        _rl.AuthIdCode = _rq.AuthTime;                          // PA-RQ-AUTH-TIME -> PA-RL-AUTH-ID-CODE
+        _response.CardNum = _request.CardNum;                               // PA-RQ-CARD-NUM -> PA-RL-CARD-NUM
+        _response.TransactionId = _request.TransactionId;                  // PA-RQ-TRANSACTION-ID -> PA-RL-TRANSACTION-ID
+        _response.AuthIdCode = _request.AuthTime;                          // PA-RQ-AUTH-TIME -> PA-RL-AUTH-ID-CODE
 
         // Decline if above available limit; use IMS summary if present, else account master. source: :665-683
         if (IsFoundPautSmrySeg())                                // IF FOUND-PAUT-SMRY-SEG. source: :665
         {
             // COMPUTE WS-AVAILABLE-AMT = PA-CREDIT-LIMIT - PA-CREDIT-BALANCE (S9(9)V99 receiver). :666-667
-            _wsAvailableAmt = Decimals.Store(
-                _paSummary.CreditLimit - _paSummary.CreditBalance, 9, 2, signed: true);
-            if (_wsTransactionAmt > _wsAvailableAmt)             // IF WS-TRANSACTION-AMT > WS-AVAILABLE-AMT. :668
+            _availableAmount = Decimals.Store(
+                _authSummary.CreditLimit - _authSummary.CreditBalance, 9, 2, signed: true);
+            if (_transactionAmount > _availableAmount)             // IF WS-TRANSACTION-AMT > WS-AVAILABLE-AMT. :668
             {
                 SetDeclineAuth();
                 SetInsufficientFund();
@@ -598,8 +598,8 @@ public sealed class AuthorizationDecisionService : IMqServer
                 // COMPUTE WS-AVAILABLE-AMT = ACCT-CREDIT-LIMIT - ACCT-CURR-BAL. source: :674-675
                 decimal acctCreditLimit = _account?.CreditLimit ?? 0m;
                 decimal acctCurrBal = _account?.CurrBal ?? 0m;
-                _wsAvailableAmt = Decimals.Store(acctCreditLimit - acctCurrBal, 9, 2, signed: true);
-                if (_wsTransactionAmt > _wsAvailableAmt)         // source: :676
+                _availableAmount = Decimals.Store(acctCreditLimit - acctCurrBal, 9, 2, signed: true);
+                if (_transactionAmount > _availableAmount)         // source: :676
                 {
                     SetDeclineAuth();
                     SetInsufficientFund();
@@ -614,40 +614,40 @@ public sealed class AuthorizationDecisionService : IMqServer
         if (IsDeclineAuth())                                     // IF DECLINE-AUTH. source: :685
         {
             SetAuthRespDeclined();                              // SET AUTH-RESP-DECLINED TO TRUE
-            _rl.AuthRespCode = "05";                            // MOVE '05' TO PA-RL-AUTH-RESP-CODE. :688
-            _rl.ApprovedAmt = 0m;                               // MOVE 0 TO PA-RL-APPROVED-AMT
-            _wsApprovedAmt = 0m;                               //         WS-APPROVED-AMT. :689-690
+            _response.AuthRespCode = "05";                            // MOVE '05' TO PA-RL-AUTH-RESP-CODE. :688
+            _response.ApprovedAmt = 0m;                               // MOVE 0 TO PA-RL-APPROVED-AMT
+            _approvedAmount = 0m;                               //         WS-APPROVED-AMT. :689-690
         }
         else
         {
             SetAuthRespApproved();                             // SET AUTH-RESP-APPROVED TO TRUE. :692
-            _rl.AuthRespCode = "00";                            // MOVE '00' TO PA-RL-AUTH-RESP-CODE. :693
-            _rl.ApprovedAmt = _rq.TransactionAmt;              // MOVE PA-RQ-TRANSACTION-AMT -> PA-RL-APPROVED-AMT
-            _wsApprovedAmt = _rq.TransactionAmt;              //         WS-APPROVED-AMT. :694-695
+            _response.AuthRespCode = "00";                            // MOVE '00' TO PA-RL-AUTH-RESP-CODE. :693
+            _response.ApprovedAmt = _request.TransactionAmt;              // MOVE PA-RQ-TRANSACTION-AMT -> PA-RL-APPROVED-AMT
+            _approvedAmount = _request.TransactionAmt;              //         WS-APPROVED-AMT. :694-695
         }
 
-        _rl.AuthRespReason = "0000";                            // MOVE '0000' TO PA-RL-AUTH-RESP-REASON. :698
+        _response.AuthRespReason = "0000";                            // MOVE '0000' TO PA-RL-AUTH-RESP-REASON. :698
         if (IsAuthRespDeclined())                                // IF AUTH-RESP-DECLINED. source: :699
         {
             // EVALUATE TRUE. 4200/4300/5100/5200 are dead (FB-3). source: :700-717
             if (IsCardNfoundXref() || IsNfoundAcctInMstr() || IsNfoundCustInMstr())
-                _rl.AuthRespReason = "3100";
+                _response.AuthRespReason = "3100";
             else if (IsInsufficientFund())
-                _rl.AuthRespReason = "4100";
+                _response.AuthRespReason = "4100";
             else if (IsCardNotActive())
-                _rl.AuthRespReason = "4200";
+                _response.AuthRespReason = "4200";
             else if (IsAccountClosed())
-                _rl.AuthRespReason = "4300";
+                _response.AuthRespReason = "4300";
             else if (IsCardFraud())
-                _rl.AuthRespReason = "5100";
+                _response.AuthRespReason = "5100";
             else if (IsMerchantFraud())
-                _rl.AuthRespReason = "5200";
+                _response.AuthRespReason = "5200";
             else
-                _rl.AuthRespReason = "9000";
+                _response.AuthRespReason = "9000";
         }
 
         // MOVE WS-APPROVED-AMT TO WS-APPROVED-AMT-DIS (edit into -zzzzzzzzz9.99). source: :720
-        _wsApprovedAmtDis = EditedNumeric.Format(_wsApprovedAmt, "-ZZZZZZZZZ9.99");
+        _approvedAmountDisplay = EditedNumeric.Format(_approvedAmount, "-ZZZZZZZZZ9.99");
 
         // STRING the 6-field CSV (each followed by ',', trailing comma included) WITH POINTER
         // WS-RESP-LENGTH. The pointer is NOT reset per message (FB-6). source: :722-731
@@ -657,7 +657,7 @@ public sealed class AuthorizationDecisionService : IMqServer
     // =================================================================================================
     //  7100-SEND-RESPONSE — source: COPAUA0C.cbl:738-783
     // =================================================================================================
-    private void SendResponse7100()
+    private void SendResponse()  // COBOL paragraph: 7100-SEND-RESPONSE
     {
         // Reply OD: OBJECTTYPE=MQOT-Q, OBJECTNAME=WS-REPLY-QNAME.
         // Reply MD: MSGTYPE=MQMT-REPLY, CORRELID=WS-SAVE-CORRELID, MSGID=MQMI-NONE, REPLYTOQ/QMGR=SPACES,
@@ -667,9 +667,9 @@ public sealed class AuthorizationDecisionService : IMqServer
         var reply = new MqMessage
         {
             // W02-BUFFLEN = WS-RESP-LENGTH bytes of W02-PUT-BUFFER (the cumulative-pointer length, FB-6).
-            Body = ReplyBufferToLength(_wsRespLength),
+            Body = ReplyBufferToLength(_replyLength),
             MsgType = MqConstants.MqmtReply,
-            CorrelId = _wsSaveCorrelid,
+            CorrelId = _savedCorrelId,
             MsgId = MqConstants.MqmiNone,
             ReplyToQueue = "",
             ReplyToQMgr = "",
@@ -678,73 +678,73 @@ public sealed class AuthorizationDecisionService : IMqServer
             Format = MqConstants.MqfmtString,
         };
 
-        MqResult r = _mq.Put1(_wsReplyQname, reply);          // MQPUT1 by name (open-put-close). :758-766
-        _wsCompCode = r.CompletionCode;
-        _wsReason = r.ReasonCode;
+        MqResult r = _mq.Put1(_replyQueueName, reply);          // MQPUT1 by name (open-put-close). :758-766
+        _completionCode = r.CompletionCode;
+        _reasonCode = r.ReasonCode;
 
-        if (_wsCompCode != MqConstants.MqccOk)                // IF WS-COMPCODE NOT = MQCC-OK. source: :767
+        if (_completionCode != MqConstants.MqccOk)                // IF WS-COMPCODE NOT = MQCC-OK. source: :767
         {
-            _errLocation = "M004";                            // source: :768-778
-            _errLevel = 'C'; _errSubsystem = 'M';
-            _errCode1 = CodeDisplay(_wsCompCode);
-            _errCode2 = CodeDisplay(_wsReason);
-            _errMessage = "FAILED TO PUT ON REPLY MQ";
-            _errEventKey = _paDetail.CardNum;                 // MOVE PA-CARD-NUM TO ERR-EVENT-KEY
-            LogError9500();
+            _errorLocation = "M004";                            // source: :768-778
+            _errorLevel = 'C'; _errorSubsystem = 'M';
+            _errorCode1 = CodeDisplay(_completionCode);
+            _errorCode2 = CodeDisplay(_reasonCode);
+            _errorMessage = "FAILED TO PUT ON REPLY MQ";
+            _errorEventKey = _authDetail.CardNum;                 // MOVE PA-CARD-NUM TO ERR-EVENT-KEY
+            LogError();
         }
     }
 
     // =================================================================================================
     //  8000-WRITE-AUTH-TO-DB — source: COPAUA0C.cbl:786-795
     // =================================================================================================
-    private void WriteAuthToDb8000()
+    private void WriteAuthToDb()  // COBOL paragraph: 8000-WRITE-AUTH-TO-DB
     {
-        UpdateSummary8400();                                  // PERFORM 8400-UPDATE-SUMMARY. source: :790
-        InsertAuth8500();                                    // PERFORM 8500-INSERT-AUTH. source: :791
+        UpdateSummary();                                  // PERFORM 8400-UPDATE-SUMMARY. source: :790
+        InsertAuth();                                    // PERFORM 8500-INSERT-AUTH. source: :791
     }
 
     // =================================================================================================
     //  8400-UPDATE-SUMMARY — source: COPAUA0C.cbl:798-851
     // =================================================================================================
-    private void UpdateSummary8400()
+    private void UpdateSummary()  // COBOL paragraph: 8400-UPDATE-SUMMARY
     {
         if (IsNfoundPautSmrySeg())                            // IF NFOUND-PAUT-SMRY-SEG. source: :801
         {
             // INITIALIZE PENDING-AUTH-SUMMARY REPLACING NUMERIC DATA BY ZERO (numerics 0, chars spaces).
             // Then overlay acct/cust id. source: :802-806
-            _paSummary = NewInitializedSummary();
-            _paSummary.AcctId = _cardXref?.AcctId ?? 0L;     // MOVE XREF-ACCT-ID TO PA-ACCT-ID
-            _paSummary.CustId = _cardXref?.CustId ?? 0L;     // MOVE XREF-CUST-ID TO PA-CUST-ID
+            _authSummary = NewInitializedSummary();
+            _authSummary.AcctId = _cardXref?.AcctId ?? 0L;     // MOVE XREF-ACCT-ID TO PA-ACCT-ID
+            _authSummary.CustId = _cardXref?.CustId ?? 0L;     // MOVE XREF-CUST-ID TO PA-CUST-ID
         }
 
         // Always copy the account limits — FB-9: unconditional, even on a failed account read (stale).
         // S9(9)V99 receivers truncate. source: :810-811
-        _paSummary.CreditLimit = Decimals.Store(_account?.CreditLimit ?? 0m, 9, 2, signed: true);
-        _paSummary.CashLimit = Decimals.Store(_account?.CashCreditLimit ?? 0m, 9, 2, signed: true);
+        _authSummary.CreditLimit = Decimals.Store(_account?.CreditLimit ?? 0m, 9, 2, signed: true);
+        _authSummary.CashLimit = Decimals.Store(_account?.CashCreditLimit ?? 0m, 9, 2, signed: true);
 
         if (IsAuthRespApproved())                            // IF AUTH-RESP-APPROVED. source: :813
         {
-            _paSummary.ApprovedAuthCnt = AddCount(_paSummary.ApprovedAuthCnt, 1);             // :814
-            _paSummary.ApprovedAuthAmt = Add9v2(_paSummary.ApprovedAuthAmt, _wsApprovedAmt); // :815
-            _paSummary.CreditBalance = Add9v2(_paSummary.CreditBalance, _wsApprovedAmt);      // :817
-            _paSummary.CashBalance = 0m;                                                       // FB-8. :818
+            _authSummary.ApprovedAuthCnt = AddCount(_authSummary.ApprovedAuthCnt, 1);             // :814
+            _authSummary.ApprovedAuthAmt = Add9v2(_authSummary.ApprovedAuthAmt, _approvedAmount); // :815
+            _authSummary.CreditBalance = Add9v2(_authSummary.CreditBalance, _approvedAmount);      // :817
+            _authSummary.CashBalance = 0m;                                                       // FB-8. :818
         }
         else
         {
-            _paSummary.DeclinedAuthCnt = AddCount(_paSummary.DeclinedAuthCnt, 1);             // :820
+            _authSummary.DeclinedAuthCnt = AddCount(_authSummary.DeclinedAuthCnt, 1);             // :820
             // FB-1: PA-TRANSACTION-AMT (the DETAIL field) is not populated until 8500, so this adds its
             // prior value (0 on a fresh summary, the previous message's amount on an existing one). :821
-            _paSummary.DeclinedAuthAmt = Add9v2(_paSummary.DeclinedAuthAmt, _paDetail.TransactionAmt);
+            _authSummary.DeclinedAuthAmt = Add9v2(_authSummary.DeclinedAuthAmt, _authDetail.TransactionAmt);
         }
 
         string status;
         if (IsFoundPautSmrySeg())                            // IF FOUND-PAUT-SMRY-SEG -> REPL. source: :824
         {
-            status = _summary.Update(_paSummary);            // EXEC DLI REPL SEGMENT(PAUTSUM0). :825-828
+            status = _summary.Update(_authSummary);            // EXEC DLI REPL SEGMENT(PAUTSUM0). :825-828
         }
         else
         {
-            status = _summary.Insert(_paSummary);            // EXEC DLI ISRT SEGMENT(PAUTSUM0). :830-833
+            status = _summary.Insert(_authSummary);            // EXEC DLI ISRT SEGMENT(PAUTSUM0). :830-833
         }
         string imsReturnCode = SqlToIms(status);             // MOVE DIBSTAT TO IMS-RETURN-CODE. :835
 
@@ -754,77 +754,77 @@ public sealed class AuthorizationDecisionService : IMqServer
         }
         else
         {
-            _errLocation = "I003";                           // source: :840-846
-            _errLevel = 'C'; _errSubsystem = 'I';
-            _errCode1 = imsReturnCode;
-            _errMessage = "IMS UPDATE SUMRY FAILED";
-            _errEventKey = _paDetail.CardNum;
-            LogError9500();
+            _errorLocation = "I003";                           // source: :840-846
+            _errorLevel = 'C'; _errorSubsystem = 'I';
+            _errorCode1 = imsReturnCode;
+            _errorMessage = "IMS UPDATE SUMRY FAILED";
+            _errorEventKey = _authDetail.CardNum;
+            LogError();
         }
     }
 
     // =================================================================================================
     //  8500-INSERT-AUTH — source: COPAUA0C.cbl:854-936
     // =================================================================================================
-    private void InsertAuth8500()
+    private void InsertAuth()  // COBOL paragraph: 8500-INSERT-AUTH
     {
         // EXEC CICS ASKTIME / FORMATTIME YYDDD(WS-CUR-DATE-X6) TIME(WS-CUR-TIME-X6) MILLISECONDS(...).
         // source: :857-866
         DateTime now = _clock.Now;
-        _wsCurDateX6 = FormatTimeYyddd(now);                 // 5-digit YYDDD + a trailing char (X(6))
-        _wsCurTimeX6 = now.ToString("HHmmss", CultureInfo.InvariantCulture);
-        _wsCurTimeMs = now.Millisecond;                      // 0..999
+        _currentDateText = FormatTimeYyddd(now);                 // 5-digit YYDDD + a trailing char (X(6))
+        _currentTimeText = now.ToString("HHmmss", CultureInfo.InvariantCulture);
+        _currentTimeMillis = now.Millisecond;                      // 0..999
 
-        _wsYyddd = ToNum5(_wsCurDateX6.Substring(0, 5));     // MOVE WS-CUR-DATE-X6(1:5) TO WS-YYDDD. :868
-        _wsCurTimeN6 = ToNum6(_wsCurTimeX6);                 // MOVE WS-CUR-TIME-X6 TO WS-CUR-TIME-N6. :869
+        _julianDate = ToNum5(_currentDateText.Substring(0, 5));     // MOVE WS-CUR-DATE-X6(1:5) TO WS-YYDDD. :868
+        _currentTimeNumeric = ToNum6(_currentTimeText);                 // MOVE WS-CUR-TIME-X6 TO WS-CUR-TIME-N6. :869
 
         // COMPUTE WS-TIME-WITH-MS = (WS-CUR-TIME-N6 * 1000) + WS-CUR-TIME-MS. source: :871-872
-        _wsTimeWithMs = (long)_wsCurTimeN6 * 1000 + _wsCurTimeMs;
+        _timeWithMillis = (long)_currentTimeNumeric * 1000 + _currentTimeMillis;
 
         // 9s-complement descending keys — preserve verbatim (do NOT "fix"). source: :874-875
-        _paDetail.AuthDate9c = (int)(99999 - _wsYyddd);      // COMPUTE PA-AUTH-DATE-9C = 99999 - WS-YYDDD
-        _paDetail.AuthTime9c = 999999999 - _wsTimeWithMs;    // COMPUTE PA-AUTH-TIME-9C = 999999999 - ...
+        _authDetail.AuthDate9c = (int)(99999 - _julianDate);      // COMPUTE PA-AUTH-DATE-9C = 99999 - WS-YYDDD
+        _authDetail.AuthTime9c = 999999999 - _timeWithMillis;    // COMPUTE PA-AUTH-TIME-9C = 999999999 - ...
 
         // Copy all request fields into the detail segment. source: :877-895
-        _paDetail.AuthOrigDate = _rq.AuthDate;
-        _paDetail.AuthOrigTime = _rq.AuthTime;
-        _paDetail.CardNum = _rq.CardNum;
-        _paDetail.AuthType = _rq.AuthType;
-        _paDetail.CardExpiryDate = _rq.CardExpiryDate;
-        _paDetail.MessageType = _rq.MessageType;
-        _paDetail.MessageSource = _rq.MessageSource;
-        _paDetail.ProcessingCode = _rq.ProcessingCode;
-        _paDetail.TransactionAmt = Decimals.Store(_rq.TransactionAmt, 10, 2, signed: true);  // PA-TRANSACTION-AMT
-        _paDetail.MerchantCatagoryCode = _rq.MerchantCatagoryCode;
-        _paDetail.AcqrCountryCode = _rq.AcqrCountryCode;
-        _paDetail.PosEntryMode = _rq.PosEntryMode;
-        _paDetail.MerchantId = _rq.MerchantId;
-        _paDetail.MerchantName = _rq.MerchantName;
-        _paDetail.MerchantCity = _rq.MerchantCity;
-        _paDetail.MerchantState = _rq.MerchantState;
-        _paDetail.MerchantZip = _rq.MerchantZip;
-        _paDetail.TransactionId = _rq.TransactionId;
+        _authDetail.AuthOrigDate = _request.AuthDate;
+        _authDetail.AuthOrigTime = _request.AuthTime;
+        _authDetail.CardNum = _request.CardNum;
+        _authDetail.AuthType = _request.AuthType;
+        _authDetail.CardExpiryDate = _request.CardExpiryDate;
+        _authDetail.MessageType = _request.MessageType;
+        _authDetail.MessageSource = _request.MessageSource;
+        _authDetail.ProcessingCode = _request.ProcessingCode;
+        _authDetail.TransactionAmt = Decimals.Store(_request.TransactionAmt, 10, 2, signed: true);  // PA-TRANSACTION-AMT
+        _authDetail.MerchantCatagoryCode = _request.MerchantCatagoryCode;
+        _authDetail.AcqrCountryCode = _request.AcqrCountryCode;
+        _authDetail.PosEntryMode = _request.PosEntryMode;
+        _authDetail.MerchantId = _request.MerchantId;
+        _authDetail.MerchantName = _request.MerchantName;
+        _authDetail.MerchantCity = _request.MerchantCity;
+        _authDetail.MerchantState = _request.MerchantState;
+        _authDetail.MerchantZip = _request.MerchantZip;
+        _authDetail.TransactionId = _request.TransactionId;
 
         // Copy reply fields. source: :897-900
-        _paDetail.AuthIdCode = _rl.AuthIdCode;
-        _paDetail.AuthRespCode = _rl.AuthRespCode;
-        _paDetail.AuthRespReason = _rl.AuthRespReason;
-        _paDetail.ApprovedAmt = Decimals.Store(_rl.ApprovedAmt, 10, 2, signed: true);  // PA-APPROVED-AMT
+        _authDetail.AuthIdCode = _response.AuthIdCode;
+        _authDetail.AuthRespCode = _response.AuthRespCode;
+        _authDetail.AuthRespReason = _response.AuthRespReason;
+        _authDetail.ApprovedAmt = Decimals.Store(_response.ApprovedAmt, 10, 2, signed: true);  // PA-APPROVED-AMT
 
         if (IsAuthRespApproved())                            // IF AUTH-RESP-APPROVED. source: :902
-            _paDetail.MatchStatus = "P";                    // SET PA-MATCH-PENDING TO TRUE
+            _authDetail.MatchStatus = "P";                    // SET PA-MATCH-PENDING TO TRUE
         else
-            _paDetail.MatchStatus = "D";                    // SET PA-MATCH-AUTH-DECLINED TO TRUE
+            _authDetail.MatchStatus = "D";                    // SET PA-MATCH-AUTH-DECLINED TO TRUE
 
-        _paDetail.AuthFraud = " ";                           // MOVE SPACE TO PA-AUTH-FRAUD (X(1)). source: :908
-        _paDetail.FraudRptDate = "        ";                 // MOVE SPACE TO PA-FRAUD-RPT-DATE (X(8) spaces)
+        _authDetail.AuthFraud = " ";                           // MOVE SPACE TO PA-AUTH-FRAUD (X(1)). source: :908
+        _authDetail.FraudRptDate = "        ";                 // MOVE SPACE TO PA-FRAUD-RPT-DATE (X(8) spaces)
 
-        _paDetail.AcctId = _cardXref?.AcctId ?? 0L;          // MOVE XREF-ACCT-ID TO PA-ACCT-ID. source: :911
+        _authDetail.AcctId = _cardXref?.AcctId ?? 0L;          // MOVE XREF-ACCT-ID TO PA-ACCT-ID. source: :911
 
         // The 8-byte PAUT9CTS child sequence key = date-9C (5 digits) + time-9C (9 digits), 9s-complement,
         // so ascending key order == newest-first (matches IX_PAUT_DETAIL_SEQ and the COPAUS0C/CBPAUP0C
         // scan order). Built as a fixed-width zero-padded decimal concatenation. source: :913-919; IMS_SCHEMA.md §2/§3.7
-        _paDetail.AuthKey = BuildAuthKey(_paDetail.AuthDate9c, _paDetail.AuthTime9c);
+        _authDetail.AuthKey = BuildAuthKey(_authDetail.AuthDate9c, _authDetail.AuthTime9c);
 
         // EXEC DLI ISRT SEGMENT(PAUTSUM0) WHERE(ACCNTID=PA-ACCT-ID) SEGMENT(PAUTDTL1) FROM(...). The
         // WHERE only locates the parent (FK enforces it); relationally it is just an INSERT. source: :913-919
@@ -837,48 +837,48 @@ public sealed class AuthorizationDecisionService : IMqServer
         }
         else
         {
-            _errLocation = "I004";                           // source: :925-931
-            _errLevel = 'C'; _errSubsystem = 'I';
-            _errCode1 = imsReturnCode;
-            _errMessage = "IMS INSERT DETL FAILED";
-            _errEventKey = _paDetail.CardNum;
-            LogError9500();
+            _errorLocation = "I004";                           // source: :925-931
+            _errorLevel = 'C'; _errorSubsystem = 'I';
+            _errorCode1 = imsReturnCode;
+            _errorMessage = "IMS INSERT DETL FAILED";
+            _errorEventKey = _authDetail.CardNum;
+            LogError();
         }
     }
 
     // =================================================================================================
     //  9000-TERMINATE — source: COPAUA0C.cbl:940-951
     // =================================================================================================
-    private void Terminate9000()
+    private void Terminate()  // COBOL paragraph: 9000-TERMINATE
     {
         // IF IMS-PSB-SCHD EXEC DLI TERM (normally a no-op — 2000 sets NOT-SCHD after each message).
         // source: :943-945  (the relational unit of work ends implicitly).
-        CloseRequestQueue9100();                             // PERFORM 9100-CLOSE-REQUEST-QUEUE. source: :947
+        CloseRequestQueue();                             // PERFORM 9100-CLOSE-REQUEST-QUEUE. source: :947
     }
 
     // =================================================================================================
     //  9100-CLOSE-REQUEST-QUEUE — source: COPAUA0C.cbl:953-980
     // =================================================================================================
-    private void CloseRequestQueue9100()
+    private void CloseRequestQueue()  // COBOL paragraph: 9100-CLOSE-REQUEST-QUEUE
     {
         if (IsRequestMqOpen() && _requestHandle is not null)  // IF WS-REQUEST-MQ-OPEN. source: :955
         {
             MqResult r = _mq.Close(_requestHandle);          // CALL 'MQCLOSE' ... MQCO-NONE. :956-961
-            _wsCompCode = r.CompletionCode;
-            _wsReason = r.ReasonCode;
+            _completionCode = r.CompletionCode;
+            _reasonCode = r.ReasonCode;
 
-            if (_wsCompCode == MqConstants.MqccOk)           // IF WS-COMPCODE = MQCC-OK. source: :963
+            if (_completionCode == MqConstants.MqccOk)           // IF WS-COMPCODE = MQCC-OK. source: :963
             {
                 SetRequestMqClse();
             }
             else
             {
-                _errLocation = "M005";                       // source: :966-975
-                _errLevel = 'W'; _errSubsystem = 'M';
-                _errCode1 = CodeDisplay(_wsCompCode);
-                _errCode2 = CodeDisplay(_wsReason);
-                _errMessage = "FAILED TO CLOSE REQUEST MQ";
-                LogError9500();
+                _errorLocation = "M005";                       // source: :966-975
+                _errorLevel = 'W'; _errorSubsystem = 'M';
+                _errorCode1 = CodeDisplay(_completionCode);
+                _errorCode2 = CodeDisplay(_reasonCode);
+                _errorMessage = "FAILED TO CLOSE REQUEST MQ";
+                LogError();
             }
         }
     }
@@ -886,7 +886,7 @@ public sealed class AuthorizationDecisionService : IMqServer
     // =================================================================================================
     //  9500-LOG-ERROR — source: COPAUA0C.cbl:983-1013
     // =================================================================================================
-    private void LogError9500()
+    private void LogError()  // COBOL paragraph: 9500-LOG-ERROR
     {
         // EXEC CICS ASKTIME / FORMATTIME YYMMDD(WS-CUR-DATE-X6) TIME(WS-CUR-TIME-X6). source: :986-994
         DateTime now = _clock.Now;
@@ -897,18 +897,18 @@ public sealed class AuthorizationDecisionService : IMqServer
         string record = BuildErrorLogRecord(errDate, errTime);
         _errorLog.Write(record);                             // NOHANDLE — failures ignored
 
-        if (_errLevel == 'C')                                // IF ERR-CRITICAL. source: :1008
+        if (_errorLevel == 'C')                                // IF ERR-CRITICAL. source: :1008
         {
-            EndRoutine9990();                                // PERFORM 9990-END-ROUTINE
+            EndRoutine();                                // PERFORM 9990-END-ROUTINE
         }
     }
 
     // =================================================================================================
     //  9990-END-ROUTINE — source: COPAUA0C.cbl:1016-1025
     // =================================================================================================
-    private void EndRoutine9990()
+    private void EndRoutine()  // COBOL paragraph: 9990-END-ROUTINE
     {
-        Terminate9000();                                     // PERFORM 9000-TERMINATE. source: :1019
+        Terminate();                                     // PERFORM 9000-TERMINATE. source: :1019
         throw new EndRoutineSignal();                        // EXEC CICS RETURN (hard exit). source: :1021
     }
 
@@ -932,20 +932,20 @@ public sealed class AuthorizationDecisionService : IMqServer
     /// </summary>
     private void StringIntoReply()
     {
-        int pos = _wsRespLength;                             // WITH POINTER WS-RESP-LENGTH (1-based)
-        AppendString(ref pos, Fixed(_rl.CardNum, 16));      // PA-RL-CARD-NUM X(16)
+        int pos = _replyLength;                             // WITH POINTER WS-RESP-LENGTH (1-based)
+        AppendString(ref pos, Fixed(_response.CardNum, 16));      // PA-RL-CARD-NUM X(16)
         AppendChar(ref pos, ',');
-        AppendString(ref pos, Fixed(_rl.TransactionId, 15)); // PA-RL-TRANSACTION-ID X(15)
+        AppendString(ref pos, Fixed(_response.TransactionId, 15)); // PA-RL-TRANSACTION-ID X(15)
         AppendChar(ref pos, ',');
-        AppendString(ref pos, Fixed(_rl.AuthIdCode, 6));    // PA-RL-AUTH-ID-CODE X(6)
+        AppendString(ref pos, Fixed(_response.AuthIdCode, 6));    // PA-RL-AUTH-ID-CODE X(6)
         AppendChar(ref pos, ',');
-        AppendString(ref pos, Fixed(_rl.AuthRespCode, 2));  // PA-RL-AUTH-RESP-CODE X(2)
+        AppendString(ref pos, Fixed(_response.AuthRespCode, 2));  // PA-RL-AUTH-RESP-CODE X(2)
         AppendChar(ref pos, ',');
-        AppendString(ref pos, Fixed(_rl.AuthRespReason, 4)); // PA-RL-AUTH-RESP-REASON X(4)
+        AppendString(ref pos, Fixed(_response.AuthRespReason, 4)); // PA-RL-AUTH-RESP-REASON X(4)
         AppendChar(ref pos, ',');
-        AppendString(ref pos, _wsApprovedAmtDis);           // WS-APPROVED-AMT-DIS -zzzzzzzzz9.99 (14 chars)
+        AppendString(ref pos, _approvedAmountDisplay);           // WS-APPROVED-AMT-DIS -zzzzzzzzz9.99 (14 chars)
         AppendChar(ref pos, ',');                            // trailing comma
-        _wsRespLength = (short)pos;                          // pointer ends at built-length+1 (persisted)
+        _replyLength = (short)pos;                          // pointer ends at built-length+1 (persisted)
     }
 
     private void AppendString(ref int pos, string s)
@@ -1009,17 +1009,17 @@ public sealed class AuthorizationDecisionService : IMqServer
     };
 
     // ---- Decision/state flag setters (88-level SET TO TRUE). ----
-    private void SetApproveAuth() => _declineFlg = 'A';
-    private void SetDeclineAuth() => _declineFlg = 'D';
-    private bool IsDeclineAuth() => _declineFlg == 'D';
+    private void SetApproveAuth() => _decisionFlag = 'A';
+    private void SetDeclineAuth() => _decisionFlag = 'D';
+    private bool IsDeclineAuth() => _decisionFlag == 'D';
 
-    private void SetAuthRespApproved() => _authRespFlg = 'A';
-    private void SetAuthRespDeclined() => _authRespFlg = 'D';
-    private bool IsAuthRespApproved() => _authRespFlg == 'A';
-    private bool IsAuthRespDeclined() => _authRespFlg == 'D';
+    private void SetAuthRespApproved() => _authResponseFlag = 'A';
+    private void SetAuthRespDeclined() => _authResponseFlag = 'D';
+    private bool IsAuthRespApproved() => _authResponseFlag == 'A';
+    private bool IsAuthRespDeclined() => _authResponseFlag == 'D';
 
-    private void SetInsufficientFund() => _declineReasonFlg = 'I';
-    private bool IsInsufficientFund() => _declineReasonFlg == 'I';
+    private void SetInsufficientFund() => _declineReasonFlag = 'I';
+    private bool IsInsufficientFund() => _declineReasonFlag == 'I';
     // Dead reason flags: CARD-NOT-ACTIVE/ACCOUNT-CLOSED/CARD-FRAUD/MERCHANT-FRAUD are declared but never
     // SET anywhere in COPAUA0C (FB-3), so their EVALUATE arms can never fire. source: :140-145,707-714.
     private static bool IsCardNotActive() => false;
@@ -1027,37 +1027,37 @@ public sealed class AuthorizationDecisionService : IMqServer
     private static bool IsCardFraud() => false;
     private static bool IsMerchantFraud() => false;
 
-    private void SetCardFoundXref() => _xrefReadFlg = 'Y';
-    private void SetCardNfoundXref() => _xrefReadFlg = 'N';
-    private bool IsCardFoundXref() => _xrefReadFlg == 'Y';
-    private bool IsCardNfoundXref() => _xrefReadFlg == 'N';
+    private void SetCardFoundXref() => _xrefReadFlag = 'Y';
+    private void SetCardNfoundXref() => _xrefReadFlag = 'N';
+    private bool IsCardFoundXref() => _xrefReadFlag == 'Y';
+    private bool IsCardNfoundXref() => _xrefReadFlag == 'N';
 
-    private void SetFoundAcctInMstr() => _acctMasterReadFlg = 'Y';
-    private void SetNfoundAcctInMstr() => _acctMasterReadFlg = 'N';
-    private bool IsFoundAcctInMstr() => _acctMasterReadFlg == 'Y';
-    private bool IsNfoundAcctInMstr() => _acctMasterReadFlg == 'N';
+    private void SetFoundAcctInMstr() => _accountReadFlag = 'Y';
+    private void SetNfoundAcctInMstr() => _accountReadFlag = 'N';
+    private bool IsFoundAcctInMstr() => _accountReadFlag == 'Y';
+    private bool IsNfoundAcctInMstr() => _accountReadFlag == 'N';
 
-    private void SetFoundCustInMstr() => _custMasterReadFlg = 'Y';
-    private void SetNfoundCustInMstr() => _custMasterReadFlg = 'N';
-    private bool IsNfoundCustInMstr() => _custMasterReadFlg == 'N';
+    private void SetFoundCustInMstr() => _customerReadFlag = 'Y';
+    private void SetNfoundCustInMstr() => _customerReadFlag = 'N';
+    private bool IsNfoundCustInMstr() => _customerReadFlag == 'N';
 
-    private void SetFoundPautSmrySeg() => _pautSmrySegFlg = 'Y';
-    private void SetNfoundPautSmrySeg() => _pautSmrySegFlg = 'N';
-    private bool IsFoundPautSmrySeg() => _pautSmrySegFlg == 'Y';
-    private bool IsNfoundPautSmrySeg() => _pautSmrySegFlg == 'N';
+    private void SetFoundPautSmrySeg() => _summarySegmentFlag = 'Y';
+    private void SetNfoundPautSmrySeg() => _summarySegmentFlag = 'N';
+    private bool IsFoundPautSmrySeg() => _summarySegmentFlag == 'Y';
+    private bool IsNfoundPautSmrySeg() => _summarySegmentFlag == 'N';
 
-    private void SetNoMoreMsgAvailable() => _msgAvailableFlg = 'N';
-    private bool IsNoMoreMsgAvailable() => _msgAvailableFlg == 'N';
+    private void SetNoMoreMsgAvailable() => _messageAvailableFlag = 'N';
+    private bool IsNoMoreMsgAvailable() => _messageAvailableFlag == 'N';
 
-    private void SetLoopEnd() => _msgLoopFlg = 'E';
-    private bool IsLoopEnd() => _msgLoopFlg == 'E';
+    private void SetLoopEnd() => _loopFlag = 'E';
+    private bool IsLoopEnd() => _loopFlag == 'E';
 
-    private void SetRequestMqOpen() => _requestMqFlg = 'O';
-    private void SetRequestMqClse() => _requestMqFlg = 'C';
-    private bool IsRequestMqOpen() => _requestMqFlg == 'O';
+    private void SetRequestMqOpen() => _requestMqFlag = 'O';
+    private void SetRequestMqClse() => _requestMqFlag = 'C';
+    private bool IsRequestMqOpen() => _requestMqFlag == 'O';
 
-    private void SetImsPsbSchd() => _imsPsbSchdFlg = 'Y';
-    private void SetImsPsbNotSchd() => _imsPsbSchdFlg = 'N';
+    private void SetImsPsbSchd() => _imsPsbScheduledFlag = 'Y';
+    private void SetImsPsbNotSchd() => _imsPsbScheduledFlag = 'N';
 
     // ---- Numeric conversions (display->numeric with COBOL de-edit semantics). ----
 
@@ -1203,35 +1203,35 @@ public sealed class AuthorizationDecisionService : IMqServer
     /// <summary>Snapshots the working PA-detail io-area into a row for the INSERT (the COBOL FROM area).</summary>
     private PautDetail ClonePaDetail() => new()
     {
-        AcctId = _paDetail.AcctId,
-        AuthKey = _paDetail.AuthKey,
-        AuthDate9c = _paDetail.AuthDate9c,
-        AuthTime9c = _paDetail.AuthTime9c,
-        AuthOrigDate = _paDetail.AuthOrigDate,
-        AuthOrigTime = _paDetail.AuthOrigTime,
-        CardNum = _paDetail.CardNum,
-        AuthType = _paDetail.AuthType,
-        CardExpiryDate = _paDetail.CardExpiryDate,
-        MessageType = _paDetail.MessageType,
-        MessageSource = _paDetail.MessageSource,
-        AuthIdCode = _paDetail.AuthIdCode,
-        AuthRespCode = _paDetail.AuthRespCode,
-        AuthRespReason = _paDetail.AuthRespReason,
-        ProcessingCode = _paDetail.ProcessingCode,
-        TransactionAmt = _paDetail.TransactionAmt,
-        ApprovedAmt = _paDetail.ApprovedAmt,
-        MerchantCatagoryCode = _paDetail.MerchantCatagoryCode,
-        AcqrCountryCode = _paDetail.AcqrCountryCode,
-        PosEntryMode = _paDetail.PosEntryMode,
-        MerchantId = _paDetail.MerchantId,
-        MerchantName = _paDetail.MerchantName,
-        MerchantCity = _paDetail.MerchantCity,
-        MerchantState = _paDetail.MerchantState,
-        MerchantZip = _paDetail.MerchantZip,
-        TransactionId = _paDetail.TransactionId,
-        MatchStatus = _paDetail.MatchStatus,
-        AuthFraud = _paDetail.AuthFraud,
-        FraudRptDate = _paDetail.FraudRptDate,
+        AcctId = _authDetail.AcctId,
+        AuthKey = _authDetail.AuthKey,
+        AuthDate9c = _authDetail.AuthDate9c,
+        AuthTime9c = _authDetail.AuthTime9c,
+        AuthOrigDate = _authDetail.AuthOrigDate,
+        AuthOrigTime = _authDetail.AuthOrigTime,
+        CardNum = _authDetail.CardNum,
+        AuthType = _authDetail.AuthType,
+        CardExpiryDate = _authDetail.CardExpiryDate,
+        MessageType = _authDetail.MessageType,
+        MessageSource = _authDetail.MessageSource,
+        AuthIdCode = _authDetail.AuthIdCode,
+        AuthRespCode = _authDetail.AuthRespCode,
+        AuthRespReason = _authDetail.AuthRespReason,
+        ProcessingCode = _authDetail.ProcessingCode,
+        TransactionAmt = _authDetail.TransactionAmt,
+        ApprovedAmt = _authDetail.ApprovedAmt,
+        MerchantCatagoryCode = _authDetail.MerchantCatagoryCode,
+        AcqrCountryCode = _authDetail.AcqrCountryCode,
+        PosEntryMode = _authDetail.PosEntryMode,
+        MerchantId = _authDetail.MerchantId,
+        MerchantName = _authDetail.MerchantName,
+        MerchantCity = _authDetail.MerchantCity,
+        MerchantState = _authDetail.MerchantState,
+        MerchantZip = _authDetail.MerchantZip,
+        TransactionId = _authDetail.TransactionId,
+        MatchStatus = _authDetail.MatchStatus,
+        AuthFraud = _authDetail.AuthFraud,
+        FraudRptDate = _authDetail.FraudRptDate,
     };
 
     // ---- CICS FORMATTIME emulation. ----
@@ -1257,15 +1257,15 @@ public sealed class AuthorizationDecisionService : IMqServer
         var sb = new StringBuilder(119);
         sb.Append(Fixed(errDate, 6));          // ERR-DATE X(6)
         sb.Append(Fixed(errTime, 6));          // ERR-TIME X(6)
-        sb.Append(Fixed(WsCicsTranid, 8));     // ERR-APPLICATION X(8)  <- WS-CICS-TRANID
-        sb.Append(Fixed(WsPgmAuth, 8));        // ERR-PROGRAM X(8)      <- WS-PGM-AUTH
-        sb.Append(Fixed(_errLocation, 4));     // ERR-LOCATION X(4)
-        sb.Append(_errLevel == '\0' ? ' ' : _errLevel);     // ERR-LEVEL X(1)
-        sb.Append(_errSubsystem == '\0' ? ' ' : _errSubsystem); // ERR-SUBSYSTEM X(1)
-        sb.Append(Fixed(_errCode1, 9));        // ERR-CODE-1 X(9)
-        sb.Append(Fixed(_errCode2, 9));        // ERR-CODE-2 X(9)
-        sb.Append(Fixed(_errMessage, 50));     // ERR-MESSAGE X(50)
-        sb.Append(Fixed(_errEventKey, 20));    // ERR-EVENT-KEY X(20)
+        sb.Append(Fixed(TranId, 8));     // ERR-APPLICATION X(8)  <- WS-CICS-TRANID
+        sb.Append(Fixed(ProgramId, 8));        // ERR-PROGRAM X(8)      <- WS-PGM-AUTH
+        sb.Append(Fixed(_errorLocation, 4));     // ERR-LOCATION X(4)
+        sb.Append(_errorLevel == '\0' ? ' ' : _errorLevel);     // ERR-LEVEL X(1)
+        sb.Append(_errorSubsystem == '\0' ? ' ' : _errorSubsystem); // ERR-SUBSYSTEM X(1)
+        sb.Append(Fixed(_errorCode1, 9));        // ERR-CODE-1 X(9)
+        sb.Append(Fixed(_errorCode2, 9));        // ERR-CODE-2 X(9)
+        sb.Append(Fixed(_errorMessage, 50));     // ERR-MESSAGE X(50)
+        sb.Append(Fixed(_errorEventKey, 20));    // ERR-EVENT-KEY X(20)
         return sb.ToString();
     }
 

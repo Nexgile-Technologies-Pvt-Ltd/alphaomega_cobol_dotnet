@@ -13,7 +13,7 @@ namespace CardDemo.Online.Programs;
 /// in place (the update-status / message / the report-date stamped into the detail image flow back to the
 /// caller). source: COPAUS1C.cbl:93-104; COPAUS2C.cbl:73-86.
 /// </summary>
-public sealed class WsFraudData
+public sealed class FraudData
 {
     /// <summary>WS-FRD-ACCT-ID 9(11) — owning account id. source: COPAUS1C.cbl:94.</summary>
     public long FrdAcctId { get; set; }
@@ -49,7 +49,7 @@ public sealed class WsFraudData
 /// authorization key fields, INSERTs the row, and on a duplicate-key (DB2 SQLCODE <c>-803</c>, here a
 /// SQLite constraint violation surfaced by <see cref="AuthFraudRepository.Insert"/> returning <c>'22'</c>)
 /// falls back to an UPDATE of just the fraud flag + report date. It writes the outcome (S/F + message)
-/// back into the <see cref="WsFraudData"/> COMMAREA for COPAUS1C to act on. No COMMIT/ROLLBACK here — the
+/// back into the <see cref="FraudData"/> COMMAREA for COPAUS1C to act on. No COMMIT/ROLLBACK here — the
 /// caller owns the unit of work (faithful bug #6). source: COPAUS2C.cbl:2-6,88-244; COPAUS2C.md.
 /// </summary>
 /// <remarks>
@@ -75,7 +75,7 @@ public sealed class PendingAuthFraudReportProgram
     // ---- DCLGEN host variables built in MAIN-PARA (the row to write). source: COPAUS2C.cbl:113-139 ----
     // WS-AUTH-TS is the 23-char group 'YY-MM-DD HH.MI.SS<sss>000' built at :38-51; it is later MOVEd into the
     // 26-char DCLGEN host variable AUTH-TS (dcl/AUTHFRDS.dcl:57, PIC X(26)), which space-pads it to 26.
-    private string _wsAuthTs = "";  // WS-AUTH-TS (23-char group). source: :38-51.
+    private string _authTs = "";  // WS-AUTH-TS (23-char group). source: :38-51.
 
     /// <summary>
     /// Constructs the fraud worker over the shared relational DB (the AUTHFRDS repository participates in
@@ -90,83 +90,83 @@ public sealed class PendingAuthFraudReportProgram
     // =============================================================================================
     //  MAIN-PARA (LINK entry) — source: COPAUS2C.cbl:89-220
     // =============================================================================================
-    /// <summary>The <c>EXEC CICS LINK</c> entry point. Mutates <paramref name="ca"/> in place (LINK COMMAREA semantics).</summary>
-    public void Run(WsFraudData ca)
+    /// <summary>The <c>EXEC CICS LINK</c> entry point. Mutates <paramref name="commarea"/> in place (LINK COMMAREA semantics).</summary>
+    public void Run(FraudData commarea)
     {
-        PautDetail pa = ca.AuthRecord;
+        PautDetail authDetail = commarea.AuthRecord;
 
         // EXEC CICS ASKTIME/FORMATTIME MMDDYY(WS-CUR-DATE) DATESEP -> WS-CUR-DATE = MM/DD/YY. source: :91-100
         DateTime now = _clock.Now;
-        string wsCurDate = $"{now.Month:D2}/{now.Day:D2}/{(now.Year % 100):D2}"; // MM/DD/YY (X(08)).
+        string currentDateMmDdYy = $"{now.Month:D2}/{now.Day:D2}/{(now.Year % 100):D2}"; // MM/DD/YY (X(08)). // WS-CUR-DATE
 
         // MOVE WS-CUR-DATE TO PA-FRAUD-RPT-DATE — stamps the COMMAREA detail image (FB #3). source: :101
-        pa.FraudRptDate = wsCurDate;
+        authDetail.FraudRptDate = currentDateMmDdYy;
 
         // Build AUTH_TS from the auth key fields. source: :103-114
-        string origDate = Fixed(pa.AuthOrigDate, 6);                 // YYMMDD
-        string wsAuthYy = origDate.Substring(0, 2);                  // PA-AUTH-ORIG-DATE(1:2). :103
-        string wsAuthMm = origDate.Substring(2, 2);                  // (3:2). :104
-        string wsAuthDd = origDate.Substring(4, 2);                  // (5:2). :105
+        string origDate = Fixed(authDetail.AuthOrigDate, 6);         // YYMMDD
+        string authYear = origDate.Substring(0, 2);                  // PA-AUTH-ORIG-DATE(1:2). :103 // WS-AUTH-YY
+        string authMonth = origDate.Substring(2, 2);                 // (3:2). :104 // WS-AUTH-MM
+        string authDay = origDate.Substring(4, 2);                   // (5:2). :105 // WS-AUTH-DD
 
         // COMPUTE WS-AUTH-TIME = 999999999 - PA-AUTH-TIME-9C into unsigned 9(09) (FB #1: drop sign, keep low 9 digits). :107
-        long wsAuthTime = 999999999L - pa.AuthTime9c;
-        long wsAuthTimeUnsigned = Math.Abs(wsAuthTime) % 1000000000L;
-        string wsAuthTimeAn = wsAuthTimeUnsigned.ToString("D9", CultureInfo.InvariantCulture); // WS-AUTH-TIME-AN X(09). :36-37
+        long authTimeRaw = 999999999L - authDetail.AuthTime9c;       // WS-AUTH-TIME
+        long authTimeUnsigned = Math.Abs(authTimeRaw) % 1000000000L;
+        string authTimeText = authTimeUnsigned.ToString("D9", CultureInfo.InvariantCulture); // WS-AUTH-TIME-AN X(09). :36-37
 
-        string wsAuthHh = wsAuthTimeAn.Substring(0, 2);  // (1:2). :108
-        string wsAuthMi = wsAuthTimeAn.Substring(2, 2);  // (3:2). :109
-        string wsAuthSs = wsAuthTimeAn.Substring(4, 2);  // (5:2). :110
-        string wsAuthSss = wsAuthTimeAn.Substring(6, 3); // (7:3). :111
+        string authHour = authTimeText.Substring(0, 2);   // (1:2). :108 // WS-AUTH-HH
+        string authMinute = authTimeText.Substring(2, 2); // (3:2). :109 // WS-AUTH-MI
+        string authSecond = authTimeText.Substring(4, 2); // (5:2). :110 // WS-AUTH-SS
+        string authMillis = authTimeText.Substring(6, 3); // (7:3). :111 // WS-AUTH-SSS
 
         // WS-AUTH-TS group: 'YY-MM-DD HH.MI.SS<sss>000' (26 chars). FILLERs supply -,-,space,.,.,'000'. :38-51,114
-        _wsAuthTs = $"{wsAuthYy}-{wsAuthMm}-{wsAuthDd} {wsAuthHh}.{wsAuthMi}.{wsAuthSs}{wsAuthSss}000";
+        _authTs = $"{authYear}-{authMonth}-{authDay} {authHour}.{authMinute}.{authSecond}{authMillis}000";
 
         // FRAUD_RPT_DATE column = CURRENT DATE (server date as DB2 DATE 'YYYY-MM-DD'), NOT WS-CUR-DATE. :194
-        string currentDate = now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        string currentDateIso = now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         // Map every PA-* COMMAREA field onto the DCLGEN host variables (the AUTHFRDS row). source: :113-139
         var row = new AuthFraud
         {
-            CardNum = Fixed(pa.CardNum, 16),                         // :113
-            AuthTs = _wsAuthTs,                                      // :114
-            AuthType = Fixed(pa.AuthType, 4),                       // :115
-            CardExpiryDate = Fixed(pa.CardExpiryDate, 4),          // :116
-            MessageType = Fixed(pa.MessageType, 6),                // :117
-            MessageSource = Fixed(pa.MessageSource, 6),            // :118
-            AuthIdCode = Fixed(pa.AuthIdCode, 6),                  // :119
-            AuthRespCode = Fixed(pa.AuthRespCode, 2),              // :120
-            AuthRespReason = Fixed(pa.AuthRespReason, 4),          // :121
-            ProcessingCode = pa.ProcessingCode.ToString("D6", CultureInfo.InvariantCulture), // PA-PROCESSING-CODE 9(06)->X(6). :122
-            TransactionAmt = pa.TransactionAmt,                     // :123
-            ApprovedAmt = pa.ApprovedAmt,                           // :124
-            MerchantCatagoryCode = Fixed(pa.MerchantCatagoryCode, 4), // (sic) :125-126
-            AcqrCountryCode = Fixed(pa.AcqrCountryCode, 3),        // :127
-            PosEntryMode = pa.PosEntryMode,                         // :128
-            MerchantId = Fixed(pa.MerchantId, 15),                 // :129
-            MerchantName = Fixed(pa.MerchantName, 22),             // VARCHAR(22), len always 22. :130-131
-            MerchantCity = Fixed(pa.MerchantCity, 13),             // :132
-            MerchantState = Fixed(pa.MerchantState, 2),            // :133
-            MerchantZip = Fixed(pa.MerchantZip, 9),                // :134
-            TransactionId = Fixed(pa.TransactionId, 15),           // :135
-            MatchStatus = Fixed(pa.MatchStatus, 1),                // :136
-            AuthFraudInd = Fixed(ca.FrdAction, 1),                 // FB #4: from WS-FRD-ACTION, not PA-AUTH-FRAUD. :137
-            FraudRptDate = currentDate,                             // CURRENT DATE. :194
-            AcctId = ca.FrdAcctId,                                  // WS-ACCT-ID. :138
-            CustId = ca.FrdCustId,                                  // WS-CUST-ID. :139
+            CardNum = Fixed(authDetail.CardNum, 16),                 // :113
+            AuthTs = _authTs,                                        // :114
+            AuthType = Fixed(authDetail.AuthType, 4),               // :115
+            CardExpiryDate = Fixed(authDetail.CardExpiryDate, 4),   // :116
+            MessageType = Fixed(authDetail.MessageType, 6),         // :117
+            MessageSource = Fixed(authDetail.MessageSource, 6),     // :118
+            AuthIdCode = Fixed(authDetail.AuthIdCode, 6),           // :119
+            AuthRespCode = Fixed(authDetail.AuthRespCode, 2),       // :120
+            AuthRespReason = Fixed(authDetail.AuthRespReason, 4),   // :121
+            ProcessingCode = authDetail.ProcessingCode.ToString("D6", CultureInfo.InvariantCulture), // PA-PROCESSING-CODE 9(06)->X(6). :122
+            TransactionAmt = authDetail.TransactionAmt,             // :123
+            ApprovedAmt = authDetail.ApprovedAmt,                   // :124
+            MerchantCatagoryCode = Fixed(authDetail.MerchantCatagoryCode, 4), // (sic) :125-126
+            AcqrCountryCode = Fixed(authDetail.AcqrCountryCode, 3), // :127
+            PosEntryMode = authDetail.PosEntryMode,                 // :128
+            MerchantId = Fixed(authDetail.MerchantId, 15),          // :129
+            MerchantName = Fixed(authDetail.MerchantName, 22),      // VARCHAR(22), len always 22. :130-131
+            MerchantCity = Fixed(authDetail.MerchantCity, 13),      // :132
+            MerchantState = Fixed(authDetail.MerchantState, 2),     // :133
+            MerchantZip = Fixed(authDetail.MerchantZip, 9),         // :134
+            TransactionId = Fixed(authDetail.TransactionId, 15),    // :135
+            MatchStatus = Fixed(authDetail.MatchStatus, 1),         // :136
+            AuthFraudInd = Fixed(commarea.FrdAction, 1),            // FB #4: from WS-FRD-ACTION, not PA-AUTH-FRAUD. :137
+            FraudRptDate = currentDateIso,                          // CURRENT DATE. :194
+            AcctId = commarea.FrdAcctId,                            // WS-ACCT-ID. :138
+            CustId = commarea.FrdCustId,                            // WS-CUST-ID. :139
         };
 
         // EXEC SQL INSERT INTO CARDDEMO.AUTHFRDS (...) VALUES (...). source: :141-198
-        string insStatus = _authFrds.Insert(row);
-        if (insStatus == FileStatus.Ok)
+        string insertStatus = _authFrds.Insert(row);
+        if (insertStatus == FileStatus.Ok)
         {
             // SQLCODE = ZERO. source: :199-201
-            ca.FrdUpdateStatus = "S";          // SET WS-FRD-UPDT-SUCCESS TO TRUE.
-            ca.FrdActMsg = "ADD SUCCESS";      // MOVE 'ADD SUCCESS' TO WS-FRD-ACT-MSG.
+            commarea.FrdUpdateStatus = "S";    // SET WS-FRD-UPDT-SUCCESS TO TRUE.
+            commarea.FrdActMsg = "ADD SUCCESS"; // MOVE 'ADD SUCCESS' TO WS-FRD-ACT-MSG.
         }
-        else if (insStatus == FileStatus.DuplicateKeyError)
+        else if (insertStatus == FileStatus.DuplicateKeyError)
         {
             // SQLCODE = -803 (duplicate key). source: :203-204
-            FraudUpdate(ca, row);
+            FraudUpdate(commarea, row);
         }
         else
         {
@@ -175,8 +175,8 @@ public sealed class PendingAuthFraudReportProgram
             // there is no live DB2 SQLCODE/SQLSTATE to render (no DB2 layer), so placeholder edits stand in.
             // The COBOL STRING leaves the final 2 bytes of the X(50) WS-FRD-ACT-MSG unchanged; we space-pad
             // (the residual would be SPACES here on a fresh COMMAREA anyway). Documented emulation boundary.
-            ca.FrdUpdateStatus = "F";          // SET WS-FRD-UPDT-FAILED TO TRUE.
-            ca.FrdActMsg = Fixed(" SYSTEM ERROR DB2: CODE:" + EditSqlCode(-1) + ", STATE: " + EditSqlState(0), 50);
+            commarea.FrdUpdateStatus = "F";    // SET WS-FRD-UPDT-FAILED TO TRUE.
+            commarea.FrdActMsg = Fixed(" SYSTEM ERROR DB2: CODE:" + EditSqlCode(-1) + ", STATE: " + EditSqlState(0), 50);
         }
 
         // EXEC CICS RETURN (bare — no SYNCPOINT here; caller owns the unit of work, FB #6). source: :218-220
@@ -185,19 +185,19 @@ public sealed class PendingAuthFraudReportProgram
     // =============================================================================================
     //  FRAUD-UPDATE (performed on duplicate key) — source: COPAUS2C.cbl:221-244
     // =============================================================================================
-    private void FraudUpdate(WsFraudData ca, AuthFraud row)
+    private void FraudUpdate(FraudData commarea, AuthFraud row)  // COBOL paragraph: FRAUD-UPDATE
     {
         // EXEC SQL UPDATE CARDDEMO.AUTHFRDS SET AUTH_FRAUD=:AUTH-FRAUD, FRAUD_RPT_DATE=CURRENT DATE
         //          WHERE CARD_NUM=:CARD-NUM AND AUTH_TS=TIMESTAMP_FORMAT(:AUTH-TS,...). source: :222-229
         // COBOL sets ONLY the two fraud columns; every other existing DB column value is preserved. Use the
         // targeted repository update (NOT the all-columns Update, which would overwrite the stored row with
         // the COMMAREA image).
-        string updStatus = _authFrds.UpdateFraudFlag(row.CardNum, row.AuthTs, row.AuthFraudInd, row.FraudRptDate);
-        if (updStatus == FileStatus.Ok)
+        string updateStatus = _authFrds.UpdateFraudFlag(row.CardNum, row.AuthTs, row.AuthFraudInd, row.FraudRptDate);
+        if (updateStatus == FileStatus.Ok)
         {
             // SQLCODE = ZERO. source: :230-232
-            ca.FrdUpdateStatus = "S";          // SET WS-FRD-UPDT-SUCCESS TO TRUE.
-            ca.FrdActMsg = "UPDT SUCCESS";     // MOVE 'UPDT SUCCESS' TO WS-FRD-ACT-MSG.
+            commarea.FrdUpdateStatus = "S";    // SET WS-FRD-UPDT-SUCCESS TO TRUE.
+            commarea.FrdActMsg = "UPDT SUCCESS"; // MOVE 'UPDT SUCCESS' TO WS-FRD-ACT-MSG.
         }
         else
         {
@@ -205,8 +205,8 @@ public sealed class PendingAuthFraudReportProgram
             // OK or NOT-FOUND over the relational store, so a true DB2 SQL failure cannot arise — there is no
             // live SQLCODE/SQLSTATE to render and the COBOL STRING's residual trailing bytes are SPACES on a
             // fresh COMMAREA, so the space-pad matches. Documented emulation boundary (no DB2 layer).
-            ca.FrdUpdateStatus = "F";          // SET WS-FRD-UPDT-FAILED TO TRUE.
-            ca.FrdActMsg = Fixed(" UPDT ERROR DB2: CODE:" + EditSqlCode(-1) + ", STATE: " + EditSqlState(0), 50);
+            commarea.FrdUpdateStatus = "F";    // SET WS-FRD-UPDT-FAILED TO TRUE.
+            commarea.FrdActMsg = Fixed(" UPDT ERROR DB2: CODE:" + EditSqlCode(-1) + ", STATE: " + EditSqlState(0), 50);
         }
     }
 

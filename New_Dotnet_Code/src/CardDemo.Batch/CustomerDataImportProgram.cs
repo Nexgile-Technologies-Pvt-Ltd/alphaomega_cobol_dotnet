@@ -31,7 +31,7 @@ namespace CardDemo.Batch;
 /// <list type="bullet">
 /// <item><b>FB-1 — CARDOUT has no JCL DD.</b> The program SELECTs/OPENs/WRITEs CARDOUT for type-'D'
 /// records, but <c>CBIMPORT.jcl</c> allocates no CARDOUT DD. The JCL-faithful <see cref="Context"/> leaves
-/// <see cref="Context.CardOutPath"/> null, so <see cref="OpenFiles1100"/> fails the OPEN OUTPUT of
+/// <see cref="Context.CardOutPath"/> null, so <see cref="OpenFiles"/> fails the OPEN OUTPUT of
 /// CARD-OUTPUT and abends (CEE3ABD) before processing any record — exactly as the real run would.</item>
 /// <item><b>FB-2 — sequence-number truncation in the error report.</b> EXPORT-SEQUENCE-NUM is 9(9) but
 /// ERR-SEQUENCE is 9(7); the MOVE truncates the two high-order digits (kept low-order 7 digits).</item>
@@ -88,10 +88,10 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     {
         try
         {
-            Initialize1000();          // source: CBIMPORT.cbl:167
-            ProcessExportFile2000();   // source: CBIMPORT.cbl:168
-            ValidateImport3000();      // source: CBIMPORT.cbl:169
-            Finalize4000();            // source: CBIMPORT.cbl:170
+            Initialize();          // source: CBIMPORT.cbl:167
+            ProcessExportFile();   // source: CBIMPORT.cbl:168
+            ValidateImport();      // source: CBIMPORT.cbl:169
+            FinalizeImport();      // source: CBIMPORT.cbl:170
             return 0;                  // GOBACK  // source: CBIMPORT.cbl:171
         }
         finally
@@ -109,20 +109,20 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     // =====================================================================================
     // 1000-INITIALIZE  // source: CBIMPORT.cbl:174-193
     // =====================================================================================
-    private void Initialize1000()
+    private void Initialize()   // COBOL paragraph: 1000-INITIALIZE
     {
         Display("CBIMPORT: Starting Customer Data Import");   // source: CBIMPORT.cbl:176
 
         // Build WS-IMPORT-DATE X(10) = CCYY-MM-DD from FUNCTION CURRENT-DATE substrings.
         // source: CBIMPORT.cbl:178-182
-        string cd = CurrentDate();                            // CCYYMMDDhhmmss... (FUNCTION CURRENT-DATE)
-        _importDate = cd.Substring(0, 4) + "-" + cd.Substring(4, 2) + "-" + cd.Substring(6, 2);
+        string currentDate = CurrentDate();                  // CCYYMMDDhhmmss... (FUNCTION CURRENT-DATE)
+        _importDate = currentDate.Substring(0, 4) + "-" + currentDate.Substring(4, 2) + "-" + currentDate.Substring(6, 2);
 
         // Build WS-IMPORT-TIME X(8) = HH:MM:SS from CURRENT-DATE (9:2)/(11:2)/(13:2).
         // source: CBIMPORT.cbl:184-188
-        _importTime = cd.Substring(8, 2) + ":" + cd.Substring(10, 2) + ":" + cd.Substring(12, 2);
+        _importTime = currentDate.Substring(8, 2) + ":" + currentDate.Substring(10, 2) + ":" + currentDate.Substring(12, 2);
 
-        OpenFiles1100();                                      // source: CBIMPORT.cbl:190
+        OpenFiles();                                      // source: CBIMPORT.cbl:190
 
         Display("CBIMPORT: Import Date: " + _importDate);     // source: CBIMPORT.cbl:192
         Display("CBIMPORT: Import Time: " + _importTime);     // source: CBIMPORT.cbl:193
@@ -136,7 +136,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// failed OPEN displays a file-specific message and abends. The relational read source is the flat
     /// EXPORT feed, slurped as raw 500-byte images; each OPEN OUTPUT truncates the target file (DISP=NEW).
     /// </summary>
-    private void OpenFiles1100()
+    private void OpenFiles()   // COBOL paragraph: 1100-OPEN-FILES (name kept: referenced by <see cref> docs)
     {
         // OPEN INPUT EXPORT-INPUT  // source: CBIMPORT.cbl:198-203
         try
@@ -151,7 +151,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
             // WS-EXPORT-STATUS; here that OPEN fails because the input dataset is absent, which is QSAM
             // FILE STATUS '35' (nonexistent/unavailable file) — the value the status field carries on this path.
             Display("ERROR: Cannot open EXPORT-INPUT, Status: " + "35");
-            AbendProgram9999();
+            AbendProgram();
         }
 
         // OPEN OUTPUT CUSTOMER-OUTPUT  // source: CBIMPORT.cbl:205-210
@@ -173,7 +173,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
             // NOT WS-CARD-OK  // source: CBIMPORT.cbl:234-237. WS-CARD-STATUS = '35' (file not allocated):
             // CBIMPORT.jcl codes no CARDOUT DD, so the OPEN finds no dataset — QSAM FILE STATUS '35'.
             Display("ERROR: Cannot open CARD-OUTPUT, Status: " + "35");
-            AbendProgram9999();
+            AbendProgram();
         }
         else
         {
@@ -204,24 +204,24 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
             // The COBOL DISPLAYs the runtime WS-*-STATUS for this DD; an OPEN OUTPUT that cannot create the
             // dataset is modeled as QSAM FILE STATUS '35' (nonexistent/unavailable file).
             Display($"ERROR: Cannot open {ddName}, Status: " + "35");
-            AbendProgram9999();
-            throw; // unreachable: AbendProgram9999 throws.
+            AbendProgram();
+            throw; // unreachable: AbendProgram throws.
         }
     }
 
     // =====================================================================================
     // 2000-PROCESS-EXPORT-FILE  // source: CBIMPORT.cbl:248-256
     // =====================================================================================
-    private void ProcessExportFile2000()
+    private void ProcessExportFile()   // COBOL paragraph: 2000-PROCESS-EXPORT-FILE
     {
-        ReadExportRecord2100();                          // priming read  // source: CBIMPORT.cbl:250
+        ReadExportRecord();                              // priming read  // source: CBIMPORT.cbl:250
 
         // PERFORM UNTIL WS-EXPORT-EOF  // source: CBIMPORT.cbl:252-256
         while (!_exportEof)
         {
             _totalRecordsRead++;                         // ADD 1 TO WS-TOTAL-RECORDS-READ  // source: CBIMPORT.cbl:253
-            ProcessRecordByType2200();                   // source: CBIMPORT.cbl:254
-            ReadExportRecord2100();                      // source: CBIMPORT.cbl:255
+            ProcessRecordByType();                       // source: CBIMPORT.cbl:254
+            ReadExportRecord();                          // source: CBIMPORT.cbl:255
         }
     }
 
@@ -232,7 +232,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// READ EXPORT-INPUT INTO EXPORT-RECORD: advance the sequential cursor over the raw 500-byte images.
     /// End-of-stream sets WS-EXPORT-EOF ('10'); any other read failure abends. // source: CBIMPORT.cbl:261-267
     /// </summary>
-    private void ReadExportRecord2100()
+    private void ReadExportRecord()   // COBOL paragraph: 2100-READ-EXPORT-RECORD
     {
         if (_exportCursor >= _exportRecords.Count)
         {
@@ -255,7 +255,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// EVALUATE EXPORT-REC-TYPE -&gt; dispatch to the per-type paragraph. Type 'D' is CARD (not 'C', which
     /// is CUSTOMER). // source: CBIMPORT.cbl:272-285
     /// </summary>
-    private void ProcessRecordByType2200()
+    private void ProcessRecordByType()   // COBOL paragraph: 2200-PROCESS-RECORD-BY-TYPE
     {
         byte[] image = _currentImage!;
         // EXPORT-REC-TYPE PIC X(1) at offset 0.  // source: CVEXPORT.cpy:10
@@ -263,12 +263,12 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
 
         switch (recType)
         {
-            case "C": ProcessCustomerRecord2300(image); break;   // source: CBIMPORT.cbl:273-274
-            case "A": ProcessAccountRecord2400(image); break;    // source: CBIMPORT.cbl:275-276
-            case "X": ProcessXrefRecord2500(image); break;       // source: CBIMPORT.cbl:277-278
-            case "T": ProcessTranRecord2600(image); break;       // source: CBIMPORT.cbl:279-280
-            case "D": ProcessCardRecord2650(image); break;       // source: CBIMPORT.cbl:281-282
-            default: ProcessUnknownRecord2700(image); break;     // source: CBIMPORT.cbl:283-284
+            case "C": ProcessCustomerRecord(image); break;   // source: CBIMPORT.cbl:273-274
+            case "A": ProcessAccountRecord(image); break;    // source: CBIMPORT.cbl:275-276
+            case "X": ProcessXrefRecord(image); break;       // source: CBIMPORT.cbl:277-278
+            case "T": ProcessTranRecord(image); break;       // source: CBIMPORT.cbl:279-280
+            case "D": ProcessCardRecord(image); break;       // source: CBIMPORT.cbl:281-282
+            default: ProcessUnknownRecord(image); break;     // source: CBIMPORT.cbl:283-284
         }
     }
 
@@ -281,7 +281,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// legacy CVEXPORT path: EXP-CUST-ID 9(9) COMP and EXP-CUST-FICO-CREDIT-SCORE 9(3) COMP-3 go through
     /// the runtime codecs. // source: CBIMPORT.cbl:290-320
     /// </summary>
-    private void ProcessCustomerRecord2300(byte[] image)
+    private void ProcessCustomerRecord(byte[] image)   // COBOL paragraph: 2300-PROCESS-CUSTOMER-RECORD
     {
         FixedRecord exp = FixedRecord.Parse(_ctx.CustomerVariant, image, _ctx.Host);
         var rec = new Customer
@@ -319,7 +319,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// COMP-3, CURR-CYC-DEBIT COMP, CREDIT-LIMIT/CURR-CYC-CREDIT zoned-display) into it, WRITE, bump the
     /// account counter. // source: CBIMPORT.cbl:325-349
     /// </summary>
-    private void ProcessAccountRecord2400(byte[] image)
+    private void ProcessAccountRecord(byte[] image)   // COBOL paragraph: 2400-PROCESS-ACCOUNT-RECORD
     {
         FixedRecord exp = FixedRecord.Parse(_ctx.AccountVariant, image, _ctx.Host);
         var rec = new Account
@@ -350,7 +350,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// INITIALIZE CARD-XREF-RECORD, MOVE EXP-XREF-CARD-NUM/CUST-ID/ACCT-ID (ACCT-ID is 9(11) COMP) into
     /// it, WRITE, bump the xref counter. // source: CBIMPORT.cbl:354-369
     /// </summary>
-    private void ProcessXrefRecord2500(byte[] image)
+    private void ProcessXrefRecord(byte[] image)   // COBOL paragraph: 2500-PROCESS-XREF-RECORD
     {
         FixedRecord exp = FixedRecord.Parse(_ctx.XrefVariant, image, _ctx.Host);
         var rec = new CardXref
@@ -372,7 +372,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// INITIALIZE TRAN-RECORD, MOVE the 13 EXP-TRAN-* fields (AMT S9(9)V99 COMP-3, MERCHANT-ID 9(9) COMP,
     /// CAT-CD 9(4) zoned) into it, WRITE, bump the transaction counter. // source: CBIMPORT.cbl:374-399
     /// </summary>
-    private void ProcessTranRecord2600(byte[] image)
+    private void ProcessTranRecord(byte[] image)   // COBOL paragraph: 2600-PROCESS-TRAN-RECORD
     {
         FixedRecord exp = FixedRecord.Parse(_ctx.TransactionVariant, image, _ctx.Host);
         var rec = new Transaction
@@ -406,7 +406,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// the program already abended in 1100-OPEN-FILES on the missing CARDOUT DD (FB-1). When a CardOutPath
     /// is supplied (override), the CARD sink is written normally. // source: CBIMPORT.cbl:404-422
     /// </summary>
-    private void ProcessCardRecord2650(byte[] image)
+    private void ProcessCardRecord(byte[] image)   // COBOL paragraph: 2650-PROCESS-CARD-RECORD
     {
         FixedRecord exp = FixedRecord.Parse(_ctx.CardVariant, image, _ctx.Host);
         var rec = new Card
@@ -431,7 +431,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// Bump WS-UNKNOWN-RECORD-TYPE-COUNT, build WS-ERROR-RECORD (ts | rec-type | seq | message), then
     /// 2750-WRITE-ERROR. // source: CBIMPORT.cbl:427-434
     /// </summary>
-    private void ProcessUnknownRecord2700(byte[] image)
+    private void ProcessUnknownRecord(byte[] image)   // COBOL paragraph: 2700-PROCESS-UNKNOWN-RECORD
     {
         _unknownRecordTypeCount++;                                       // source: CBIMPORT.cbl:427
 
@@ -464,7 +464,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
         Put(rec, 37, "Unknown record type encountered".PadRight(50, ' '));
         // bytes 87..131 = FILLER X(43) SPACES (already space-filled).  // source: CBIMPORT.cbl:160
 
-        WriteError2750(rec);                                            // source: CBIMPORT.cbl:434
+        WriteError(rec);                                                // source: CBIMPORT.cbl:434
     }
 
     // =====================================================================================
@@ -474,7 +474,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// WRITE ERROR-OUTPUT-RECORD FROM WS-ERROR-RECORD; a write failure on the error file is logged but
     /// TOLERATED (no abend). Bump WS-ERROR-RECORDS-WRITTEN. // source: CBIMPORT.cbl:439-446
     /// </summary>
-    private void WriteError2750(byte[] errorRecord)
+    private void WriteError(byte[] errorRecord)   // COBOL paragraph: 2750-WRITE-ERROR
     {
         try
         {
@@ -496,7 +496,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// FB-3: prints two static lines and performs NO actual validation (despite the documented "validate
     /// data integrity using checksums" purpose). // source: CBIMPORT.cbl:451-452
     /// </summary>
-    private void ValidateImport3000()
+    private void ValidateImport()   // COBOL paragraph: 3000-VALIDATE-IMPORT
     {
         Display("CBIMPORT: Import validation completed");                // source: CBIMPORT.cbl:451
         Display("CBIMPORT: No validation errors detected");             // source: CBIMPORT.cbl:452
@@ -510,7 +510,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// summary prints them zero-padded to 9 digits as COBOL DISPLAY of an unedited 9(9) would.
     /// // source: CBIMPORT.cbl:457-478
     /// </summary>
-    private void Finalize4000()
+    private void FinalizeImport()   // COBOL paragraph: 4000-FINALIZE
     {
         // CLOSE EXPORT-INPUT + the six outputs.  // source: CBIMPORT.cbl:457-463
         _customerOut.Flush();
@@ -535,7 +535,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     // 9999-ABEND-PROGRAM  // source: CBIMPORT.cbl:481-484
     // =====================================================================================
     /// <summary>DISPLAY the abend banner then CALL 'CEE3ABD' (mapped to <see cref="AbendException"/>). // source: CBIMPORT.cbl:483-484</summary>
-    private void AbendProgram9999()
+    private void AbendProgram()   // COBOL paragraph: 9999-ABEND-PROGRAM
     {
         Display("CBIMPORT: ABENDING PROGRAM");                          // source: CBIMPORT.cbl:483
         throw new AbendException("999", "CBIMPORT abend.");             // CALL 'CEE3ABD'  // source: CBIMPORT.cbl:484
@@ -607,7 +607,7 @@ public sealed class CustomerDataImportProgram(CustomerDataImportProgram.Context 
     /// <param name="Host">Host encoding for the input feed and the output datasets.</param>
     /// <param name="CardOutPath">
     /// CARDOUT — card staging output (150-byte CVACT02Y). FB-1: <c>CBIMPORT.jcl</c> allocates NO CARDOUT
-    /// DD, so the JCL-faithful default is <c>null</c>, which makes <see cref="OpenFiles1100"/> abend on
+    /// DD, so the JCL-faithful default is <c>null</c>, which makes <see cref="OpenFiles"/> abend on
     /// the missing DD. Supply a path to enable the recommended option-b CARD target.
     /// </param>
     public sealed record Context(

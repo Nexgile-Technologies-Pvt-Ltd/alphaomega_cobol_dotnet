@@ -80,7 +80,7 @@ public sealed class TransactionDetailReportProgram
     // The card-sorted forward cursor over TRANSACTION (mirrors the upstream SORT by TRAN-CARD-NUM).
     private IEnumerator<Transaction>? _transactCursor;
 
-    // The DATEPARM date window captured for the TRANSACT.DALY pre-filter — see Execute / TranfileOpen0000.
+    // The DATEPARM date window captured for the TRANSACT.DALY pre-filter — see Execute / OpenTransactionFile.
     // On the mainframe TRANFILE = TRANSACT.DALY, which the upstream SORT step has already date-filtered, so
     // CBTRN03C only ever sees in-window records. Null = empty DATEPARM (no filter; the read loop never runs).
     private string? _dalyStartDate;
@@ -98,8 +98,8 @@ public sealed class TransactionDetailReportProgram
     private string _ioStatus = "00";
 
     // --- WS-DATEPARM-RECORD (lines 122-125) ----------------------------------------------------------
-    private string _wsStartDate = new(' ', 10); // WS-START-DATE PIC X(10)  // source: CBTRN03C.cbl:123
-    private string _wsEndDate = new(' ', 10);   // WS-END-DATE   PIC X(10)  // source: CBTRN03C.cbl:125
+    private string _startDate = new(' ', 10); // WS-START-DATE PIC X(10)  // source: CBTRN03C.cbl:123
+    private string _endDate = new(' ', 10);   // WS-END-DATE   PIC X(10)  // source: CBTRN03C.cbl:125
 
     // --- WS-REPORT-VARS (lines 127-137) --------------------------------------------------------------
     private bool _firstTime = true;            // WS-FIRST-TIME   PIC X VALUE 'Y'  // source: CBTRN03C.cbl:128
@@ -223,7 +223,7 @@ public sealed class TransactionDetailReportProgram
 
         // TRANFILE on the mainframe is TRANSACT.DALY — the date-filtered, card-sorted output of the upstream
         // SORT (TRANREPT.jcl STEP05R, INCLUDE COND on TRAN-PROC-TS(1:10)). Capture that window now so
-        // TranfileOpen0000 yields only the in-window records (the DALY contents). The in-program
+        // OpenTransactionFile yields only the in-window records (the DALY contents). The in-program
         // NEXT-SENTENCE date filter (faithful bug #1) therefore never trips on real input, exactly as on the
         // mainframe where DALY is already pre-filtered. A null start date models an empty DATEPARM (no
         // filter; the read loop never runs because 0550-DATEPARM-READ sets END-OF-FILE='Y').
@@ -234,14 +234,14 @@ public sealed class TransactionDetailReportProgram
         {
             Display("START OF EXECUTION OF PROGRAM CBTRN03C"); // source: CBTRN03C.cbl:160
 
-            TranfileOpen0000();   // source: CBTRN03C.cbl:161
-            ReptfileOpen0100();   // source: CBTRN03C.cbl:162
-            CardxrefOpen0200();   // source: CBTRN03C.cbl:163
-            TrantypeOpen0300();   // source: CBTRN03C.cbl:164
-            TrancatgOpen0400();   // source: CBTRN03C.cbl:165
-            DateparmOpen0500();   // source: CBTRN03C.cbl:166
+            OpenTransactionFile();   // source: CBTRN03C.cbl:161
+            OpenReportFile();   // source: CBTRN03C.cbl:162
+            OpenCardXref();   // source: CBTRN03C.cbl:163
+            OpenTranType();   // source: CBTRN03C.cbl:164
+            OpenTranCategory();   // source: CBTRN03C.cbl:165
+            OpenDateParm();   // source: CBTRN03C.cbl:166
 
-            DateparmRead0550(startDate, endDate); // source: CBTRN03C.cbl:168
+            ReadDateParm(startDate, endDate); // source: CBTRN03C.cbl:168
 
             // PERFORM UNTIL END-OF-FILE = 'Y'  // source: CBTRN03C.cbl:170-206
             while (!_endOfFile)
@@ -249,7 +249,7 @@ public sealed class TransactionDetailReportProgram
                 // IF END-OF-FILE = 'N' (redundant inner guard vs the UNTIL — bug #7)  // source: CBTRN03C.cbl:171
                 if (!_endOfFile)
                 {
-                    TranfileGetNext1000(); // source: CBTRN03C.cbl:172
+                    GetNextTransaction(); // source: CBTRN03C.cbl:172
 
                     // Date filter (lines 173-178): IF in-range CONTINUE ELSE NEXT SENTENCE.
                     // FAITHFUL BUG #1: the whole PERFORM UNTIL ... END-PERFORM is ONE sentence terminated by
@@ -257,13 +257,13 @@ public sealed class TransactionDetailReportProgram
                     // after that period — 9000-TRANFILE-CLOSE (cbl:208). An out-of-range record therefore
                     // TERMINATES the read loop entirely (it does NOT skip-and-continue): no page/grand totals
                     // are written, processing jumps straight to the close paragraphs. Modelled as `break`.
-                    // NOTE: TRANFILE = TRANSACT.DALY is pre-filtered to this same window in TranfileOpen0000,
+                    // NOTE: TRANFILE = TRANSACT.DALY is pre-filtered to this same window in OpenTransactionFile,
                     // so on real input `inRange` is always true and this break is DORMANT — preserved for
                     // fidelity but never fired, exactly as on the mainframe (the SORT removed out-of-window rows).
                     string procDate = Substr(_tranRecord.ProcTs, 0, 10); // TRAN-PROC-TS (1:10)  // source: CBTRN03C.cbl:173-174
                     bool inRange =
-                        string.CompareOrdinal(procDate, _wsStartDate) >= 0 &&
-                        string.CompareOrdinal(procDate, _wsEndDate) <= 0;
+                        string.CompareOrdinal(procDate, _startDate) >= 0 &&
+                        string.CompareOrdinal(procDate, _endDate) <= 0;
                     if (!inRange)
                         break; // NEXT SENTENCE -> branch past END-PERFORM. to 9000-TRANFILE-CLOSE  // source: CBTRN03C.cbl:177,206,208
 
@@ -277,21 +277,21 @@ public sealed class TransactionDetailReportProgram
                         {
                             // IF WS-FIRST-TIME = 'N' -> flush prior card's account total  // source: CBTRN03C.cbl:182-184
                             if (!_firstTime)
-                                WriteAccountTotals1120();
+                                WriteAccountTotals();
 
                             _currCardNum = Alpha(_tranRecord.CardNum, CardNumWidth); // MOVE TRAN-CARD-NUM TO WS-CURR-CARD-NUM  // source: CBTRN03C.cbl:185
                             _fdXrefCardNum = Alpha(_tranRecord.CardNum, CardNumWidth); // MOVE TRAN-CARD-NUM TO FD-XREF-CARD-NUM  // source: CBTRN03C.cbl:186
-                            LookupXref1500A();                                       // source: CBTRN03C.cbl:187
+                            LookupXref();                                       // source: CBTRN03C.cbl:187
                         }
 
                         _fdTranType = Alpha(_tranRecord.TypeCd, 2); // MOVE TRAN-TYPE-CD OF TRAN-RECORD TO FD-TRAN-TYPE  // source: CBTRN03C.cbl:189
-                        LookupTrantype1500B();                       // source: CBTRN03C.cbl:190
+                        LookupTranType();                       // source: CBTRN03C.cbl:190
 
                         _fdTranTypeCd = Alpha(_tranRecord.TypeCd, 2); // MOVE TRAN-TYPE-CD OF TRAN-RECORD TO FD-TRAN-TYPE-CD  // source: CBTRN03C.cbl:191-192
                         _fdTranCatCd = _tranRecord.CatCd;             // MOVE TRAN-CAT-CD OF TRAN-RECORD TO FD-TRAN-CAT-CD  // source: CBTRN03C.cbl:193-194
-                        LookupTrancatg1500C();                        // source: CBTRN03C.cbl:195
+                        LookupTranCategory();                        // source: CBTRN03C.cbl:195
 
-                        WriteTransactionReport1100(); // source: CBTRN03C.cbl:196
+                        WriteTransactionReport(); // source: CBTRN03C.cbl:196
                     }
                     else // ELSE (END-OF-FILE = 'Y' — this iteration hit EOF)  // source: CBTRN03C.cbl:197
                     {
@@ -302,20 +302,20 @@ public sealed class TransactionDetailReportProgram
                         // totals (a second time) — inflates the final page total and grand total.
                         AddTranAmt(_tranRecord.Amt); // ADD TRAN-AMT TO WS-PAGE-TOTAL WS-ACCOUNT-TOTAL  // source: CBTRN03C.cbl:200-201
 
-                        WritePageTotals1110();  // source: CBTRN03C.cbl:202
-                        WriteGrandTotals1110(); // source: CBTRN03C.cbl:203
+                        WritePageTotals();  // source: CBTRN03C.cbl:202
+                        WriteGrandTotals(); // source: CBTRN03C.cbl:203
                         // FAITHFUL BUG #3: 1120-WRITE-ACCOUNT-TOTALS is NOT called here, so the final card's
                         // account total is never written.
                     }
                 }
             }
 
-            TranfileClose9000();  // source: CBTRN03C.cbl:208
-            ReptfileClose9100();  // source: CBTRN03C.cbl:209
-            CardxrefClose9200();  // source: CBTRN03C.cbl:210
-            TrantypeClose9300();  // source: CBTRN03C.cbl:211
-            TrancatgClose9400();  // source: CBTRN03C.cbl:212
-            DateparmClose9500();  // source: CBTRN03C.cbl:213
+            CloseTransactionFile();  // source: CBTRN03C.cbl:208
+            CloseReportFile();  // source: CBTRN03C.cbl:209
+            CloseCardXref();  // source: CBTRN03C.cbl:210
+            CloseTranType();  // source: CBTRN03C.cbl:211
+            CloseTranCategory();  // source: CBTRN03C.cbl:212
+            CloseDateParm();  // source: CBTRN03C.cbl:213
 
             Display("END OF EXECUTION OF PROGRAM CBTRN03C"); // source: CBTRN03C.cbl:215
             // GOBACK  // source: CBTRN03C.cbl:217
@@ -333,14 +333,14 @@ public sealed class TransactionDetailReportProgram
     /// as the supplied start/end date pair: a non-null start date is status '00' (proceed); a null start
     /// date is an empty file (status '10' -> APPL-EOF -> END-OF-FILE='Y'). // source: CBTRN03C.cbl:220-243
     /// </summary>
-    private void DateparmRead0550(string? startDate, string? endDate)
+    private void ReadDateParm(string? startDate, string? endDate) // COBOL paragraph: 0550-DATEPARM-READ
     {
         // READ DATE-PARMS-FILE INTO WS-DATEPARM-RECORD  // source: CBTRN03C.cbl:221
         if (startDate is not null)
         {
             _dateparmStatus = FileStatus.Ok;
-            _wsStartDate = Alpha(startDate, 10);          // WS-START-DATE PIC X(10)
-            _wsEndDate = Alpha(endDate ?? "", 10);        // WS-END-DATE   PIC X(10)
+            _startDate = Alpha(startDate, 10);          // WS-START-DATE PIC X(10)
+            _endDate = Alpha(endDate ?? "", 10);        // WS-END-DATE   PIC X(10)
         }
         else
         {
@@ -358,7 +358,7 @@ public sealed class TransactionDetailReportProgram
         if (ApplAok)                                      // IF APPL-AOK  // source: CBTRN03C.cbl:231
         {
             // DISPLAY 'Reporting from ' WS-START-DATE ' to ' WS-END-DATE  // source: CBTRN03C.cbl:232-233
-            Display("Reporting from " + _wsStartDate + " to " + _wsEndDate);
+            Display("Reporting from " + _startDate + " to " + _endDate);
         }
         else if (ApplEof)                                 // IF APPL-EOF  // source: CBTRN03C.cbl:235
         {
@@ -368,8 +368,8 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR READING DATEPARM FILE");       // source: CBTRN03C.cbl:238
             _ioStatus = _dateparmStatus;                  // MOVE DATEPARM-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:239
-            DisplayIoStatus9910();                        // source: CBTRN03C.cbl:240
-            AbendProgram9999();                           // source: CBTRN03C.cbl:241
+            DisplayIoStatus();                        // source: CBTRN03C.cbl:240
+            AbendProgram();                           // source: CBTRN03C.cbl:241
         }
         // (no EXIT; paragraph ends at the period on line 243)
     }
@@ -381,7 +381,7 @@ public sealed class TransactionDetailReportProgram
     /// 1000-TRANFILE-GET-NEXT — sequential READ of the next transaction row (card-sorted cursor). On EOF the
     /// TRAN-RECORD is left unchanged (READ ... INTO is not done on status '10'). // source: CBTRN03C.cbl:248-272
     /// </summary>
-    private void TranfileGetNext1000()
+    private void GetNextTransaction() // COBOL paragraph: 1000-TRANFILE-GET-NEXT
     {
         // READ TRANSACT-FILE INTO TRAN-RECORD  // source: CBTRN03C.cbl:249
         _tranfileStatus = ReadNextCardSorted(out Transaction? next);
@@ -408,8 +408,8 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR READING TRANSACTION FILE");    // source: CBTRN03C.cbl:266
             _ioStatus = _tranfileStatus;                  // MOVE TRANFILE-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:267
-            DisplayIoStatus9910();                        // source: CBTRN03C.cbl:268
-            AbendProgram9999();                           // source: CBTRN03C.cbl:269
+            DisplayIoStatus();                        // source: CBTRN03C.cbl:268
+            AbendProgram();                           // source: CBTRN03C.cbl:269
         }
         // EXIT  // source: CBTRN03C.cbl:272
     }
@@ -419,7 +419,7 @@ public sealed class TransactionDetailReportProgram
     /// 1100-WRITE-TRANSACTION-REPORT — one-time header on first detail, MOD-20 page break, accumulate this
     /// in-range record's amount, then write the detail line. // source: CBTRN03C.cbl:274-290
     /// </summary>
-    private void WriteTransactionReport1100()
+    private void WriteTransactionReport() // COBOL paragraph: 1100-WRITE-TRANSACTION-REPORT
     {
         // IF WS-FIRST-TIME = 'Y'  // source: CBTRN03C.cbl:275
         if (_firstTime)
@@ -427,19 +427,19 @@ public sealed class TransactionDetailReportProgram
             _firstTime = false;                 // MOVE 'N' TO WS-FIRST-TIME  // source: CBTRN03C.cbl:276
             // MOVE WS-START-DATE TO REPT-START-DATE; MOVE WS-END-DATE TO REPT-END-DATE  // source: CBTRN03C.cbl:277-278
             // (carried directly into the REPORT-NAME-HEADER template; see BuildReportNameHeader.)
-            WriteHeaders1120();                 // source: CBTRN03C.cbl:279
+            WriteHeaders();                 // source: CBTRN03C.cbl:279
         }
 
         // IF FUNCTION MOD(WS-LINE-COUNTER, WS-PAGE-SIZE) = 0  // source: CBTRN03C.cbl:282
         if (_lineCounter % PageSize == 0)
         {
             // FAITHFUL BUG #6: page-total then header (order matters).
-            WritePageTotals1110();              // source: CBTRN03C.cbl:283
-            WriteHeaders1120();                 // source: CBTRN03C.cbl:284
+            WritePageTotals();              // source: CBTRN03C.cbl:283
+            WriteHeaders();                 // source: CBTRN03C.cbl:284
         }
 
         AddTranAmt(_tranRecord.Amt);            // ADD TRAN-AMT TO WS-PAGE-TOTAL WS-ACCOUNT-TOTAL  // source: CBTRN03C.cbl:287-288
-        WriteDetail1120();                      // source: CBTRN03C.cbl:289
+        WriteDetail();                      // source: CBTRN03C.cbl:289
         // EXIT  // source: CBTRN03C.cbl:290
     }
 
@@ -448,14 +448,14 @@ public sealed class TransactionDetailReportProgram
     /// 1110-WRITE-PAGE-TOTALS — write the page-total line, roll the page total into the grand total, reset
     /// the page total, then write a HEADER-2 rule line. (+2 to WS-LINE-COUNTER.) // source: CBTRN03C.cbl:293-304
     /// </summary>
-    private void WritePageTotals1110()
+    private void WritePageTotals() // COBOL paragraph: 1110-WRITE-PAGE-TOTALS
     {
         // MOVE WS-PAGE-TOTAL TO REPT-PAGE-TOTAL; MOVE REPORT-PAGE-TOTALS TO FD-REPTFILE-REC  // source: CBTRN03C.cbl:294-295
-        WriteReportRec1111(BuildReportPageTotals(_pageTotal)); // source: CBTRN03C.cbl:296
+        WriteReportRec(BuildReportPageTotals(_pageTotal)); // source: CBTRN03C.cbl:296
         _grandTotal = AddMoney(_grandTotal, _pageTotal);       // ADD WS-PAGE-TOTAL TO WS-GRAND-TOTAL  // source: CBTRN03C.cbl:297
         _pageTotal = 0m;                                       // MOVE 0 TO WS-PAGE-TOTAL  // source: CBTRN03C.cbl:298
         _lineCounter += 1;                                     // ADD 1 TO WS-LINE-COUNTER  // source: CBTRN03C.cbl:299
-        WriteReportRec1111(BuildTransactionHeader2());         // MOVE TRANSACTION-HEADER-2 ...  // source: CBTRN03C.cbl:300-301
+        WriteReportRec(BuildTransactionHeader2());         // MOVE TRANSACTION-HEADER-2 ...  // source: CBTRN03C.cbl:300-301
         _lineCounter += 1;                                     // ADD 1 TO WS-LINE-COUNTER  // source: CBTRN03C.cbl:302
         // EXIT  // source: CBTRN03C.cbl:304
     }
@@ -465,13 +465,13 @@ public sealed class TransactionDetailReportProgram
     /// 1120-WRITE-ACCOUNT-TOTALS — write the account-total line, reset the account total, then write a
     /// HEADER-2 rule line. (+2 to WS-LINE-COUNTER.) // source: CBTRN03C.cbl:306-316
     /// </summary>
-    private void WriteAccountTotals1120()
+    private void WriteAccountTotals() // COBOL paragraph: 1120-WRITE-ACCOUNT-TOTALS
     {
         // MOVE WS-ACCOUNT-TOTAL TO REPT-ACCOUNT-TOTAL; MOVE REPORT-ACCOUNT-TOTALS TO FD-REPTFILE-REC  // source: CBTRN03C.cbl:307-308
-        WriteReportRec1111(BuildReportAccountTotals(_accountTotal)); // source: CBTRN03C.cbl:309
+        WriteReportRec(BuildReportAccountTotals(_accountTotal)); // source: CBTRN03C.cbl:309
         _accountTotal = 0m;                                          // MOVE 0 TO WS-ACCOUNT-TOTAL  // source: CBTRN03C.cbl:310
         _lineCounter += 1;                                          // ADD 1 TO WS-LINE-COUNTER  // source: CBTRN03C.cbl:311
-        WriteReportRec1111(BuildTransactionHeader2());              // MOVE TRANSACTION-HEADER-2 ...  // source: CBTRN03C.cbl:312-313
+        WriteReportRec(BuildTransactionHeader2());              // MOVE TRANSACTION-HEADER-2 ...  // source: CBTRN03C.cbl:312-313
         _lineCounter += 1;                                          // ADD 1 TO WS-LINE-COUNTER  // source: CBTRN03C.cbl:314
         // EXIT  // source: CBTRN03C.cbl:316
     }
@@ -481,10 +481,10 @@ public sealed class TransactionDetailReportProgram
     /// 1110-WRITE-GRAND-TOTALS — write the grand-total line. FAITHFUL BUG #5: does NOT increment
     /// WS-LINE-COUNTER. // source: CBTRN03C.cbl:318-322
     /// </summary>
-    private void WriteGrandTotals1110()
+    private void WriteGrandTotals() // COBOL paragraph: 1110-WRITE-GRAND-TOTALS
     {
         // MOVE WS-GRAND-TOTAL TO REPT-GRAND-TOTAL; MOVE REPORT-GRAND-TOTALS TO FD-REPTFILE-REC  // source: CBTRN03C.cbl:319-320
-        WriteReportRec1111(BuildReportGrandTotals(_grandTotal)); // source: CBTRN03C.cbl:321
+        WriteReportRec(BuildReportGrandTotals(_grandTotal)); // source: CBTRN03C.cbl:321
         // (no ADD 1 TO WS-LINE-COUNTER — bug #5)
         // EXIT  // source: CBTRN03C.cbl:322
     }
@@ -494,15 +494,15 @@ public sealed class TransactionDetailReportProgram
     /// 1120-WRITE-HEADERS — write the 4-line header block (name header, blank line, HEADER-1, HEADER-2).
     /// (+4 to WS-LINE-COUNTER.) // source: CBTRN03C.cbl:324-341
     /// </summary>
-    private void WriteHeaders1120()
+    private void WriteHeaders() // COBOL paragraph: 1120-WRITE-HEADERS
     {
-        WriteReportRec1111(BuildReportNameHeader());      // MOVE REPORT-NAME-HEADER ...  // source: CBTRN03C.cbl:325-326
+        WriteReportRec(BuildReportNameHeader());      // MOVE REPORT-NAME-HEADER ...  // source: CBTRN03C.cbl:325-326
         _lineCounter += 1;                                // source: CBTRN03C.cbl:327
-        WriteReportRec1111(new string(' ', ReportRecLen)); // MOVE WS-BLANK-LINE ...  // source: CBTRN03C.cbl:329-330
+        WriteReportRec(new string(' ', ReportRecLen)); // MOVE WS-BLANK-LINE ...  // source: CBTRN03C.cbl:329-330
         _lineCounter += 1;                                // source: CBTRN03C.cbl:331
-        WriteReportRec1111(BuildTransactionHeader1());    // MOVE TRANSACTION-HEADER-1 ...  // source: CBTRN03C.cbl:333-334
+        WriteReportRec(BuildTransactionHeader1());    // MOVE TRANSACTION-HEADER-1 ...  // source: CBTRN03C.cbl:333-334
         _lineCounter += 1;                                // source: CBTRN03C.cbl:335
-        WriteReportRec1111(BuildTransactionHeader2());    // MOVE TRANSACTION-HEADER-2 ...  // source: CBTRN03C.cbl:337-338
+        WriteReportRec(BuildTransactionHeader2());    // MOVE TRANSACTION-HEADER-2 ...  // source: CBTRN03C.cbl:337-338
         _lineCounter += 1;                                // source: CBTRN03C.cbl:339
         // EXIT (Header block = 4 lines, +4 to WS-LINE-COUNTER.)  // source: CBTRN03C.cbl:341
     }
@@ -512,7 +512,7 @@ public sealed class TransactionDetailReportProgram
     /// 1111-WRITE-REPORT-REC — WRITE FD-REPTFILE-REC (133 bytes). Status '00' -> ok, else 12 -> abend.
     /// // source: CBTRN03C.cbl:343-359
     /// </summary>
-    private void WriteReportRec1111(string record)
+    private void WriteReportRec(string record) // COBOL paragraph: 1111-WRITE-REPORT-REC
     {
         // WRITE FD-REPTFILE-REC (FD record is X(133); pad/truncate to exactly 133).  // source: CBTRN03C.cbl:345
         _writer!.WriteText(FixedLine(record, ReportRecLen));
@@ -531,8 +531,8 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR WRITING REPTFILE");           // source: CBTRN03C.cbl:354
             _ioStatus = _treptStatus;                    // MOVE TRANREPT-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:355
-            DisplayIoStatus9910();                       // source: CBTRN03C.cbl:356
-            AbendProgram9999();                          // source: CBTRN03C.cbl:357
+            DisplayIoStatus();                       // source: CBTRN03C.cbl:356
+            AbendProgram();                          // source: CBTRN03C.cbl:357
         }
         // EXIT  // source: CBTRN03C.cbl:359
     }
@@ -542,7 +542,7 @@ public sealed class TransactionDetailReportProgram
     /// 1120-WRITE-DETAIL — INITIALIZE the detail line, move the transaction/xref/type/category fields into
     /// it (with the COBOL MOVE truncations), then write it. (+1 to WS-LINE-COUNTER.) // source: CBTRN03C.cbl:361-374
     /// </summary>
-    private void WriteDetail1120()
+    private void WriteDetail() // COBOL paragraph: 1120-WRITE-DETAIL
     {
         // INITIALIZE TRANSACTION-DETAIL-REPORT (data items -> spaces/zeros; FILLERs keep their VALUEs).
         // Modeled by building a fresh detail line whose FILLER positions are the constant '-'/' ' separators.
@@ -557,7 +557,7 @@ public sealed class TransactionDetailReportProgram
         decimal amt = _tranRecord.Amt;                                   // MOVE TRAN-AMT (-> -ZZZ,ZZZ,ZZZ.ZZ)  // source: CBTRN03C.cbl:370
 
         // MOVE TRANSACTION-DETAIL-REPORT TO FD-REPTFILE-REC  // source: CBTRN03C.cbl:371
-        WriteReportRec1111(BuildTransactionDetailReport(
+        WriteReportRec(BuildTransactionDetailReport(
             transId, accountId, typeCd, typeDesc, catCd, catDesc, source, amt)); // source: CBTRN03C.cbl:372
         _lineCounter += 1;                                               // ADD 1 TO WS-LINE-COUNTER  // source: CBTRN03C.cbl:373
         // EXIT  // source: CBTRN03C.cbl:374
@@ -565,7 +565,7 @@ public sealed class TransactionDetailReportProgram
 
     // *---------------------------------------------------------------*
     /// <summary>0000-TRANFILE-OPEN — OPEN INPUT TRANSACT-FILE -> position the card-sorted forward cursor. // source: CBTRN03C.cbl:376-392</summary>
-    private void TranfileOpen0000()
+    private void OpenTransactionFile() // COBOL paragraph: 0000-TRANFILE-OPEN
     {
         _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBTRN03C.cbl:377
         // OPEN INPUT TRANSACT-FILE -> build the forward cursor over the TRANSACT.DALY contents: the
@@ -594,15 +594,15 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR OPENING TRANFILE");            // source: CBTRN03C.cbl:387
             _ioStatus = _tranfileStatus;                  // MOVE TRANFILE-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:388
-            DisplayIoStatus9910();                        // source: CBTRN03C.cbl:389
-            AbendProgram9999();                           // source: CBTRN03C.cbl:390
+            DisplayIoStatus();                        // source: CBTRN03C.cbl:389
+            AbendProgram();                           // source: CBTRN03C.cbl:390
         }
         // EXIT  // source: CBTRN03C.cbl:392
     }
 
     // *---------------------------------------------------------------*
     /// <summary>0100-REPTFILE-OPEN — OPEN OUTPUT REPORT-FILE (the report dataset was created in Execute). // source: CBTRN03C.cbl:394-410</summary>
-    private void ReptfileOpen0100()
+    private void OpenReportFile() // COBOL paragraph: 0100-REPTFILE-OPEN
     {
         _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBTRN03C.cbl:395
         // OPEN OUTPUT REPORT-FILE -> the FixedFileWriter was already opened in Execute.  // source: CBTRN03C.cbl:396
@@ -614,15 +614,15 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR OPENING REPTFILE");            // source: CBTRN03C.cbl:405
             _ioStatus = _treptStatus;                     // MOVE TRANREPT-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:406
-            DisplayIoStatus9910();                        // source: CBTRN03C.cbl:407
-            AbendProgram9999();                           // source: CBTRN03C.cbl:408
+            DisplayIoStatus();                        // source: CBTRN03C.cbl:407
+            AbendProgram();                           // source: CBTRN03C.cbl:408
         }
         // EXIT  // source: CBTRN03C.cbl:410
     }
 
     // *---------------------------------------------------------------*
     /// <summary>0200-CARDXREF-OPEN — OPEN INPUT XREF-FILE (CARD_XREF handle for random keyed reads). // source: CBTRN03C.cbl:412-428</summary>
-    private void CardxrefOpen0200()
+    private void OpenCardXref() // COBOL paragraph: 0200-CARDXREF-OPEN
     {
         _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBTRN03C.cbl:413
         _ = _xref;                                        // OPEN INPUT XREF-FILE  // source: CBTRN03C.cbl:414
@@ -634,15 +634,15 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR OPENING CROSS REF FILE");      // source: CBTRN03C.cbl:423
             _ioStatus = _cardxrefStatus;                  // MOVE CARDXREF-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:424
-            DisplayIoStatus9910();                        // source: CBTRN03C.cbl:425
-            AbendProgram9999();                           // source: CBTRN03C.cbl:426
+            DisplayIoStatus();                        // source: CBTRN03C.cbl:425
+            AbendProgram();                           // source: CBTRN03C.cbl:426
         }
         // EXIT  // source: CBTRN03C.cbl:428
     }
 
     // *---------------------------------------------------------------*
     /// <summary>0300-TRANTYPE-OPEN — OPEN INPUT TRANTYPE-FILE (TRAN_TYPE handle for random keyed reads). // source: CBTRN03C.cbl:430-446</summary>
-    private void TrantypeOpen0300()
+    private void OpenTranType() // COBOL paragraph: 0300-TRANTYPE-OPEN
     {
         _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBTRN03C.cbl:431
         _ = _trantype;                                    // OPEN INPUT TRANTYPE-FILE  // source: CBTRN03C.cbl:432
@@ -654,15 +654,15 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR OPENING TRANSACTION TYPE FILE"); // source: CBTRN03C.cbl:441
             _ioStatus = _trantypeStatus;                    // MOVE TRANTYPE-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:442
-            DisplayIoStatus9910();                          // source: CBTRN03C.cbl:443
-            AbendProgram9999();                             // source: CBTRN03C.cbl:444
+            DisplayIoStatus();                          // source: CBTRN03C.cbl:443
+            AbendProgram();                             // source: CBTRN03C.cbl:444
         }
         // EXIT  // source: CBTRN03C.cbl:446
     }
 
     // *---------------------------------------------------------------*
     /// <summary>0400-TRANCATG-OPEN — OPEN INPUT TRANCATG-FILE (TRAN_CATEGORY handle for random keyed reads). // source: CBTRN03C.cbl:448-464</summary>
-    private void TrancatgOpen0400()
+    private void OpenTranCategory() // COBOL paragraph: 0400-TRANCATG-OPEN
     {
         _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBTRN03C.cbl:449
         _ = _trancatg;                                    // OPEN INPUT TRANCATG-FILE  // source: CBTRN03C.cbl:450
@@ -674,15 +674,15 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR OPENING TRANSACTION CATG FILE"); // source: CBTRN03C.cbl:459
             _ioStatus = _trancatgStatus;                    // MOVE TRANCATG-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:460
-            DisplayIoStatus9910();                          // source: CBTRN03C.cbl:461
-            AbendProgram9999();                             // source: CBTRN03C.cbl:462
+            DisplayIoStatus();                          // source: CBTRN03C.cbl:461
+            AbendProgram();                             // source: CBTRN03C.cbl:462
         }
         // EXIT  // source: CBTRN03C.cbl:464
     }
 
     // *---------------------------------------------------------------*
     /// <summary>0500-DATEPARM-OPEN — OPEN INPUT DATE-PARMS-FILE (the parameter dataset). // source: CBTRN03C.cbl:466-482</summary>
-    private void DateparmOpen0500()
+    private void OpenDateParm() // COBOL paragraph: 0500-DATEPARM-OPEN
     {
         _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBTRN03C.cbl:467
         // OPEN INPUT DATE-PARMS-FILE -> the parameter pair is supplied to Run.  // source: CBTRN03C.cbl:468
@@ -694,8 +694,8 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR OPENING DATE PARM FILE");      // source: CBTRN03C.cbl:477
             _ioStatus = _dateparmStatus;                  // MOVE DATEPARM-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:478
-            DisplayIoStatus9910();                        // source: CBTRN03C.cbl:479
-            AbendProgram9999();                           // source: CBTRN03C.cbl:480
+            DisplayIoStatus();                        // source: CBTRN03C.cbl:479
+            AbendProgram();                           // source: CBTRN03C.cbl:480
         }
         // EXIT  // source: CBTRN03C.cbl:482
     }
@@ -705,7 +705,7 @@ public sealed class TransactionDetailReportProgram
     /// 1500-A-LOOKUP-XREF — random keyed READ of CARD_XREF by FD-XREF-CARD-NUM (INVALID KEY -> abend).
     /// On success XREF-ACCT-ID is set for 1120-WRITE-DETAIL. // source: CBTRN03C.cbl:484-492
     /// </summary>
-    private void LookupXref1500A()
+    private void LookupXref() // COBOL paragraph: 1500-A-LOOKUP-XREF
     {
         // READ XREF-FILE INTO CARD-XREF-RECORD (KEY = FD-XREF-CARD-NUM)  // source: CBTRN03C.cbl:485
         _cardxrefStatus = _xref.ReadByKey(_fdXrefCardNum, out CardXref? xref);
@@ -714,8 +714,8 @@ public sealed class TransactionDetailReportProgram
             // INVALID KEY  // source: CBTRN03C.cbl:486
             Display("INVALID CARD NUMBER : " + _fdXrefCardNum); // source: CBTRN03C.cbl:487
             _ioStatus = "23";                                   // MOVE 23 TO IO-STATUS (bug #9 -> '0023')  // source: CBTRN03C.cbl:488
-            DisplayIoStatus9910();                              // source: CBTRN03C.cbl:489
-            AbendProgram9999();                                 // source: CBTRN03C.cbl:490
+            DisplayIoStatus();                              // source: CBTRN03C.cbl:489
+            AbendProgram();                                 // source: CBTRN03C.cbl:490
         }
         else
         {
@@ -729,7 +729,7 @@ public sealed class TransactionDetailReportProgram
     /// 1500-B-LOOKUP-TRANTYPE — random keyed READ of TRAN_TYPE by FD-TRAN-TYPE (INVALID KEY -> abend).
     /// On success TRAN-TYPE-DESC is set. // source: CBTRN03C.cbl:494-502
     /// </summary>
-    private void LookupTrantype1500B()
+    private void LookupTranType() // COBOL paragraph: 1500-B-LOOKUP-TRANTYPE
     {
         // READ TRANTYPE-FILE INTO TRAN-TYPE-RECORD (KEY = FD-TRAN-TYPE)  // source: CBTRN03C.cbl:495
         _trantypeStatus = _trantype.ReadByKey(_fdTranType, out TranType? type);
@@ -738,8 +738,8 @@ public sealed class TransactionDetailReportProgram
             // INVALID KEY  // source: CBTRN03C.cbl:496
             Display("INVALID TRANSACTION TYPE : " + _fdTranType); // source: CBTRN03C.cbl:497
             _ioStatus = "23";                                     // MOVE 23 TO IO-STATUS  // source: CBTRN03C.cbl:498
-            DisplayIoStatus9910();                                // source: CBTRN03C.cbl:499
-            AbendProgram9999();                                   // source: CBTRN03C.cbl:500
+            DisplayIoStatus();                                // source: CBTRN03C.cbl:499
+            AbendProgram();                                   // source: CBTRN03C.cbl:500
         }
         else
         {
@@ -754,7 +754,7 @@ public sealed class TransactionDetailReportProgram
     /// (FD-TRAN-TYPE-CD + FD-TRAN-CAT-CD) (INVALID KEY -> abend). On success TRAN-CAT-TYPE-DESC is set.
     /// // source: CBTRN03C.cbl:504-512
     /// </summary>
-    private void LookupTrancatg1500C()
+    private void LookupTranCategory() // COBOL paragraph: 1500-C-LOOKUP-TRANCATG
     {
         // READ TRANCATG-FILE INTO TRAN-CAT-RECORD (KEY = FD-TRAN-CAT-KEY)  // source: CBTRN03C.cbl:505
         _trancatgStatus = _trancatg.ReadByKey(_fdTranTypeCd, _fdTranCatCd, out TranCategory? category);
@@ -763,8 +763,8 @@ public sealed class TransactionDetailReportProgram
             // INVALID KEY  // source: CBTRN03C.cbl:506
             Display("INVALID TRAN CATG KEY : " + _fdTranTypeCd + ZonedDigits(_fdTranCatCd, 4)); // source: CBTRN03C.cbl:507
             _ioStatus = "23";                                                                    // MOVE 23 TO IO-STATUS  // source: CBTRN03C.cbl:508
-            DisplayIoStatus9910();                                                               // source: CBTRN03C.cbl:509
-            AbendProgram9999();                                                                  // source: CBTRN03C.cbl:510
+            DisplayIoStatus();                                                               // source: CBTRN03C.cbl:509
+            AbendProgram();                                                                  // source: CBTRN03C.cbl:510
         }
         else
         {
@@ -775,7 +775,7 @@ public sealed class TransactionDetailReportProgram
 
     // *---------------------------------------------------------------*
     /// <summary>9000-TRANFILE-CLOSE — CLOSE TRANSACT-FILE (end the card-sorted cursor). // source: CBTRN03C.cbl:514-530</summary>
-    private void TranfileClose9000()
+    private void CloseTransactionFile() // COBOL paragraph: 9000-TRANFILE-CLOSE
     {
         _applResult = 0 + 8;                              // ADD 8 TO ZERO GIVING APPL-RESULT (-> 8)  // source: CBTRN03C.cbl:515
         _transactCursor?.Dispose();                       // CLOSE TRANSACT-FILE  // source: CBTRN03C.cbl:516
@@ -788,15 +788,15 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR CLOSING POSTED TRANSACTION FILE"); // source: CBTRN03C.cbl:525
             _ioStatus = _tranfileStatus;                      // MOVE TRANFILE-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:526
-            DisplayIoStatus9910();                            // source: CBTRN03C.cbl:527
-            AbendProgram9999();                               // source: CBTRN03C.cbl:528
+            DisplayIoStatus();                            // source: CBTRN03C.cbl:527
+            AbendProgram();                               // source: CBTRN03C.cbl:528
         }
         // EXIT  // source: CBTRN03C.cbl:530
     }
 
     // *---------------------------------------------------------------*
     /// <summary>9100-REPTFILE-CLOSE — CLOSE REPORT-FILE (the report writer is flushed/closed in Execute). // source: CBTRN03C.cbl:532-548</summary>
-    private void ReptfileClose9100()
+    private void CloseReportFile() // COBOL paragraph: 9100-REPTFILE-CLOSE
     {
         _applResult = 0 + 8;                              // ADD 8 TO ZERO GIVING APPL-RESULT  // source: CBTRN03C.cbl:533
         _writer?.Flush();                                 // CLOSE REPORT-FILE (final dispose in Execute's finally)  // source: CBTRN03C.cbl:534
@@ -808,15 +808,15 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR CLOSING REPORT FILE");         // source: CBTRN03C.cbl:543
             _ioStatus = _treptStatus;                     // MOVE TRANREPT-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:544
-            DisplayIoStatus9910();                        // source: CBTRN03C.cbl:545
-            AbendProgram9999();                           // source: CBTRN03C.cbl:546
+            DisplayIoStatus();                        // source: CBTRN03C.cbl:545
+            AbendProgram();                           // source: CBTRN03C.cbl:546
         }
         // EXIT  // source: CBTRN03C.cbl:548
     }
 
     // *---------------------------------------------------------------*
     /// <summary>9200-CARDXREF-CLOSE — CLOSE XREF-FILE. // source: CBTRN03C.cbl:551-567</summary>
-    private void CardxrefClose9200()
+    private void CloseCardXref() // COBOL paragraph: 9200-CARDXREF-CLOSE
     {
         _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBTRN03C.cbl:552
         _ = _xref;                                        // CLOSE XREF-FILE  // source: CBTRN03C.cbl:553
@@ -828,15 +828,15 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR CLOSING CROSS REF FILE");      // source: CBTRN03C.cbl:562
             _ioStatus = _cardxrefStatus;                  // MOVE CARDXREF-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:563
-            DisplayIoStatus9910();                        // source: CBTRN03C.cbl:564
-            AbendProgram9999();                           // source: CBTRN03C.cbl:565
+            DisplayIoStatus();                        // source: CBTRN03C.cbl:564
+            AbendProgram();                           // source: CBTRN03C.cbl:565
         }
         // EXIT  // source: CBTRN03C.cbl:567
     }
 
     // *---------------------------------------------------------------*
     /// <summary>9300-TRANTYPE-CLOSE — CLOSE TRANTYPE-FILE. // source: CBTRN03C.cbl:569-585</summary>
-    private void TrantypeClose9300()
+    private void CloseTranType() // COBOL paragraph: 9300-TRANTYPE-CLOSE
     {
         _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBTRN03C.cbl:570
         _ = _trantype;                                    // CLOSE TRANTYPE-FILE  // source: CBTRN03C.cbl:571
@@ -848,15 +848,15 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR CLOSING TRANSACTION TYPE FILE"); // source: CBTRN03C.cbl:580
             _ioStatus = _trantypeStatus;                    // MOVE TRANTYPE-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:581
-            DisplayIoStatus9910();                          // source: CBTRN03C.cbl:582
-            AbendProgram9999();                             // source: CBTRN03C.cbl:583
+            DisplayIoStatus();                          // source: CBTRN03C.cbl:582
+            AbendProgram();                             // source: CBTRN03C.cbl:583
         }
         // EXIT  // source: CBTRN03C.cbl:585
     }
 
     // *---------------------------------------------------------------*
     /// <summary>9400-TRANCATG-CLOSE — CLOSE TRANCATG-FILE. // source: CBTRN03C.cbl:587-603</summary>
-    private void TrancatgClose9400()
+    private void CloseTranCategory() // COBOL paragraph: 9400-TRANCATG-CLOSE
     {
         _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBTRN03C.cbl:588
         _ = _trancatg;                                    // CLOSE TRANCATG-FILE  // source: CBTRN03C.cbl:589
@@ -868,15 +868,15 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR CLOSING TRANSACTION CATG FILE"); // source: CBTRN03C.cbl:598
             _ioStatus = _trancatgStatus;                    // MOVE TRANCATG-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:599
-            DisplayIoStatus9910();                          // source: CBTRN03C.cbl:600
-            AbendProgram9999();                             // source: CBTRN03C.cbl:601
+            DisplayIoStatus();                          // source: CBTRN03C.cbl:600
+            AbendProgram();                             // source: CBTRN03C.cbl:601
         }
         // EXIT  // source: CBTRN03C.cbl:603
     }
 
     // *---------------------------------------------------------------*
     /// <summary>9500-DATEPARM-CLOSE — CLOSE DATE-PARMS-FILE. // source: CBTRN03C.cbl:605-621</summary>
-    private void DateparmClose9500()
+    private void CloseDateParm() // COBOL paragraph: 9500-DATEPARM-CLOSE
     {
         _applResult = 8;                                  // MOVE 8 TO APPL-RESULT  // source: CBTRN03C.cbl:606
         // CLOSE DATE-PARMS-FILE  // source: CBTRN03C.cbl:607
@@ -888,8 +888,8 @@ public sealed class TransactionDetailReportProgram
         {
             Display("ERROR CLOSING DATE PARM FILE");      // source: CBTRN03C.cbl:616
             _ioStatus = _dateparmStatus;                  // MOVE DATEPARM-STATUS TO IO-STATUS  // source: CBTRN03C.cbl:617
-            DisplayIoStatus9910();                        // source: CBTRN03C.cbl:618
-            AbendProgram9999();                           // source: CBTRN03C.cbl:619
+            DisplayIoStatus();                        // source: CBTRN03C.cbl:618
+            AbendProgram();                           // source: CBTRN03C.cbl:619
         }
         // EXIT  // source: CBTRN03C.cbl:621
     }
@@ -899,7 +899,7 @@ public sealed class TransactionDetailReportProgram
     /// 9999-ABEND-PROGRAM — DISPLAY 'ABENDING PROGRAM'; MOVE 0 TO TIMING; MOVE 999 TO ABCODE;
     /// CALL 'CEE3ABD' USING ABCODE, TIMING. Maps to a 999 abend (no graceful return). // source: CBTRN03C.cbl:626-630
     /// </summary>
-    private void AbendProgram9999()
+    private void AbendProgram() // COBOL paragraph: 9999-ABEND-PROGRAM
     {
         Display("ABENDING PROGRAM"); // source: CBTRN03C.cbl:627
         // MOVE 0 TO TIMING; MOVE 999 TO ABCODE; CALL 'CEE3ABD' USING ABCODE, TIMING.  // source: CBTRN03C.cbl:628-630
@@ -912,7 +912,7 @@ public sealed class TransactionDetailReportProgram
     /// 9910-DISPLAY-IO-STATUS — formats the 2-byte file status into a 4-char "NNNN" string and DISPLAYs
     /// <c>'FILE STATUS IS: NNNN' IO-STATUS-04</c>. // source: CBTRN03C.cbl:633-646
     /// </summary>
-    private void DisplayIoStatus9910()
+    private void DisplayIoStatus() // COBOL paragraph: 9910-DISPLAY-IO-STATUS
     {
         // IO-STATUS-04 = IO-STATUS-0401 PIC 9 + IO-STATUS-0403 PIC 999  // source: CBTRN03C.cbl:146-148
         string s = _ioStatus.Length >= 2 ? _ioStatus[..2] : _ioStatus.PadRight(2);
@@ -957,9 +957,9 @@ public sealed class TransactionDetailReportProgram
         sb.Append(Alpha("DALYREPT", 38));                  // REPT-SHORT-NAME X(38) VALUE 'DALYREPT'
         sb.Append(Alpha("Daily Transaction Report", 41));  // REPT-LONG-NAME  X(41)
         sb.Append(Alpha("Date Range: ", 12));              // REPT-DATE-HEADER X(12)
-        sb.Append(Alpha(_wsStartDate, 10));                // REPT-START-DATE X(10) (= WS-START-DATE)
+        sb.Append(Alpha(_startDate, 10));                // REPT-START-DATE X(10) (= WS-START-DATE)
         sb.Append(" to ");                                  // FILLER X(04) VALUE ' to '
-        sb.Append(Alpha(_wsEndDate, 10));                  // REPT-END-DATE X(10) (= WS-END-DATE)
+        sb.Append(Alpha(_endDate, 10));                  // REPT-END-DATE X(10) (= WS-END-DATE)
         return sb.ToString();
     }
 

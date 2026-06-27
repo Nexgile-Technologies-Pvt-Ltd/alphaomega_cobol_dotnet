@@ -44,15 +44,15 @@ public sealed class MainMenuProgram : ITransactionHandler
 {
     // === WS-VARIABLES (WORKING-STORAGE) — COBOL VALUE clauses. source: COMEN01C.cbl:35-48 ===
 
-    private const string WS_PGMNAME = "COMEN01C"; // source: COMEN01C.cbl:36
-    private const string WS_TRANID = "CM00";      // source: COMEN01C.cbl:37
+    private const string ProgramId = "COMEN01C"; // WS-PGMNAME PIC X(08). source: COMEN01C.cbl:36
+    private const string TranId = "CM00";        // WS-TRANID PIC X(04). source: COMEN01C.cbl:37
 
     // WS-ERR-FLG PIC X(01): 88 ERR-FLG-ON='Y' / ERR-FLG-OFF='N'. source: COMEN01C.cbl:40-42
-    private string _wsErrFlg = "N";
-    private bool ErrFlgOn => _wsErrFlg == "Y";    // 88 ERR-FLG-ON
+    private string _errorFlag = "N";              // WS-ERR-FLG
+    private bool ErrorFlagOn => _errorFlag == "Y"; // 88 ERR-FLG-ON
 
-    private string _wsMessage = "";               // WS-MESSAGE PIC X(80). source: COMEN01C.cbl:38
-    private int _wsOption;                         // WS-OPTION PIC 9(02). source: COMEN01C.cbl:46
+    private string _message = "";                 // WS-MESSAGE PIC X(80). source: COMEN01C.cbl:38
+    private int _option;                           // WS-OPTION PIC 9(02). source: COMEN01C.cbl:46
 
     // Per-turn override of the ERRMSG colour byte (ERRMSGC), used by the not-installed / coming-soon
     // branches (MOVE DFHRED / DFHGREEN TO ERRMSGC OF COMEN1AO). Null = use the map's default RED.
@@ -61,22 +61,22 @@ public sealed class MainMenuProgram : ITransactionHandler
     // === Constants from the copybooks referenced by the program ===
 
     /// <summary>CCDA-TITLE01 PIC X(40). source: COTTL01Y.cpy:18-20.</summary>
-    private const string CCDA_TITLE01 = "      AWS Mainframe Modernization       ";
+    private const string Title01 = "      AWS Mainframe Modernization       "; // CCDA-TITLE01 PIC X(40)
 
     /// <summary>CCDA-TITLE02 PIC X(40). source: COTTL01Y.cpy:21-23.</summary>
-    private const string CCDA_TITLE02 = "              CardDemo                  ";
+    private const string Title02 = "              CardDemo                  "; // CCDA-TITLE02 PIC X(40)
 
     /// <summary>CCDA-MSG-INVALID-KEY PIC X(50). source: CSMSG01Y.cpy:20-21.</summary>
-    private const string CCDA_MSG_INVALID_KEY = "Invalid key pressed. Please see below...         ";
+    private const string InvalidKeyMessage = "Invalid key pressed. Please see below...         "; // CCDA-MSG-INVALID-KEY PIC X(50)
 
     /// <summary>CDEMO-MENU-OPT-COUNT PIC 9(02) VALUE 11. source: COMEN02Y.cpy:21.</summary>
-    private const int CDEMO_MENU_OPT_COUNT = 11;
+    private const int MenuOptionCount = 11; // CDEMO-MENU-OPT-COUNT PIC 9(02)
 
     // === The CARDDEMO-MAIN-MENU-OPTIONS table (copybook COMEN02Y, REDEFINES gives 12 OCCURS slots) ===
     // 11 populated rows + an empty 12th slot. source: COMEN02Y.cpy:23-98.
     private readonly record struct MenuOpt(int Num, string Name, string PgmName, string UsrType);
 
-    private static readonly MenuOpt[] CdemoMenuOpt =
+    private static readonly MenuOpt[] MenuOptions = // CDEMO-MENU-OPT table
     {
         new( 1, "Account View                       ", "COACTVWC", "U"), // source: COMEN02Y.cpy:25-28
         new( 2, "Account Update                     ", "COACTUPC", "U"), // source: COMEN02Y.cpy:31-34
@@ -93,16 +93,16 @@ public sealed class MainMenuProgram : ITransactionHandler
     };
 
     /// <summary>
-    /// 1-based subscript into <see cref="CdemoMenuOpt"/> matching COBOL <c>CDEMO-MENU-OPT(idx)</c>.
+    /// 1-based subscript into <see cref="MenuOptions"/> matching COBOL <c>CDEMO-MENU-OPT(idx)</c>.
     /// A subscript of 0 or beyond the 12-slot table resolves to an empty record — the deterministic
     /// stand-in for COBOL's undefined subscript-0 / past-end storage (FB-1/FB-3). The value never
     /// equals <c>'A'</c>, so the admin guard stays false exactly as the shipped data behaves.
     /// </summary>
     private static MenuOpt OptionAt(int idx) =>
-        idx >= 1 && idx <= CdemoMenuOpt.Length ? CdemoMenuOpt[idx - 1] : EmptyOpt;
+        idx >= 1 && idx <= MenuOptions.Length ? MenuOptions[idx - 1] : EmptyOption;
 
     /// <summary>The empty record returned for a 0 / out-of-range subscript (non-null fields).</summary>
-    private static readonly MenuOpt EmptyOpt = new(0, "", "", "");
+    private static readonly MenuOpt EmptyOption = new(0, "", "", "");
 
     // === CARDDEMO-COMMAREA (typed view) restored each turn; mirrors COCOM01Y. ===
     private CardDemoCommArea _commArea = new();
@@ -134,16 +134,16 @@ public sealed class MainMenuProgram : ITransactionHandler
     // === MAIN-PARA. source: COMEN01C.cbl:75-110 ===
     public void Handle(CicsContext ctx)
     {
-        MainPara(ctx);
+        RunMainProcedure(ctx); // COBOL paragraph: MAIN-PARA
     }
 
-    private void MainPara(CicsContext ctx)
+    private void RunMainProcedure(CicsContext ctx) // COBOL paragraph: MAIN-PARA
     {
         // SET ERR-FLG-OFF TO TRUE. source: COMEN01C.cbl:77
-        _wsErrFlg = "N";
+        _errorFlag = "N";
 
         // MOVE SPACES TO WS-MESSAGE, ERRMSGO OF COMEN1AO. source: COMEN01C.cbl:79-80
-        _wsMessage = "";
+        _message = "";
         _errMsgColor = null;
 
         if (ctx.EibCalen == 0) // IF EIBCALEN = 0. source: COMEN01C.cbl:82
@@ -182,8 +182,8 @@ public sealed class MainMenuProgram : ITransactionHandler
                         break;
 
                     default:                    // WHEN OTHER. source: COMEN01C.cbl:99
-                        _wsErrFlg = "Y";                       // MOVE 'Y' TO WS-ERR-FLG. source: :100
-                        _wsMessage = CCDA_MSG_INVALID_KEY;     // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. source: :101
+                        _errorFlag = "Y";                       // MOVE 'Y' TO WS-ERR-FLG. source: :100
+                        _message = InvalidKeyMessage;     // MOVE CCDA-MSG-INVALID-KEY TO WS-MESSAGE. source: :101
                         SendMenuScreen(ctx);                   // PERFORM SEND-MENU-SCREEN. source: :102
                         break;
                 }
@@ -195,37 +195,37 @@ public sealed class MainMenuProgram : ITransactionHandler
         // PROCESS-ENTER-KEY may XCTL, which records the terminating outcome). CICS would never reach the
         // RETURN after an XCTL; mirror that by not overwriting an existing XCTL outcome.
         if (ctx.Outcome is null)
-            ctx.ReturnTransId(WS_TRANID, _commArea);
+            ctx.ReturnTransId(TranId, _commArea);
     }
 
     // === PROCESS-ENTER-KEY. source: COMEN01C.cbl:115-191 ===
     private void ProcessEnterKey(CicsContext ctx)
     {
         // OPTIONI OF COMEN1AI — the 2-char keyed option field, as received (not trimmed).
-        string optionI = OptionInput(ctx);
+        string optionInput = OptionInput(ctx); // OPTIONI
 
         // PERFORM VARYING WS-IDX FROM LENGTH OF OPTIONI BY -1 UNTIL
         //   OPTIONI(WS-IDX:1) NOT = SPACES OR WS-IDX = 1. source: COMEN01C.cbl:117-121
-        int wsIdx = optionI.Length; // LENGTH OF OPTIONI = 2
-        while (!(CharAt(optionI, wsIdx) != ' ' || wsIdx == 1))
-            wsIdx--;
+        int idx = optionInput.Length; // WS-IDX; LENGTH OF OPTIONI = 2
+        while (!(CharAt(optionInput, idx) != ' ' || idx == 1))
+            idx--;
 
         // MOVE OPTIONI(1:WS-IDX) TO WS-OPTION-X (PIC X(02) JUST RIGHT). source: COMEN01C.cbl:122
-        string wsOptionX = JustRight(Substr(optionI, 1, wsIdx), 2);
+        string optionText = JustRight(Substr(optionInput, 1, idx), 2); // WS-OPTION-X
         // INSPECT WS-OPTION-X REPLACING ALL ' ' BY '0'. source: COMEN01C.cbl:123
-        wsOptionX = wsOptionX.Replace(' ', '0');
+        optionText = optionText.Replace(' ', '0');
         // MOVE WS-OPTION-X TO WS-OPTION (alphanumeric -> PIC 9(02)). source: COMEN01C.cbl:124
-        _wsOption = ToNumeric2(wsOptionX);
+        _option = ToNumeric2(optionText);
         // MOVE WS-OPTION TO OPTIONO OF COMEN1AO (echo, zero-padded). source: COMEN01C.cbl:125
         // (Applied in BUILD-MENU-OPTIONS/SEND time via OptionEcho.)
 
         // IF WS-OPTION IS NOT NUMERIC OR WS-OPTION > CDEMO-MENU-OPT-COUNT OR WS-OPTION = ZEROS.
         // FB-6: the IS NOT NUMERIC disjunct is always false after the MOVE; kept verbatim.
         // source: COMEN01C.cbl:127-134
-        if (IsNotNumeric(_wsOption) || _wsOption > CDEMO_MENU_OPT_COUNT || _wsOption == 0)
+        if (IsNotNumeric(_option) || _option > MenuOptionCount || _option == 0)
         {
-            _wsErrFlg = "Y";                                             // MOVE 'Y' TO WS-ERR-FLG. source: :130
-            _wsMessage = "Please enter a valid option number...";       // source: :131-132
+            _errorFlag = "Y";                                             // MOVE 'Y' TO WS-ERR-FLG. source: :130
+            _message = "Please enter a valid option number...";       // source: :131-132
             SendMenuScreen(ctx);                                        // PERFORM SEND-MENU-SCREEN. source: :133
             // FB-1: NO early exit — fall through to the admin check and the IF NOT ERR-FLG-ON guard.
         }
@@ -233,18 +233,18 @@ public sealed class MainMenuProgram : ITransactionHandler
         // IF CDEMO-USRTYP-USER AND CDEMO-MENU-OPT-USRTYPE(WS-OPTION) = 'A'. source: COMEN01C.cbl:136-137
         // FB-3: WS-OPTION may be 0 / out of range here (no re-guard); OptionAt() resolves it to an
         // empty, non-'A' slot, so the guard stays false exactly as the shipped table behaves (FB-4).
-        if (_commArea.IsUser && OptionAt(_wsOption).UsrType == "A")
+        if (_commArea.IsUser && OptionAt(_option).UsrType == "A")
         {
-            _wsErrFlg = "Y";                                       // SET ERR-FLG-ON TO TRUE. source: :138
-            _wsMessage = "";                                       // MOVE SPACES TO WS-MESSAGE. source: :139
-            _wsMessage = "No access - Admin Only option... ";      // source: :140-141 (trailing space)
+            _errorFlag = "Y";                                       // SET ERR-FLG-ON TO TRUE. source: :138
+            _message = "";                                       // MOVE SPACES TO WS-MESSAGE. source: :139
+            _message = "No access - Admin Only option... ";      // source: :140-141 (trailing space)
             SendMenuScreen(ctx);                                   // PERFORM SEND-MENU-SCREEN. source: :142
         }
 
         // IF NOT ERR-FLG-ON. source: COMEN01C.cbl:145
-        if (!ErrFlgOn)
+        if (!ErrorFlagOn)
         {
-            MenuOpt opt = OptionAt(_wsOption);
+            MenuOpt opt = OptionAt(_option);
 
             // EVALUATE TRUE. source: COMEN01C.cbl:146-188
             if (opt.PgmName == "COPAUS0C")
@@ -254,8 +254,8 @@ public sealed class MainMenuProgram : ITransactionHandler
                 bool installed = InquireProgram(opt.PgmName); // EIBRESP = DFHRESP(NORMAL) when installed
                 if (installed) // IF EIBRESP = DFHRESP(NORMAL). source: :152
                 {
-                    _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID TO CDEMO-FROM-TRANID. source: :153
-                    _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :154
+                    _commArea.FromTranId = TranId;   // MOVE WS-TRANID TO CDEMO-FROM-TRANID. source: :153
+                    _commArea.FromProgram = ProgramId; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :154
                     _commArea.PgmContext = 0;           // MOVE ZEROS TO CDEMO-PGM-CONTEXT. source: :155
                     // EXEC CICS XCTL PROGRAM(COPAUS0C) COMMAREA(CARDDEMO-COMMAREA). source: :156-159
                     ctx.Xctl(opt.PgmName, _commArea);
@@ -263,10 +263,10 @@ public sealed class MainMenuProgram : ITransactionHandler
                 }
                 else // ELSE (not installed). source: :160
                 {
-                    _wsMessage = "";                    // MOVE SPACES TO WS-MESSAGE. source: :161
+                    _message = "";                    // MOVE SPACES TO WS-MESSAGE. source: :161
                     _errMsgColor = BmsColor.Red;        // MOVE DFHRED TO ERRMSGC OF COMEN1AO. source: :162
                     // STRING 'This option ' || name(DELIMITED BY '  ') || ' is not installed...'. source: :163-167
-                    _wsMessage = StringInto(
+                    _message = StringInto(
                         "This option ",
                         Delimited(opt.Name, "  "),
                         " is not installed...");
@@ -276,10 +276,10 @@ public sealed class MainMenuProgram : ITransactionHandler
             {
                 // WHEN CDEMO-MENU-OPT-PGMNAME(WS-OPTION)(1:5) = 'DUMMY'. source: :169
                 // (No shipped option starts with DUMMY — unreachable with the current table.)
-                _wsMessage = "";                        // MOVE SPACES TO WS-MESSAGE. source: :170
+                _message = "";                        // MOVE SPACES TO WS-MESSAGE. source: :170
                 _errMsgColor = BmsColor.Green;          // MOVE DFHGREEN TO ERRMSGC OF COMEN1AO. source: :171
                 // STRING 'This option ' || name(DELIMITED BY SPACE) || 'is coming soon ...'. source: :172-176
-                _wsMessage = StringInto(
+                _message = StringInto(
                     "This option ",
                     Delimited(opt.Name, " "),
                     "is coming soon ...");
@@ -287,9 +287,9 @@ public sealed class MainMenuProgram : ITransactionHandler
             else
             {
                 // WHEN OTHER (options 1-10). source: :177-187
-                _commArea.FromTranId = WS_TRANID;   // MOVE WS-TRANID TO CDEMO-FROM-TRANID. source: :178
-                _commArea.FromProgram = WS_PGMNAME; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :179
-                _commArea.FromProgram = WS_PGMNAME; // FB-2: duplicate MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :180
+                _commArea.FromTranId = TranId;   // MOVE WS-TRANID TO CDEMO-FROM-TRANID. source: :178
+                _commArea.FromProgram = ProgramId; // MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :179
+                _commArea.FromProgram = ProgramId; // FB-2: duplicate MOVE WS-PGMNAME TO CDEMO-FROM-PROGRAM. source: :180
                 _commArea.PgmContext = 0;           // MOVE ZEROS TO CDEMO-PGM-CONTEXT. source: :183
                 // EXEC CICS XCTL PROGRAM(CDEMO-MENU-OPT-PGMNAME(WS-OPTION)) COMMAREA(...). source: :184-187
                 ctx.Xctl(opt.PgmName, _commArea);
@@ -326,7 +326,7 @@ public sealed class MainMenuProgram : ITransactionHandler
         map.Field("OPTION").SetValue(OptionEcho());
 
         // MOVE WS-MESSAGE TO ERRMSGO OF COMEN1AO. source: COMEN01C.cbl:213
-        SetErrMsg(map, _wsMessage); // FB-5: clamps the X(80) message to the X(78) ERRMSGO field.
+        SetErrMsg(map, _message); // FB-5: clamps the X(80) message to the X(78) ERRMSGO field.
         if (_errMsgColor is { } c)  // ERRMSGC override (DFHRED / DFHGREEN). source: :162, :171
             map.Field("ERRMSG").ColorOverride = c;
 
@@ -349,10 +349,10 @@ public sealed class MainMenuProgram : ITransactionHandler
         // MOVE FUNCTION CURRENT-DATE TO WS-CURDATE-DATA. source: COMEN01C.cbl:240
         DateTime now = ctx.Clock.Now;
 
-        map.Field("TITLE01").SetValue(CCDA_TITLE01); // MOVE CCDA-TITLE01 TO TITLE01O. source: :242
-        map.Field("TITLE02").SetValue(CCDA_TITLE02); // MOVE CCDA-TITLE02 TO TITLE02O. source: :243
-        map.Field("TRNNAME").SetValue(WS_TRANID);    // MOVE WS-TRANID  TO TRNNAMEO. source: :244
-        map.Field("PGMNAME").SetValue(WS_PGMNAME);   // MOVE WS-PGMNAME TO PGMNAMEO. source: :245
+        map.Field("TITLE01").SetValue(Title01); // MOVE CCDA-TITLE01 TO TITLE01O. source: :242
+        map.Field("TITLE02").SetValue(Title02); // MOVE CCDA-TITLE02 TO TITLE02O. source: :243
+        map.Field("TRNNAME").SetValue(TranId);    // MOVE WS-TRANID  TO TRNNAMEO. source: :244
+        map.Field("PGMNAME").SetValue(ProgramId);   // MOVE WS-PGMNAME TO PGMNAMEO. source: :245
 
         // Build mm/dd/yy from WS-CURDATE-MM/DD + WS-CURDATE-YEAR(3:2). source: :247-251
         map.Field("CURDATE").SetValue(now.ToString("MM/dd/yy"));
@@ -364,18 +364,18 @@ public sealed class MainMenuProgram : ITransactionHandler
     private void BuildMenuOptions(BmsMap map)
     {
         // PERFORM VARYING WS-IDX FROM 1 BY 1 UNTIL WS-IDX > CDEMO-MENU-OPT-COUNT. source: :264-265
-        for (int wsIdx = 1; !(wsIdx > CDEMO_MENU_OPT_COUNT); wsIdx++)
+        for (int idx = 1; !(idx > MenuOptionCount); idx++) // WS-IDX
         {
-            MenuOpt opt = OptionAt(wsIdx);
+            MenuOpt opt = OptionAt(idx);
 
             // MOVE SPACES TO WS-MENU-OPT-TXT (PIC X(40)). source: :267
             // STRING CDEMO-MENU-OPT-NUM(WS-IDX) || '. ' || CDEMO-MENU-OPT-NAME(WS-IDX). source: :269-272
             // All DELIMITED BY SIZE: num is PIC 9(02) (zero-padded), name is X(35) (full width).
-            string wsMenuOptTxt = Pic2(opt.Num) + ". " + opt.Name;
-            wsMenuOptTxt = ClampOrPad(wsMenuOptTxt, 40); // WS-MENU-OPT-TXT is X(40)
+            string menuOptionText = Pic2(opt.Num) + ". " + opt.Name; // WS-MENU-OPT-TXT
+            menuOptionText = ClampOrPad(menuOptionText, 40); // WS-MENU-OPT-TXT is X(40)
 
             // EVALUATE WS-IDX -> OPTNnnnO. source: :274-301
-            string field = wsIdx switch
+            string field = idx switch
             {
                 1 => "OPTN001",
                 2 => "OPTN002",
@@ -392,7 +392,7 @@ public sealed class MainMenuProgram : ITransactionHandler
                 _ => "", // WHEN OTHER -> CONTINUE
             };
             if (field.Length > 0)
-                map.Field(field).SetValue(wsMenuOptTxt);
+                map.Field(field).SetValue(menuOptionText);
         }
     }
 
@@ -413,7 +413,7 @@ public sealed class MainMenuProgram : ITransactionHandler
     }
 
     /// <summary>MOVE WS-OPTION TO OPTIONO — the zero-padded 2-digit echo (PIC 9(02)). source: :125.</summary>
-    private string OptionEcho() => Pic2(_wsOption);
+    private string OptionEcho() => Pic2(_option);
 
     /// <summary>
     /// MOVE WS-MESSAGE TO ERRMSGO OF COMEN1AO with the FB-5 clamp: ERRMSGO is X(78) but WS-MESSAGE is
@@ -463,7 +463,7 @@ public sealed class MainMenuProgram : ITransactionHandler
     }
 
     /// <summary>FB-6: after the space-&gt;'0' INSPECT + MOVE into PIC 9(02), the value is always numeric.</summary>
-    private static bool IsNotNumeric(int wsOption) => false;
+    private static bool IsNotNumeric(int option) => false; // WS-OPTION
 
     /// <summary>Renders a value as <c>PIC 9(02)</c> — zero-padded, low two digits.</summary>
     private static string Pic2(int n) => Math.Abs(n % 100).ToString("D2");

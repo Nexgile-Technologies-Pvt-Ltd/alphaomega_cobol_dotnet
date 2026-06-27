@@ -101,28 +101,28 @@ public sealed class SystemDateInquiryService : IMqServer
     //  WORKING-STORAGE flags — source: CODATE01.cbl:13-23
     // =================================================================================================
     // WS-MQ-MSG-FLAG X(1) VALUE 'N'; 88 NO-MORE-MSGS VALUE 'Y'. source: :13-14
-    private char _wsMqMsgFlag = 'N';
+    private char _moreMessagesFlag = 'N';    // WS-MQ-MSG-FLAG
 
     // FB-4: the open/close flag names are swapped vs. their intuitive meaning but internally consistent.
     //   WS-RESP-QUEUE-STS  88 RESP-QUEUE-OPEN  -> set when the OUTPUT/reply queue opens. source: :16-17
     //   WS-ERR-QUEUE-STS   88 ERR-QUEUE-OPEN   -> set when the ERROR queue opens.        source: :19-20
     //   WS-REPLY-QUEUE-STS 88 REPLY-QUEUE-OPEN -> set when the INPUT/request queue opens. source: :22-23
-    private char _wsRespQueueSts = 'N';      // 88 RESP-QUEUE-OPEN  = 'Y'  (output/reply queue)
-    private char _wsErrQueueSts = 'N';       // 88 ERR-QUEUE-OPEN   = 'Y'  (error queue)
-    private char _wsReplyQueueSts = 'N';     // 88 REPLY-QUEUE-OPEN = 'Y'  (input/request queue)
+    private char _respQueueStatus = 'N';     // WS-RESP-QUEUE-STS  88 RESP-QUEUE-OPEN  = 'Y'  (output/reply queue)
+    private char _errQueueStatus = 'N';      // WS-ERR-QUEUE-STS   88 ERR-QUEUE-OPEN   = 'Y'  (error queue)
+    private char _replyQueueStatus = 'N';    // WS-REPLY-QUEUE-STS 88 REPLY-QUEUE-OPEN = 'Y'  (input/request queue)
 
     // WS-CICS-RESP-CDS — RETRIEVE RESP/RESP2 + their display copies. source: :26-30
-    private int _wsCicsResp1Cd;              // S9(8) COMP
-    private int _wsCicsResp2Cd;              // S9(8) COMP
-    private int _wsCicsResp1CdD;             // 9(8)  (display copy)
-    private int _wsCicsResp2CdD;             // 9(8)  (display copy — left 0 by FB-6)
+    private int _cicsResp1Code;              // WS-CICS-RESP1-CD S9(8) COMP
+    private int _cicsResp2Code;              // WS-CICS-RESP2-CD S9(8) COMP
+    private int _cicsResp1CodeDisplay;       // WS-CICS-RESP1-CD-D 9(8)  (display copy)
+    private int _cicsResp2CodeDisplay;       // WS-CICS-RESP2-CD-D 9(8)  (display copy — left 0 by FB-6)
 
     // =================================================================================================
     //  DATE FIELDS (WS-DATE-TIME) — source: CODATE01.cbl:35-38
     // =================================================================================================
-    private long _wsAbsTime;                 // WS-ABS-TIME S9(15) COMP-3 (ASKTIME absolute time)
-    private string _wsMmddyyyy = "";         // WS-MMDDYYYY X(10) (FORMATTIME MMDDYYYY DATESEP('-') -> MM-DD-YYYY)
-    private string _wsTime = "";             // WS-TIME     X(8)  (FORMATTIME TIME TIMESEP -> HH:MM:SS)
+    private long _absoluteTime;              // WS-ABS-TIME S9(15) COMP-3 (ASKTIME absolute time)
+    private string _formattedDate = "";      // WS-MMDDYYYY X(10) (FORMATTIME MMDDYYYY DATESEP('-') -> MM-DD-YYYY)
+    private string _formattedTime = "";      // WS-TIME     X(8)  (FORMATTIME TIME TIMESEP -> HH:MM:SS)
 
     // =================================================================================================
     //  MQ work fields — source: CODATE01.cbl:42-67
@@ -136,12 +136,12 @@ public sealed class SystemDateInquiryService : IMqServer
     private byte[] _mqCorrelId = MqConstants.MqciNone;  // MQ-CORRELID X(24)
     private byte[] _mqMsgId = MqConstants.MqmiNone;     // MQ-MSG-ID   X(24)
     private int _mqMsgCount;                  // MQ-MSG-COUNT 9(9)  (FB-10: dead counter)
-    private byte[] _saveCorelid = MqConstants.MqciNone; // SAVE-CORELID X(24)
-    private byte[] _saveMsgid = MqConstants.MqmiNone;   // SAVE-MSGID   X(24)
-    private string _saveReply2q = "";        // SAVE-REPLY2Q X(48)  (FB-2/FB-10: captured, never used for PUT)
+    private byte[] _savedCorrelId = MqConstants.MqciNone; // SAVE-CORELID X(24)
+    private byte[] _savedMsgId = MqConstants.MqmiNone;    // SAVE-MSGID   X(24)
+    private string _savedReplyToQueue = "";  // SAVE-REPLY2Q X(48)  (FB-2/FB-10: captured, never used for PUT)
 
     // MQ-ERR-DISPLAY (the 80-ish byte error block written to CARD.DEMO.ERROR). source: :58-67
-    private string _mqErrorPara = "";        // MQ-ERROR-PARA X(25)
+    private string _mqErrorParagraph = "";   // MQ-ERROR-PARA X(25)
     private string _mqApplReturnMessage = "";// MQ-APPL-RETURN-MESSAGE X(25)
     private int _mqApplConditionCode;        // MQ-APPL-CONDITION-CODE 9(2)
     private int _mqApplReasonCode;           // MQ-APPL-REASON-CODE 9(5)
@@ -159,15 +159,15 @@ public sealed class SystemDateInquiryService : IMqServer
 
     // REQUEST-MSG-COPY overlay: WS-FUNC X(4) + WS-KEY 9(11) + WS-FILLER X(985). source: :109-112
     // (Parsed but never inspected — FB-1.)
-    private string _wsFunc = "";             // WS-FUNC X(4)
-    private long _wsKey;                     // WS-KEY  9(11)
+    private string _requestFunction = "";    // WS-FUNC X(4)
+    private long _requestKey;                // WS-KEY  9(11)
 
     // =================================================================================================
     //  WS-VARIABLES — source: CODATE01.cbl:114-120  (all dead — FB-10)
     // =================================================================================================
-    private const string LitAcctFilename = "ACCTDAT ";   // LIT-ACCTFILENAME X(8) (never referenced). :115-116
-    private int _wsRespCd;                                // WS-RESP-CD S9(9) COMP (unused). :117-118
-    private int _wsReasCd;                                // WS-REAS-CD S9(9) COMP (unused). :119-120
+    private const string AccountFileName = "ACCTDAT ";   // LIT-ACCTFILENAME X(8) (never referenced). :115-116
+    private int _responseCode;                           // WS-RESP-CD S9(9) COMP (unused). :117-118
+    private int _reasonCode;                             // WS-REAS-CD S9(9) COMP (unused). :119-120
 
     /// <summary>Signals the COBOL 8000-TERMINATION hard exit (PERFORM 8000-TERMINATION then EXEC CICS
     /// RETURN + GOBACK). Unwinds to <see cref="Handle"/> and ends the transaction.</summary>
@@ -210,7 +210,7 @@ public sealed class SystemDateInquiryService : IMqServer
         _mq = mq;
         try
         {
-            Control1000(trigger);
+            RunControl(trigger);
         }
         catch (TerminationSignal)
         {
@@ -219,7 +219,7 @@ public sealed class SystemDateInquiryService : IMqServer
         return _mqMsgCount;   // FB-10: the COBOL never surfaces MQ-MSG-COUNT; returned here for the shim only.
     }
 
-    private void Control1000(TriggerMessage trigger)
+    private void RunControl(TriggerMessage trigger) // COBOL paragraph: 1000-CONTROL
     {
         // MOVE SPACES TO INPUT-QUEUE-NAME, QMGR-NAME, QUEUE-MESSAGE. source: :129-132
         _inputQueueName = "";
@@ -227,40 +227,40 @@ public sealed class SystemDateInquiryService : IMqServer
         InitializeMqErrDisplay();
 
         // PERFORM 2100-OPEN-ERROR-QUEUE (open CARD.DEMO.ERROR first, so failures can be reported). :136
-        OpenErrorQueue2100();
+        OpenErrorQueue();
 
         // EXEC CICS RETRIEVE INTO(MQTM) RESP/RESP2. The shim always supplies the trigger. source: :140-144
-        _wsCicsResp1Cd = (int)Resp.Normal;
-        _wsCicsResp2Cd = 0;
+        _cicsResp1Code = (int)Resp.Normal;
+        _cicsResp2Code = 0;
 
-        if (_wsCicsResp1Cd == (int)Resp.Normal)                 // IF WS-CICS-RESP1-CD = DFHRESP(NORMAL). :145
+        if (_cicsResp1Code == (int)Resp.Normal)                 // IF WS-CICS-RESP1-CD = DFHRESP(NORMAL). :145
         {
             _inputQueueName = trigger.QueueName;                // MOVE MQTM-QNAME TO INPUT-QUEUE-NAME. :146
             _replyQueueName = MqQueues.ReplyDate;               // MOVE 'CARD.DEMO.REPLY.DATE' TO ...    . :147
         }
         else
         {
-            _mqErrorPara = "CICS RETRIEVE";                     // MOVE 'CICS RETRIEVE' TO MQ-ERROR-PARA. :149
-            _wsCicsResp1CdD = _wsCicsResp1Cd;                   // MOVE WS-CICS-RESP1-CD TO ...-CD-D. :150
+            _mqErrorParagraph = "CICS RETRIEVE";                     // MOVE 'CICS RETRIEVE' TO MQ-ERROR-PARA. :149
+            _cicsResp1CodeDisplay = _cicsResp1Code;                   // MOVE WS-CICS-RESP1-CD TO ...-CD-D. :150
             // FB-6: self-move (intended -CD-D), so WS-CICS-RESP2-CD-D stays 0. source: :151
-            _wsCicsResp2Cd = _wsCicsResp2Cd;
+            _cicsResp2Code = _cicsResp2Code;
             _mqApplReturnMessage =                              // STRING 'RESP: '... 'END'. source: :152-155
-                "RESP: " + Disp8(_wsCicsResp1CdD) + Disp8(_wsCicsResp2CdD) + "END";
-            Error9000();                                        // PERFORM 9000-ERROR. source: :157
-            Termination8000();                                 // PERFORM 8000-TERMINATION. source: :158
+                "RESP: " + Disp8(_cicsResp1CodeDisplay) + Disp8(_cicsResp2CodeDisplay) + "END";
+            ReportError();                                        // PERFORM 9000-ERROR. source: :157
+            Terminate();                                 // PERFORM 8000-TERMINATION. source: :158
         }
 
-        OpenInputQueue2300();                                  // PERFORM 2300-OPEN-INPUT-QUEUE. source: :161
-        OpenOutputQueue2400();                                 // PERFORM 2400-OPEN-OUTPUT-QUEUE. source: :162
-        GetRequest3000();                                     // PERFORM 3000-GET-REQUEST (prime). source: :163
+        OpenInputQueue();                                  // PERFORM 2300-OPEN-INPUT-QUEUE. source: :161
+        OpenOutputQueue();                                 // PERFORM 2400-OPEN-OUTPUT-QUEUE. source: :162
+        GetRequest();                                     // PERFORM 3000-GET-REQUEST (prime). source: :163
 
         // PERFORM 4000-MAIN-PROCESS UNTIL NO-MORE-MSGS. source: :164-165
         while (!IsNoMoreMsgs())
         {
-            MainProcess4000();
+            MainProcess();
         }
 
-        Termination8000();                                    // PERFORM 8000-TERMINATION. source: :167
+        Terminate();                                    // PERFORM 8000-TERMINATION. source: :167
     }
 
     // =================================================================================================
@@ -268,7 +268,7 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     /// <summary>Open the trigger-supplied request queue for GET (MQOO-INPUT-SHARED + SAVE-ALL-CONTEXT +
     /// FAIL-IF-QUIESCING). On success SET REPLY-QUEUE-OPEN (FB-4: the input queue sets the reply flag).</summary>
-    private void OpenInputQueue2300()
+    private void OpenInputQueue() // COBOL paragraph: 2300-OPEN-INPUT-QUEUE
     {
         // MOVE SPACES TO MQOD-OBJECTQMGRNAME; MOVE INPUT-QUEUE-NAME TO MQOD-OBJECTNAME. source: :175-176
         // COMPUTE MQ-OPTIONS = MQOO-INPUT-SHARED + MQOO-SAVE-ALL-CONTEXT + MQOO-FAIL-IF-QUIESCING. :178-180
@@ -293,8 +293,8 @@ public sealed class SystemDateInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _inputQueueName;
                 _mqApplReturnMessage = "INP MQOPEN ERR";       // source: :199
-                Error9000();                                  // PERFORM 9000-ERROR. source: :200
-                Termination8000();                            // PERFORM 8000-TERMINATION. source: :201
+                ReportError();                                  // PERFORM 9000-ERROR. source: :200
+                Terminate();                            // PERFORM 8000-TERMINATION. source: :201
                 break;
         }
     }
@@ -304,7 +304,7 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     /// <summary>Open CARD.DEMO.REPLY.DATE for PUT (MQOO-OUTPUT + PASS-ALL-CONTEXT + FAIL-IF-QUIESCING).
     /// On success SET RESP-QUEUE-OPEN.</summary>
-    private void OpenOutputQueue2400()
+    private void OpenOutputQueue() // COBOL paragraph: 2400-OPEN-OUTPUT-QUEUE
     {
         // MOVE SPACES TO MQOD-OBJECTQMGRNAME; MOVE REPLY-QUEUE-NAME TO MQOD-OBJECTNAME. source: :209-210
         // COMPUTE MQ-OPTIONS = MQOO-OUTPUT + MQOO-PASS-ALL-CONTEXT + MQOO-FAIL-IF-QUIESCING. :212-214
@@ -328,8 +328,8 @@ public sealed class SystemDateInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _replyQueueName;
                 _mqApplReturnMessage = "OUT MQOPEN ERR";       // source: :233
-                Error9000();                                  // PERFORM 9000-ERROR. source: :234
-                Termination8000();                            // PERFORM 8000-TERMINATION. source: :235
+                ReportError();                                  // PERFORM 9000-ERROR. source: :234
+                Terminate();                            // PERFORM 8000-TERMINATION. source: :235
                 break;
         }
     }
@@ -339,7 +339,7 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     /// <summary>Open CARD.DEMO.ERROR for PUT (the error sink). On failure DISPLAY the block and TERMINATE
     /// (no 9000-ERROR here — you cannot write errors when the error queue itself failed to open).</summary>
-    private void OpenErrorQueue2100()
+    private void OpenErrorQueue() // COBOL paragraph: 2100-OPEN-ERROR-QUEUE
     {
         _errorQueueName = MqQueues.Error;                     // MOVE 'CARD.DEMO.ERROR' TO ERROR-QUEUE-NAME. :243
         // MOVE SPACES TO MQOD-OBJECTQMGRNAME; MOVE ERROR-QUEUE-NAME TO MQOD-OBJECTNAME. source: :244-245
@@ -365,7 +365,7 @@ public sealed class SystemDateInquiryService : IMqServer
                 _mqApplQueueName = _errorQueueName;
                 _mqApplReturnMessage = "ERR MQOPEN ERR";       // source: :268
                 DisplayMqErrDisplay();                        // DISPLAY MQ-ERR-DISPLAY (not enqueued). :269
-                Termination8000();                            // PERFORM 8000-TERMINATION. source: :270
+                Terminate();                            // PERFORM 8000-TERMINATION. source: :270
                 break;
         }
     }
@@ -375,11 +375,11 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     /// <summary>Per-message loop body (performed UNTIL NO-MORE-MSGS): SYNCPOINT the previous message's
     /// unit of work, then GET the next request.</summary>
-    private void MainProcess4000()
+    private void MainProcess() // COBOL paragraph: 4000-MAIN-PROCESS
     {
         // EXEC CICS SYNCPOINT END-EXEC (commit previous message's UOW). In-proc the PUT is already
         // committed on the shared connection; this is the per-message boundary. source: :275-277
-        GetRequest3000();                                    // PERFORM 3000-GET-REQUEST. source: :279
+        GetRequest();                                    // PERFORM 3000-GET-REQUEST. source: :279
     }
 
     // =================================================================================================
@@ -388,7 +388,7 @@ public sealed class SystemDateInquiryService : IMqServer
     /// <summary>GET one request message (5 s wait, any next msg) and dispatch it; on the empty queue set
     /// NO-MORE-MSGS, on any other GET failure write the error and terminate. The request body is captured
     /// but never inspected (FB-1).</summary>
-    private void GetRequest3000()
+    private void GetRequest() // COBOL paragraph: 3000-GET-REQUEST
     {
         // MOVE 5000 TO MQGMO-WAITINTERVAL; MOVE SPACES TO MQ-CORRELID/MQ-MSG-ID; MOVE INPUT-QUEUE-NAME
         // TO MQ-QUEUE; MOVE INPUT-QUEUE-HANDLE TO MQ-HOBJ; MOVE 1000 TO MQ-BUFFER-LENGTH. source: :286-291
@@ -399,8 +399,8 @@ public sealed class SystemDateInquiryService : IMqServer
 
         // MOVE MQMI-NONE TO MQMD-MSGID; MOVE MQCI-NONE TO MQMD-CORRELID (take any next msg). source: :292-293
         // INITIALIZE REQUEST-MSG-COPY REPLACING NUMERIC BY ZEROES -> WS-FUNC spaces, WS-KEY 0. source: :294
-        _wsFunc = "";
-        _wsKey = 0;
+        _requestFunction = "";
+        _requestKey = 0;
 
         // COMPUTE MQGMO-OPTIONS = MQGMO-SYNCPOINT + FAIL-IF-QUIESCING + CONVERT + WAIT. source: :296-299
         // CALL 'MQGET' USING MQ-HCONN ... (FB-3: MQ-HCONN, not QMGR-HANDLE-CONN). source: :301-309
@@ -416,15 +416,15 @@ public sealed class SystemDateInquiryService : IMqServer
             _mqApplConditionCode = _mqConditionCode;          // source: :316
             _mqApplReasonCode = _mqReasonCode;                // source: :317
             _requestMessage = Fixed(msg.Body, 1000);          // MOVE MQ-BUFFER TO REQUEST-MESSAGE. source: :318
-            _saveCorelid = _mqCorrelId;                       // MOVE MQ-CORRELID TO SAVE-CORELID. :319
-            _saveReply2q = _mqQueueReply;                     // MOVE MQ-QUEUE-REPLY TO SAVE-REPLY2Q (FB-2). :320
-            _saveMsgid = _mqMsgId;                            // MOVE MQ-MSG-ID TO SAVE-MSGID. :321
+            _savedCorrelId = _mqCorrelId;                       // MOVE MQ-CORRELID TO SAVE-CORELID. :319
+            _savedReplyToQueue = _mqQueueReply;                     // MOVE MQ-QUEUE-REPLY TO SAVE-REPLY2Q (FB-2). :320
+            _savedMsgId = _mqMsgId;                            // MOVE MQ-MSG-ID TO SAVE-MSGID. :321
 
             // MOVE REQUEST-MESSAGE TO REQUEST-MSG-COPY (overlay X(1000) onto FUNC/KEY/FILLER). FB-1:
             // parsed, then never inspected. source: :322
             OverlayRequestMsgCopy(_requestMessage);
 
-            ProcessRequestReply4000();                        // PERFORM 4000-PROCESS-REQUEST-REPLY. :323
+            ProcessRequestReply();                        // PERFORM 4000-PROCESS-REQUEST-REPLY. :323
             _mqMsgCount++;                                    // ADD 1 TO MQ-MSG-COUNT (FB-10: dead). :324
         }
         else                                                  // ELSE. source: :325
@@ -439,8 +439,8 @@ public sealed class SystemDateInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _inputQueueName;
                 _mqApplReturnMessage = "INP MQGET ERR:";      // source: :333
-                Error9000();                                  // PERFORM 9000-ERROR. source: :334
-                Termination8000();                            // PERFORM 8000-TERMINATION. source: :335
+                ReportError();                                  // PERFORM 9000-ERROR. source: :334
+                Terminate();                            // PERFORM 8000-TERMINATION. source: :335
             }
         }
     }
@@ -451,32 +451,32 @@ public sealed class SystemDateInquiryService : IMqServer
     /// <summary>Build the date/time reply: ASKTIME the current absolute time, FORMATTIME it into
     /// MM-DD-YYYY / HH:MM:SS, STRING the free-text reply (FB-5: no separator between the date value and the
     /// next label), then PUT it. The request content is ignored — the answer is always "now".</summary>
-    private void ProcessRequestReply4000()
+    private void ProcessRequestReply() // COBOL paragraph: 4000-PROCESS-REQUEST-REPLY
     {
         _replyMessage = "";                                  // MOVE SPACES TO REPLY-MESSAGE. source: :340
         // INITIALIZE WS-DATE-TIME REPLACING NUMERIC BY ZEROES -> WS-ABS-TIME 0, WS-MMDDYYYY/WS-TIME spaces.
         // source: :341
-        _wsAbsTime = 0;
-        _wsMmddyyyy = "";
-        _wsTime = "";
+        _absoluteTime = 0;
+        _formattedDate = "";
+        _formattedTime = "";
 
         // EXEC CICS ASKTIME ABSTIME(WS-ABS-TIME). The IClock supplies "now"; ABSTIME is the CICS absolute
         // time (ms since 1900-01-01 00:00:00). source: :343-345
         DateTime now = _clock.Now;
-        _wsAbsTime = CicsAbsTime(now);
+        _absoluteTime = CicsAbsTime(now);
 
         // EXEC CICS FORMATTIME ABSTIME(WS-ABS-TIME) MMDDYYYY(WS-MMDDYYYY) DATESEP('-') TIME(WS-TIME) TIMESEP.
         // -> WS-MMDDYYYY = MM-DD-YYYY (month-day-year, hyphen sep); WS-TIME = HH:MM:SS (colon sep). :347-353
-        _wsMmddyyyy = now.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture);   // X(10)
-        _wsTime = now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);         // X(8)
+        _formattedDate = now.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture);   // X(10)
+        _formattedTime = now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);         // X(8)
 
         // STRING 'SYSTEM DATE : ' WS-MMDDYYYY 'SYSTEM TIME : ' WS-TIME DELIMITED BY SIZE INTO REPLY-MESSAGE.
         // FB-5: no delimiter between the date VALUE and the next LABEL, so the date butts directly against
         // 'SYSTEM TIME : '. The X(10)/X(8) fields contribute their full fixed width. source: :355-360
-        _replyMessage = "SYSTEM DATE : " + Fixed(_wsMmddyyyy, 10)
-                      + "SYSTEM TIME : " + Fixed(_wsTime, 8);
+        _replyMessage = "SYSTEM DATE : " + Fixed(_formattedDate, 10)
+                      + "SYSTEM TIME : " + Fixed(_formattedTime, 8);
 
-        PutReply4100();                                      // PERFORM 4100-PUT-REPLY. source: :361
+        PutReply();                                      // PERFORM 4100-PUT-REPLY. source: :361
     }
 
     // =================================================================================================
@@ -484,7 +484,7 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     /// <summary>PUT the built reply to CARD.DEMO.REPLY.DATE (the pre-opened OUTPUT-QUEUE-HANDLE — FB-2:
     /// never the request's ReplyToQ), echoing the saved MsgId/CorrelId.</summary>
-    private void PutReply4100()
+    private void PutReply() // COBOL paragraph: 4100-PUT-REPLY
     {
         _mqBuffer = Fixed(_replyMessage, 1000);              // MOVE REPLY-MESSAGE TO MQ-BUFFER. source: :371
         _mqBufferLength = 1000;                              // MOVE 1000 TO MQ-BUFFER-LENGTH. source: :372
@@ -492,8 +492,8 @@ public sealed class SystemDateInquiryService : IMqServer
         var reply = new MqMessage
         {
             Body = _mqBuffer,
-            MsgId = _saveMsgid,                              // MOVE SAVE-MSGID TO MQMD-MSGID. source: :373
-            CorrelId = _saveCorelid,                         // MOVE SAVE-CORELID TO MQMD-CORRELID. :374
+            MsgId = _savedMsgId,                              // MOVE SAVE-MSGID TO MQMD-MSGID. source: :373
+            CorrelId = _savedCorrelId,                         // MOVE SAVE-CORELID TO MQMD-CORRELID. :374
             Format = MqConstants.MqfmtString,                // MOVE MQFMT-STRING TO MQMD-FORMAT. :375
             CodedCharSetId = MqConstants.MqccsiQMgr,         // COMPUTE MQMD-CODEDCHARSETID = MQCCSI-Q-MGR. :377
         };
@@ -515,8 +515,8 @@ public sealed class SystemDateInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _replyQueueName;
                 _mqApplReturnMessage = "MQPUT ERR";          // source: :400
-                Error9000();                                 // PERFORM 9000-ERROR. source: :401
-                Termination8000();                           // PERFORM 8000-TERMINATION. source: :402
+                ReportError();                                 // PERFORM 9000-ERROR. source: :401
+                Terminate();                           // PERFORM 8000-TERMINATION. source: :402
                 break;
         }
     }
@@ -526,7 +526,7 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     /// <summary>PUT the MQ-ERR-DISPLAY block to CARD.DEMO.ERROR. On a PUT failure DISPLAY the block and
     /// terminate (no recursion into 9000-ERROR).</summary>
-    private void Error9000()
+    private void ReportError() // COBOL paragraph: 9000-ERROR
     {
         _errorMessage = FormatMqErrDisplay();                // MOVE MQ-ERR-DISPLAY TO ERROR-MESSAGE. source: :409
         _mqBuffer = Fixed(_errorMessage, 1000);              // MOVE ERROR-MESSAGE TO MQ-BUFFER. source: :410
@@ -559,7 +559,7 @@ public sealed class SystemDateInquiryService : IMqServer
                 _mqApplQueueName = _errorQueueName;
                 _mqApplReturnMessage = "MQPUT ERR";          // source: :437
                 DisplayMqErrDisplay();                       // DISPLAY MQ-ERR-DISPLAY. source: :438
-                Termination8000();                           // PERFORM 8000-TERMINATION (no 9000 recursion). :439
+                Terminate();                           // PERFORM 8000-TERMINATION (no 9000 recursion). :439
                 break;
         }
     }
@@ -569,7 +569,7 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     /// <summary>Close the open queues (FB-4 flag/queue mapping), EXEC CICS RETURN + GOBACK. FB-8: a close
     /// error re-PERFORMs 8000-TERMINATION; modeled idempotently — a re-entry short-circuits to the RETURN.</summary>
-    private void Termination8000()
+    private void Terminate() // COBOL paragraph: 8000-TERMINATION
     {
         if (_terminating)
         {
@@ -581,15 +581,15 @@ public sealed class SystemDateInquiryService : IMqServer
 
         if (IsReplyQueueOpen())                              // IF REPLY-QUEUE-OPEN. source: :444
         {
-            CloseInputQueue5000();                           // PERFORM 5000-CLOSE-INPUT-QUEUE (FB-4). :445
+            CloseInputQueue();                           // PERFORM 5000-CLOSE-INPUT-QUEUE (FB-4). :445
         }
         if (IsRespQueueOpen())                               // IF RESP-QUEUE-OPEN. source: :447
         {
-            CloseOutputQueue5100();                          // PERFORM 5100-CLOSE-OUTPUT-QUEUE. source: :448
+            CloseOutputQueue();                          // PERFORM 5100-CLOSE-OUTPUT-QUEUE. source: :448
         }
         if (IsErrQueueOpen())                                // IF ERR-QUEUE-OPEN. source: :450
         {
-            CloseErrorQueue5200();                           // PERFORM 5200-CLOSE-ERROR-QUEUE. source: :451
+            CloseErrorQueue();                           // PERFORM 5200-CLOSE-ERROR-QUEUE. source: :451
         }
 
         // EXEC CICS RETURN END-EXEC; GOBACK. source: :453-454
@@ -599,7 +599,7 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     //  5000-CLOSE-INPUT-QUEUE — source: CODATE01.cbl:456-477
     // =================================================================================================
-    private void CloseInputQueue5000()
+    private void CloseInputQueue() // COBOL paragraph: 5000-CLOSE-INPUT-QUEUE
     {
         _mqQueue = _inputQueueName;                          // MOVE INPUT-QUEUE-NAME TO MQ-QUEUE. source: :457
         // MOVE INPUT-QUEUE-HANDLE TO MQ-HOBJ; COMPUTE MQ-OPTIONS = MQCO-NONE. source: :458-459
@@ -619,7 +619,7 @@ public sealed class SystemDateInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _inputQueueName;
                 _mqApplReturnMessage = "MQCLOSE ERR";        // source: :475
-                Termination8000();                           // PERFORM 8000-TERMINATION (FB-8). source: :476
+                Terminate();                           // PERFORM 8000-TERMINATION (FB-8). source: :476
                 break;
         }
     }
@@ -627,7 +627,7 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     //  5100-CLOSE-OUTPUT-QUEUE — source: CODATE01.cbl:478-499
     // =================================================================================================
-    private void CloseOutputQueue5100()
+    private void CloseOutputQueue() // COBOL paragraph: 5100-CLOSE-OUTPUT-QUEUE
     {
         _mqQueue = _replyQueueName;                          // MOVE REPLY-QUEUE-NAME TO MQ-QUEUE. source: :479
         // MOVE OUTPUT-QUEUE-HANDLE TO MQ-HOBJ; COMPUTE MQ-OPTIONS = MQCO-NONE. source: :480-481
@@ -648,7 +648,7 @@ public sealed class SystemDateInquiryService : IMqServer
                 // FB-7: the output/reply close error names INPUT-QUEUE-NAME (sic — not REPLY-QUEUE-NAME).
                 _mqApplQueueName = _inputQueueName;          // source: :496
                 _mqApplReturnMessage = "MQCLOSE ERR";        // source: :497
-                Termination8000();                           // PERFORM 8000-TERMINATION (FB-8). source: :498
+                Terminate();                           // PERFORM 8000-TERMINATION (FB-8). source: :498
                 break;
         }
     }
@@ -656,7 +656,7 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     //  5200-CLOSE-ERROR-QUEUE — source: CODATE01.cbl:501-523
     // =================================================================================================
-    private void CloseErrorQueue5200()
+    private void CloseErrorQueue() // COBOL paragraph: 5200-CLOSE-ERROR-QUEUE
     {
         _mqQueue = _errorQueueName;                          // MOVE ERROR-QUEUE-NAME TO MQ-QUEUE. source: :502
         // MOVE ERROR-QUEUE-HANDLE TO MQ-HOBJ; COMPUTE MQ-OPTIONS = MQCO-NONE. source: :503-504
@@ -676,8 +676,8 @@ public sealed class SystemDateInquiryService : IMqServer
                 _mqApplReasonCode = _mqReasonCode;
                 _mqApplQueueName = _errorQueueName;
                 _mqApplReturnMessage = "MQCLOSE ERR";        // source: :520
-                Error9000();                                 // PERFORM 9000-ERROR (FB-8). source: :521
-                Termination8000();                           // PERFORM 8000-TERMINATION (FB-8). source: :522
+                ReportError();                                 // PERFORM 9000-ERROR (FB-8). source: :521
+                Terminate();                           // PERFORM 8000-TERMINATION (FB-8). source: :522
                 break;
         }
     }
@@ -693,9 +693,9 @@ public sealed class SystemDateInquiryService : IMqServer
     /// </summary>
     private void OverlayRequestMsgCopy(string buffer)
     {
-        string b = Fixed(buffer, 1000);
-        _wsFunc = b.Substring(0, 4);                         // WS-FUNC X(4)
-        _wsKey = ParseKey11(b.Substring(4, 11));             // WS-KEY 9(11)
+        string padded = Fixed(buffer, 1000);
+        _requestFunction = padded.Substring(0, 4);                         // WS-FUNC X(4)
+        _requestKey = ParseKey11(padded.Substring(4, 11));             // WS-KEY 9(11)
     }
 
     // =================================================================================================
@@ -703,7 +703,7 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     private void InitializeMqErrDisplay()
     {
-        _mqErrorPara = "";
+        _mqErrorParagraph = "";
         _mqApplReturnMessage = "";
         _mqApplConditionCode = 0;
         _mqApplReasonCode = 0;
@@ -715,7 +715,7 @@ public sealed class SystemDateInquiryService : IMqServer
     private string FormatMqErrDisplay()
     {
         var sb = new StringBuilder(115);
-        sb.Append(Fixed(_mqErrorPara, 25));                  // MQ-ERROR-PARA X(25)
+        sb.Append(Fixed(_mqErrorParagraph, 25));                  // MQ-ERROR-PARA X(25)
         sb.Append("  ");                                     // FILLER X(2)
         sb.Append(Fixed(_mqApplReturnMessage, 25));          // MQ-APPL-RETURN-MESSAGE X(25)
         sb.Append("  ");                                     // FILLER X(2)
@@ -732,17 +732,17 @@ public sealed class SystemDateInquiryService : IMqServer
     // =================================================================================================
     //  88-level flag setters / testers (FB-4 naming preserved).
     // =================================================================================================
-    private void SetNoMoreMsgs() => _wsMqMsgFlag = 'Y';
-    private bool IsNoMoreMsgs() => _wsMqMsgFlag == 'Y';
+    private void SetNoMoreMsgs() => _moreMessagesFlag = 'Y';
+    private bool IsNoMoreMsgs() => _moreMessagesFlag == 'Y';
 
-    private void SetRespQueueOpen() => _wsRespQueueSts = 'Y';   // output/reply queue (FB-4)
-    private bool IsRespQueueOpen() => _wsRespQueueSts == 'Y';
+    private void SetRespQueueOpen() => _respQueueStatus = 'Y';   // output/reply queue (FB-4)
+    private bool IsRespQueueOpen() => _respQueueStatus == 'Y';
 
-    private void SetErrQueueOpen() => _wsErrQueueSts = 'Y';
-    private bool IsErrQueueOpen() => _wsErrQueueSts == 'Y';
+    private void SetErrQueueOpen() => _errQueueStatus = 'Y';
+    private bool IsErrQueueOpen() => _errQueueStatus == 'Y';
 
-    private void SetReplyQueueOpen() => _wsReplyQueueSts = 'Y'; // input/request queue (FB-4)
-    private bool IsReplyQueueOpen() => _wsReplyQueueSts == 'Y';
+    private void SetReplyQueueOpen() => _replyQueueStatus = 'Y'; // input/request queue (FB-4)
+    private bool IsReplyQueueOpen() => _replyQueueStatus == 'Y';
 
     // =================================================================================================
     //  Time + string formatting helpers.

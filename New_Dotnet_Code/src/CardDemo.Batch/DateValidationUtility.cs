@@ -28,8 +28,8 @@ namespace CardDemo.Batch;
 /// minimum reproduce the valid/invalid decision.</para>
 ///
 /// <para>Paragraphs are methods, COBOL names kept, with <c>// source: CSUTLDTC.cbl:NNN</c> citations and
-/// preserved statement order. The three procedure bodies are the unnamed mainline, <see cref="A000Main"/>,
-/// and <see cref="A000MainExit"/>.</para>
+/// preserved statement order. The three procedure bodies are the unnamed mainline, <see cref="RunMainConversion"/>,
+/// and <see cref="MainConversionExit"/>.</para>
 ///
 /// <para>FAITHFUL BUGS / quirks reproduced verbatim (port spec §6 — do NOT fix):
 /// <list type="number">
@@ -73,26 +73,26 @@ public sealed class DateValidationUtility
 
     // ---- WS-MESSAGE (the 80-byte result template). // source: CSUTLDTC.cbl:42-57 ------------------------
     // The named items the program writes; FILLER literal labels are reconstructed in BuildLsResult().
-    private int _wsSeverityN;                 // WS-SEVERITY-N PIC 9(4) REDEFINES WS-SEVERITY X(04)  (bytes 1-4)
-    private int _wsMsgNoN;                    // WS-MSG-NO-N  PIC 9(4) REDEFINES WS-MSG-NO  X(04)    (bytes 16-19)
-    private string _wsResult = "";            // WS-RESULT    PIC X(15)                              (bytes 21-35)
-    private byte[] _wsDate = new byte[WsDateWidth];   // WS-DATE     PIC X(10) (raw bytes — bug #1)  (bytes 46-55)
-    private string _wsDateFmt = "";           // WS-DATE-FMT  PIC X(10)                              (bytes 67-76)
+    private int _severityNumeric;             // WS-SEVERITY-N PIC 9(4) REDEFINES WS-SEVERITY X(04)  (bytes 1-4)
+    private int _messageNumber;               // WS-MSG-NO-N  PIC 9(4) REDEFINES WS-MSG-NO  X(04)    (bytes 16-19)
+    private string _verdictText = "";         // WS-RESULT    PIC X(15)                              (bytes 21-35)
+    private byte[] _echoedTestDate = new byte[DateWidth];   // WS-DATE     PIC X(10) (raw bytes — bug #1)  (bytes 46-55)
+    private string _echoedMask = "";          // WS-DATE-FMT  PIC X(10)                              (bytes 67-76)
 
     // 01 FEEDBACK-CODE — the LE condition token populated by CEEDAYS. // source: CSUTLDTC.cbl:60-80
     private Feedback _feedback;
 
     // ---- LINKAGE SECTION (the three BY REFERENCE parameters). // source: CSUTLDTC.cbl:83-88 -------------
-    private string _lsDate = "";              // LS-DATE        PIC X(10)
-    private string _lsDateFormat = "";        // LS-DATE-FORMAT PIC X(10)
+    private string _inputDate = "";           // LS-DATE        PIC X(10)
+    private string _inputDateFormat = "";     // LS-DATE-FORMAT PIC X(10)
 
     // Field widths from the WS-MESSAGE / LINKAGE PICs.
     private const int LsDateWidth = 10;       // LS-DATE PIC X(10)        // source: CSUTLDTC.cbl:84
     private const int LsDateFormatWidth = 10; // LS-DATE-FORMAT PIC X(10) // source: CSUTLDTC.cbl:85
     private const int LsResultWidth = 80;     // LS-RESULT PIC X(80)      // source: CSUTLDTC.cbl:86
-    private const int WsResultWidth = 15;     // WS-RESULT PIC X(15)      // source: CSUTLDTC.cbl:49
-    private const int WsDateWidth = 10;       // WS-DATE PIC X(10)        // source: CSUTLDTC.cbl:52
-    private const int WsDateFmtWidth = 10;    // WS-DATE-FMT PIC X(10)    // source: CSUTLDTC.cbl:55
+    private const int ResultWidth = 15;     // WS-RESULT PIC X(15)      // source: CSUTLDTC.cbl:49
+    private const int DateWidth = 10;       // WS-DATE PIC X(10)        // source: CSUTLDTC.cbl:52
+    private const int DateFormatWidth = 10;    // WS-DATE-FMT PIC X(10)    // source: CSUTLDTC.cbl:55
 
     /// <summary>RETURN-CODE set on return (= numeric severity <c>WS-SEVERITY-N</c>). // source: CSUTLDTC.cbl:98</summary>
     public int ReturnCode { get; private set; }
@@ -151,8 +151,8 @@ public sealed class DateValidationUtility
     {
         // LS-DATE / LS-DATE-FORMAT are PIC X(10): receive left-justified, space-padded / right-truncated to
         // exactly 10 chars (the COBOL fixed-width LINKAGE fields the caller passes BY REFERENCE).
-        _lsDate = Fit(lsDate, LsDateWidth);
-        _lsDateFormat = Fit(lsDateFormat, LsDateFormatWidth);
+        _inputDate = Fit(lsDate, LsDateWidth);
+        _inputDateFormat = Fit(lsDateFormat, LsDateFormatWidth);
 
         // INITIALIZE WS-MESSAGE — reset the named items: alphanumeric -> spaces, numeric -> 0. The FILLER
         // literal labels are NOT re-applied by INITIALIZE (faithful bug #6); they are reconstructed at their
@@ -160,11 +160,11 @@ public sealed class DateValidationUtility
         InitializeWsMessage();
 
         // MOVE SPACES TO WS-DATE — blank the echoed test-date field. // source: CSUTLDTC.cbl:91
-        _wsDate = SpacesBytes(WsDateWidth, host);
+        _echoedTestDate = SpacesBytes(DateWidth, host);
 
         // PERFORM A000-MAIN THRU A000-MAIN-EXIT — do the conversion + verdict. // source: CSUTLDTC.cbl:93-94
-        A000Main(host);
-        A000MainExit();
+        RunMainConversion(host);
+        MainConversionExit();
 
         // (DISPLAY WS-MESSAGE is commented out in the source. // source: CSUTLDTC.cbl:96)
 
@@ -172,7 +172,7 @@ public sealed class DateValidationUtility
         LsResult = BuildLsResult(host);
 
         // MOVE WS-SEVERITY-N TO RETURN-CODE — set RETURN-CODE to the numeric severity. // source: CSUTLDTC.cbl:98
-        ReturnCode = _wsSeverityN;
+        ReturnCode = _severityNumeric;
 
         // EXIT PROGRAM — return to caller (GOBACK is commented out). // source: CSUTLDTC.cbl:100-101
     }
@@ -180,7 +180,7 @@ public sealed class DateValidationUtility
     // ====================================================================================================
     // A000-MAIN. // source: CSUTLDTC.cbl:103-151
     // ====================================================================================================
-    private void A000Main(HostKind host)
+    private void RunMainConversion(HostKind host)  // COBOL paragraph: A000-MAIN
     {
         // MOVE LENGTH OF LS-DATE TO VSTRING-LENGTH OF WS-DATE-TO-TEST — VSTRING length pinned to 10 (bug #2).
         // source: CSUTLDTC.cbl:105-106
@@ -189,8 +189,8 @@ public sealed class DateValidationUtility
         // MOVE LS-DATE TO VSTRING-TEXT OF WS-DATE-TO-TEST, WS-DATE — multi-receiver MOVE: into the VSTRING
         // text AND into the echoed WS-DATE field. Each receiver gets a per-receiver alphanumeric MOVE
         // (left-justify, space-pad/truncate to its own width). // source: CSUTLDTC.cbl:107-108
-        _dateToTestText = Fit(_lsDate, _dateToTestLength);          // VSTRING-TEXT OF WS-DATE-TO-TEST (10)
-        _wsDate = Encode(Fit(_lsDate, WsDateWidth), host);          // WS-DATE X(10) — clean date (overwritten below)
+        _dateToTestText = Fit(_inputDate, _dateToTestLength);       // VSTRING-TEXT OF WS-DATE-TO-TEST (10)
+        _echoedTestDate = Encode(Fit(_inputDate, DateWidth), host); // WS-DATE X(10) — clean date (overwritten below)
 
         // MOVE LENGTH OF LS-DATE-FORMAT TO VSTRING-LENGTH OF WS-DATE-FORMAT — pinned to 10 (bug #2).
         // source: CSUTLDTC.cbl:109-110
@@ -198,8 +198,8 @@ public sealed class DateValidationUtility
 
         // MOVE LS-DATE-FORMAT TO VSTRING-TEXT OF WS-DATE-FORMAT, WS-DATE-FMT — multi-receiver MOVE.
         // source: CSUTLDTC.cbl:111-113
-        _dateFormatText = Fit(_lsDateFormat, _dateFormatLength);    // VSTRING-TEXT OF WS-DATE-FORMAT (10)
-        _wsDateFmt = Fit(_lsDateFormat, WsDateFmtWidth);           // WS-DATE-FMT X(10) — clean mask (kept)
+        _dateFormatText = Fit(_inputDateFormat, _dateFormatLength); // VSTRING-TEXT OF WS-DATE-FORMAT (10)
+        _echoedMask = Fit(_inputDateFormat, DateFormatWidth);        // WS-DATE-FMT X(10) — clean mask (kept)
 
         // MOVE 0 TO OUTPUT-LILLIAN — clear the Lillian output. // source: CSUTLDTC.cbl:114
         _outputLillian = 0;
@@ -212,43 +212,43 @@ public sealed class DateValidationUtility
         // are the binary length halfword (X'000A' = 10), then the first 8 chars of the date text. This
         // corrupts the echoed date (faithful bug #1) and overwrites the clean copy from line 108.
         // source: CSUTLDTC.cbl:122
-        _wsDate = VstringGroupImageToWsDate(_dateToTestLength, _dateToTestText, host);
+        _echoedTestDate = VstringGroupImageToWsDate(_dateToTestLength, _dateToTestText, host);
 
         // MOVE SEVERITY OF FEEDBACK-CODE TO WS-SEVERITY-N — binary S9(4) -> 9(4). // source: CSUTLDTC.cbl:123
-        _wsSeverityN = ToFourDigit(_feedback.Severity);
+        _severityNumeric = ToFourDigit(_feedback.Severity);
 
         // MOVE MSG-NO OF FEEDBACK-CODE TO WS-MSG-NO-N — binary S9(4) -> 9(4). // source: CSUTLDTC.cbl:124
-        _wsMsgNoN = ToFourDigit(_feedback.MsgNo);
+        _messageNumber = ToFourDigit(_feedback.MsgNo);
 
         // EVALUATE TRUE over the feedback 88-levels -> WS-RESULT verdict text (WHEN OTHER -> 'Date is invalid').
         // The 88s test the full 8-byte FEEDBACK-TOKEN-VALUE. // source: CSUTLDTC.cbl:128-149
         ulong token = _feedback.Token;
         if (token == FcInvalidDate)              // X'0000000000000000' (all-zeros = SUCCESS = date VALID)
-            _wsResult = "Date is valid";          // // source: CSUTLDTC.cbl:129-130
+            _verdictText = "Date is valid";       // // source: CSUTLDTC.cbl:129-130
         else if (token == FcInsufficientData)    // X'000309CB59C3C5C5'
-            _wsResult = "Insufficient";           // // source: CSUTLDTC.cbl:131-132
+            _verdictText = "Insufficient";        // // source: CSUTLDTC.cbl:131-132
         else if (token == FcBadDateValue)        // X'000309CC59C3C5C5'
-            _wsResult = "Datevalue error";        // // source: CSUTLDTC.cbl:133-134
+            _verdictText = "Datevalue error";     // // source: CSUTLDTC.cbl:133-134
         else if (token == FcInvalidEra)          // X'000309CD59C3C5C5'
-            _wsResult = "Invalid Era    ";        // // source: CSUTLDTC.cbl:135-136
+            _verdictText = "Invalid Era    ";     // // source: CSUTLDTC.cbl:135-136
         else if (token == FcUnsuppRange)         // X'000309D159C3C5C5'
-            _wsResult = "Unsupp. Range  ";        // // source: CSUTLDTC.cbl:137-138
+            _verdictText = "Unsupp. Range  ";     // // source: CSUTLDTC.cbl:137-138
         else if (token == FcInvalidMonth)        // X'000309D559C3C5C5'
-            _wsResult = "Invalid month  ";        // // source: CSUTLDTC.cbl:139-140
+            _verdictText = "Invalid month  ";     // // source: CSUTLDTC.cbl:139-140
         else if (token == FcBadPicString)        // X'000309D659C3C5C5'
-            _wsResult = "Bad Pic String ";        // // source: CSUTLDTC.cbl:141-142
+            _verdictText = "Bad Pic String ";     // // source: CSUTLDTC.cbl:141-142
         else if (token == FcNonNumericData)      // X'000309D859C3C5C5'
-            _wsResult = "Nonnumeric data";        // // source: CSUTLDTC.cbl:143-144
+            _verdictText = "Nonnumeric data";     // // source: CSUTLDTC.cbl:143-144
         else if (token == FcYearInEraZero)       // X'000309D959C3C5C5'
-            _wsResult = "YearInEra is 0 ";        // // source: CSUTLDTC.cbl:145-146
+            _verdictText = "YearInEra is 0 ";     // // source: CSUTLDTC.cbl:145-146
         else
-            _wsResult = "Date is invalid";        // WHEN OTHER // source: CSUTLDTC.cbl:147-148
+            _verdictText = "Date is invalid";     // WHEN OTHER // source: CSUTLDTC.cbl:147-148
     }
 
     // ====================================================================================================
     // A000-MAIN-EXIT. // source: CSUTLDTC.cbl:152-154
     // ====================================================================================================
-    private void A000MainExit()
+    private void MainConversionExit()  // COBOL paragraph: A000-MAIN-EXIT
     {
         // EXIT. — return target of the PERFORM ... THRU. No-op.
     }
@@ -259,11 +259,11 @@ public sealed class DateValidationUtility
     // ====================================================================================================
     private void InitializeWsMessage()
     {
-        _wsSeverityN = 0;                       // WS-SEVERITY-N / WS-SEVERITY -> 0
-        _wsMsgNoN = 0;                          // WS-MSG-NO-N / WS-MSG-NO -> 0
-        _wsResult = new string(' ', WsResultWidth);   // WS-RESULT -> spaces
-        _wsDate = SpacesBytes(WsDateWidth, HostKind.Ebcdic); // WS-DATE -> spaces (re-blanked at line 91 too)
-        _wsDateFmt = new string(' ', WsDateFmtWidth); // WS-DATE-FMT -> spaces
+        _severityNumeric = 0;                   // WS-SEVERITY-N / WS-SEVERITY -> 0
+        _messageNumber = 0;                     // WS-MSG-NO-N / WS-MSG-NO -> 0
+        _verdictText = new string(' ', ResultWidth);   // WS-RESULT -> spaces
+        _echoedTestDate = SpacesBytes(DateWidth, HostKind.Ebcdic); // WS-DATE -> spaces (re-blanked at line 91 too)
+        _echoedMask = new string(' ', DateFormatWidth); // WS-DATE-FMT -> spaces
     }
 
     // ====================================================================================================
@@ -291,27 +291,27 @@ public sealed class DateValidationUtility
         }
 
         // bytes 1-4  : WS-SEVERITY (X4-numeric view WS-SEVERITY-N PIC 9(4), zero-filled). // CSUTLDTC.cbl:43-44
-        PutText(Pic9(_wsSeverityN, 4), 4);
+        PutText(Pic9(_severityNumeric, 4), 4);
         // bytes 5-15 : FILLER X(11) VALUE 'Mesg Code:' (10 chars + 1 trailing space). // CSUTLDTC.cbl:45
         PutText("Mesg Code:", 11);
         // bytes 16-19: WS-MSG-NO (X4-numeric view WS-MSG-NO-N PIC 9(4), zero-filled). // CSUTLDTC.cbl:46-47
-        PutText(Pic9(_wsMsgNoN, 4), 4);
+        PutText(Pic9(_messageNumber, 4), 4);
         // byte  20   : FILLER X(01) VALUE SPACE. // CSUTLDTC.cbl:48
         PutText(" ", 1);
         // bytes 21-35: WS-RESULT X(15) verdict text. // CSUTLDTC.cbl:49
-        PutText(_wsResult, WsResultWidth);
+        PutText(_verdictText, ResultWidth);
         // byte  36   : FILLER X(01) VALUE SPACE. // CSUTLDTC.cbl:50
         PutText(" ", 1);
         // bytes 37-45: FILLER X(09) VALUE 'TstDate:' (8 chars + 1 trailing space). // CSUTLDTC.cbl:51
         PutText("TstDate:", 9);
         // bytes 46-55: WS-DATE X(10) — RAW bytes (bug #1: X'000A' + 8 date chars). // CSUTLDTC.cbl:52
-        PutBytes(_wsDate, WsDateWidth);
+        PutBytes(_echoedTestDate, DateWidth);
         // byte  56   : FILLER X(01) VALUE SPACE. // CSUTLDTC.cbl:53
         PutText(" ", 1);
         // bytes 57-66: FILLER X(10) VALUE 'Mask used:'. // CSUTLDTC.cbl:54
         PutText("Mask used:", 10);
         // bytes 67-76: WS-DATE-FMT X(10) — clean mask. // CSUTLDTC.cbl:55
-        PutText(_wsDateFmt, WsDateFmtWidth);
+        PutText(_echoedMask, DateFormatWidth);
         // byte  77   : FILLER X(01) VALUE SPACE. // CSUTLDTC.cbl:56
         PutText(" ", 1);
         // bytes 78-80: FILLER X(03) VALUE SPACES. // CSUTLDTC.cbl:57
@@ -521,14 +521,14 @@ public sealed class DateValidationUtility
     /// </summary>
     private static byte[] VstringGroupImageToWsDate(short vLength, string vText, HostKind host)
     {
-        var result = new byte[WsDateWidth];
+        var result = new byte[DateWidth];
         // Vstring-length PIC S9(4) BINARY is a 2-byte big-endian halfword on the mainframe.
         result[0] = (byte)((vLength >> 8) & 0xFF);   // high byte (0x00 for length 10)
         result[1] = (byte)(vLength & 0xFF);          // low byte  (0x0A for length 10)
 
         byte[] textBytes = Encode(vText, host);
         byte space = SpacesBytes(1, host)[0];
-        for (int i = 2; i < WsDateWidth; i++)
+        for (int i = 2; i < DateWidth; i++)
         {
             int srcIndex = i - 2;                     // the first 8 chars of the date text shift in after the 2 length bytes
             result[i] = srcIndex < textBytes.Length ? textBytes[srcIndex] : space;

@@ -50,30 +50,30 @@ public static class OnlineProgramRegistry
 
         return new ProgramRegistry()
             // Entry + menus.
-            .Register(() => new Cosgn00c(db))   // COSGN00C / CC00 — sign-on (entry point)
-            .Register(() => new Comen01c(db))   // COMEN01C / CM00 — main menu
-            .Register(() => new Coadm01c(db))   // COADM01C / CA00 — admin menu
+            .Register(() => new SignOnProgram(db))   // COSGN00C / CC00 — sign-on (entry point)
+            .Register(() => new MainMenuProgram(db))   // COMEN01C / CM00 — main menu
+            .Register(() => new AdminMenuProgram(db))   // COADM01C / CA00 — admin menu
             // Account / card.
-            .Register(() => new Coactvwc(db))   // COACTVWC / CAVW — account view
-            .Register(() => new Coactupc(db))   // COACTUPC / CAUP — account update
-            .Register(() => new Cocrdlic(db))   // COCRDLIC / CCLI — credit card list
-            .Register(() => new Cocrdslc(db))   // COCRDSLC / CCDL — credit card view (detail)
-            .Register(() => new Cocrdupc(db))   // COCRDUPC / CCUP — credit card update
+            .Register(() => new AccountViewProgram(db))   // COACTVWC / CAVW — account view
+            .Register(() => new AccountUpdateProgram(db))   // COACTUPC / CAUP — account update
+            .Register(() => new CardListProgram(db))   // COCRDLIC / CCLI — credit card list
+            .Register(() => new CardDetailViewProgram(db))   // COCRDSLC / CCDL — credit card view (detail)
+            .Register(() => new CardUpdateProgram(db))   // COCRDUPC / CCUP — credit card update
             // Transactions / bill / reports.
-            .Register(() => new Cotrn00c(db))   // COTRN00C / CT00 — transaction list
-            .Register(() => new Cotrn01c(db))   // COTRN01C / CT01 — transaction view
-            .Register(() => new Cotrn02c(db))   // COTRN02C / CT02 — transaction add
-            .Register(() => new Cobil00c(db))   // COBIL00C / CB00 — bill payment
-            .Register(() => new Corpt00c(db))   // CORPT00C / CR00 — transaction reports
+            .Register(() => new TransactionListProgram(db))   // COTRN00C / CT00 — transaction list
+            .Register(() => new TransactionViewProgram(db))   // COTRN01C / CT01 — transaction view
+            .Register(() => new TransactionAddProgram(db))   // COTRN02C / CT02 — transaction add
+            .Register(() => new BillPaymentProgram(db))   // COBIL00C / CB00 — bill payment
+            .Register(() => new TransactionReportProgram(db))   // CORPT00C / CR00 — transaction reports
             // User security (admin).
-            .Register(() => new Cousr00c(db))   // COUSR00C / CU00 — user list
-            .Register(() => new Cousr01c(db))   // COUSR01C / CU01 — user add
-            .Register(() => new Cousr02c(db))   // COUSR02C / CU02 — user update
-            .Register(() => new Cousr03c(db))   // COUSR03C / CU03 — user delete
+            .Register(() => new UserListProgram(db))   // COUSR00C / CU00 — user list
+            .Register(() => new UserAddProgram(db))   // COUSR01C / CU01 — user add
+            .Register(() => new UserUpdateProgram(db))   // COUSR02C / CU02 — user update
+            .Register(() => new UserDeleteProgram(db))   // COUSR03C / CU03 — user delete
             // ---- Optional add-on online handlers (DB2 transaction-type + IMS/DB2/MQ pending-auth) ----
-            .Register(() => new Cotrtlic(db))   // COTRTLIC / CTLI — transaction-type list/update (DB2)
-            .Register(() => new Cotrtupc(db))   // COTRTUPC / CTTU — transaction-type maintenance (DB2)
-            .Register(() => new Copaus0c(db))   // COPAUS0C / CPVS — pending-auth view summary (IMS)
-            .Register(() => new Copaus1c(db));  // COPAUS1C / CPVD — pending-auth view detail (IMS, plan AWS01PLN)
+            .Register(() => new TransactionTypeListProgram(db))   // COTRTLIC / CTLI — transaction-type list/update (DB2)
+            .Register(() => new TransactionTypeUpdateProgram(db))   // COTRTUPC / CTTU — transaction-type maintenance (DB2)
+            .Register(() => new PendingAuthSummaryProgram(db))   // COPAUS0C / CPVS — pending-auth view summary (IMS)
+            .Register(() => new PendingAuthDetailProgram(db));  // COPAUS1C / CPVD — pending-auth view detail (IMS, plan AWS01PLN)
     }
 }

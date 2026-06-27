@@ -144,7 +144,7 @@ public static class CardDemoJobs
             steps.Add(new JobStep("STEP05", "CBTRN01C", ctx =>
             {
                 // Read-and-validate driver: emits diagnostics only, no posting. Always RC 0.
-                Cbtrn01c.Run(ctx.Db, ctx.Path("CBTRN01C.sysout"));
+                DailyTransactionValidationProgram.Run(ctx.Db, ctx.Path("CBTRN01C.sysout"));
                 return 0;
             }));
         }
@@ -156,7 +156,7 @@ public static class CardDemoJobs
             string rejPath = ctx.Gdg.AllocateNext(GdgDalyRejs);
             try
             {
-                int rc = new Cbtrn02c().Run(ctx.Db, rejPath, ctx.Clock, HostKind.Ebcdic);
+                int rc = new TransactionPostingProgram().Run(ctx.Db, rejPath, ctx.Clock, HostKind.Ebcdic);
                 ctx.Gdg.Catalog(GdgDalyRejs); // DISP=(NEW,CATLG,DELETE): catalog on clean end.
                 return rc;                     // 4 == posted with rejects (warning), 0 == clean.
             }
@@ -191,7 +191,7 @@ public static class CardDemoJobs
                 ctx.Gdg.AllocateNext(GdgSysTran); // SYSTRAN(+1) — the interest TX output generation.
                 try
                 {
-                    int rc = new Cbact04c().Run(ctx.Db, parmDate, ctx.Clock);
+                    int rc = new InterestCalculationProgram().Run(ctx.Db, parmDate, ctx.Clock);
                     // Snapshot the freshly written interest transactions into the SYSTRAN generation.
                     UtilitySteps.IdcamsReproUnload(ctx, ctx.Gdg.Plus1(GdgSysTran),
                         w => SerializeTransactions(ctx, w), HostKind.Ebcdic);
@@ -265,7 +265,7 @@ public static class CardDemoJobs
             {
                 if (ctx.CopybookDir is null) return 12;
                 string outPath = exportPath ?? ctx.Path("EXPORT.DATA");
-                Cbexport.Run(
+                CustomerDataExportProgram.Run(
                     new BatchSupport(ctx.Db), outPath, ctx.CopybookDir, ctx.Clock, HostKind.Ebcdic);
                 return 0;
             }),
@@ -285,7 +285,7 @@ public static class CardDemoJobs
                 if (ctx.CopybookDir is null) return 12;
                 var serializer = new RecordSerializer(new RecordLayouts(ctx.CopybookDir));
                 string cvexport = File.ReadAllText(Path.Combine(ctx.CopybookDir, "CVEXPORT.cpy"));
-                var contextRec = new Cbimport.Context(
+                var contextRec = new CustomerDataImportProgram.Context(
                     ExportPath: exportPath,
                     CustomerOutPath: ctx.Path("CUSTOUT.dat"),
                     AccountOutPath: ctx.Path("ACCTOUT.dat"),
@@ -301,7 +301,7 @@ public static class CardDemoJobs
                     Clock: ctx.Clock,
                     Host: HostKind.Ebcdic,
                     CardOutPath: supplyCardOut ? ctx.Path("CARDOUT.dat") : null);
-                return new Cbimport(contextRec).Run();
+                return new CustomerDataImportProgram(contextRec).Run();
             }),
         ]);
 
@@ -346,7 +346,7 @@ public static class CardDemoJobs
                 string reportPath = ctx.Gdg.AllocateNext(GdgTranRept);
                 try
                 {
-                    Cbtrn03c.Run(ctx.Db, reportPath, startDate, endDate, HostKind.Ascii);
+                    TransactionDetailReportProgram.Run(ctx.Db, reportPath, startDate, endDate, HostKind.Ascii);
                     ctx.Gdg.Catalog(GdgTranRept);
                     return 0;
                 }
@@ -428,7 +428,7 @@ public static class CardDemoJobs
                 ctx.Path("ACCTDATA.PSCOMP"), ctx.Path("ACCTDATA.ARRYPS"), ctx.Path("ACCTDATA.VBPS"))),
             new JobStep("STEP05", "CBACT01C", ctx =>
             {
-                Cbact01c.Run(new BatchSupport(ctx.Db),
+                AccountMasterReportProgram.Run(new BatchSupport(ctx.Db),
                     ctx.Path("ACCTDATA.PSCOMP"), ctx.Path("ACCTDATA.ARRYPS"), ctx.Path("ACCTDATA.VBPS"),
                     HostKind.Ebcdic);
                 return 0;
@@ -440,7 +440,7 @@ public static class CardDemoJobs
         "READCARD", "READCARD",
         [
             new JobStep("STEP05", "CBACT02C", ctx =>
-                new Cbact02c().Run(ctx.Db, ctx.Path("READCARD.sysout"))),
+                new CardMasterReportProgram().Run(ctx.Db, ctx.Path("READCARD.sysout"))),
         ]);
 
     /// <summary>READCUST — sequentially read and DISPLAY the CUSTOMER master (CBCUS01C), a read-only dump.</summary>
@@ -448,7 +448,7 @@ public static class CardDemoJobs
         "READCUST", "READCUST",
         [
             new JobStep("STEP05", "CBCUS01C", ctx =>
-                new Cbcus01c().Run(ctx.Db, ctx.Path("READCUST.sysout"))),
+                new CustomerMasterReportProgram().Run(ctx.Db, ctx.Path("READCUST.sysout"))),
         ]);
 
     /// <summary>READXREF — sequentially read and DISPLAY the CARD_XREF master (CBACT03C), a read-only dump.</summary>
@@ -456,7 +456,7 @@ public static class CardDemoJobs
         "READXREF", "READXREF",
         [
             new JobStep("STEP05", "CBACT03C", ctx =>
-                new Cbact03c().Run(ctx.Db, ctx.Path("READXREF.sysout"))),
+                new CardXrefReportProgram().Run(ctx.Db, ctx.Path("READXREF.sysout"))),
         ]);
 
     // =================================================================================================
@@ -488,7 +488,7 @@ public static class CardDemoJobs
             {
                 // CBSTM03A reads TRNXFILE(TRANSACTION)/XREFFILE/ACCTFILE/CUSTFILE via CBSTM03B and writes the
                 // STMTFILE (plain text) + HTMLFILE (HTML) statements.
-                Cbstm03a.Run(ctx.Db, ctx.Path("STATEMNT.PS"), ctx.Path("STATEMNT.HTML"), HostKind.Ebcdic);
+                StatementGenerationProgram.Run(ctx.Db, ctx.Path("STATEMNT.PS"), ctx.Path("STATEMNT.HTML"), HostKind.Ebcdic);
                 return 0;
             }, conditions: [new CondCode(0, CondOperator.Ne)]),
         ]);
@@ -506,7 +506,7 @@ public static class CardDemoJobs
     public static Job LoadPaDb() => new(
         "LOADPADB", "M2APP — Load pending-auth IMS DB",
         [
-            new JobStep("STEP01", "PAUDBLOD", ctx => Paudblod.Run(
+            new JobStep("STEP01", "PAUDBLOD", ctx => PendingAuthDbLoadUtility.Run(
                 new PautSummaryRepository(ctx.Db), new PautDetailRepository(ctx.Db),
                 ctx.Path("PAUTDB.ROOT.FILEO"), ctx.Path("PAUTDB.CHILD.FILEO"),
                 ctx.Clock, HostKind.Ebcdic).ReturnCode),
@@ -522,7 +522,7 @@ public static class CardDemoJobs
         [
             new JobStep("STEP0", "IEFBR14", ctx => UtilitySteps.Iefbr14(
                 ctx.Path("PAUTDB.ROOT.FILEO"), ctx.Path("PAUTDB.CHILD.FILEO"))),
-            new JobStep("STEP01", "PAUDBUNL", ctx => Paudbunl.Run(
+            new JobStep("STEP01", "PAUDBUNL", ctx => PendingAuthDbUnloadUtility.Run(
                 new PautSummaryRepository(ctx.Db), new PautDetailRepository(ctx.Db),
                 ctx.Path("PAUTDB.ROOT.FILEO"), ctx.Path("PAUTDB.CHILD.FILEO"),
                 ctx.Clock, HostKind.Ebcdic).ReturnCode),
@@ -536,7 +536,7 @@ public static class CardDemoJobs
     public static Job UnldGsam() => new(
         "UNLDGSAM", "M2APP — Unload pending-auth IMS DB to GSAM",
         [
-            new JobStep("STEP01", "DBUNLDGS", ctx => Dbunldgs.Run(
+            new JobStep("STEP01", "DBUNLDGS", ctx => PendingAuthGsamUnloadUtility.Run(
                 new PautSummaryRepository(ctx.Db), new PautDetailRepository(ctx.Db),
                 ctx.Path("PAUTDB.ROOT.GSAM"), ctx.Path("PAUTDB.CHILD.GSAM"),
                 ctx.Clock, HostKind.Ebcdic).ReturnCode),
@@ -557,7 +557,7 @@ public static class CardDemoJobs
     public static Job CbPaup0J() => new(
         "CBPAUP0J", "EXECUTE IMS PROGRAM TO DELETE EXPIRED AUTHORIZATIONS",
         [
-            new JobStep("STEP01", "CBPAUP0C", ctx => Cbpaup0c.Run(
+            new JobStep("STEP01", "CBPAUP0C", ctx => PendingAuthPurgeProgram.Run(
                 new PautSummaryRepository(ctx.Db), new PautDetailRepository(ctx.Db),
                 "00,00001,00001,Y", ctx.Clock).ReturnCode),
         ]);
@@ -579,7 +579,7 @@ public static class CardDemoJobs
             new JobStep("STEP1", "COBTUPDT", ctx =>
             {
                 string path = inputFilePath ?? ctx.Path("INPFILE.dat");
-                Cobtupdt program = Cobtupdt.Create(ctx.Db, Cobtupdt.ReadInputFile(path));
+                TransactionTypeMaintenanceBatch program = TransactionTypeMaintenanceBatch.Create(ctx.Db, TransactionTypeMaintenanceBatch.ReadInputFile(path));
                 program.Run();
                 return program.ReturnCode; // 0 clean, 4 = a record errored (warning, not abort).
             }),

@@ -48,14 +48,14 @@ public sealed class BatchTests
     /// interest TRANSACTION must carry exactly that amount, type '01', cat 0005, and source 'System'.
     /// </summary>
     [Fact]
-    public void Cbact04c_InterestCompute_TruncatesTowardZero_OnKnownAccount()
+    public void InterestCalculationProgram_InterestCompute_TruncatesTowardZero_OnKnownAccount()
     {
         using BatchSupport s = BatchSupport.Open();
         SeedOneInterestAccount(s,
             acctId: 11111111111L, groupId: "ZEROGRP   ", typeCd: "01", catCd: 5,
             balance: 1234.56m, rate: 19.99m, cardNum: "4111111111111111", startBal: 100.00m);
 
-        var prog = new Cbact04c();
+        var prog = new InterestCalculationProgram();
         int rc = prog.Run(s, parmDate: "2022071800", clock: Clock);
 
         Assert.Equal(0, rc);
@@ -88,7 +88,7 @@ public sealed class BatchTests
     /// fallback applied) — proving the COMPUTE truncation holds across the real dataset, not just one row.
     /// </summary>
     [Fact]
-    public void Cbact04c_FullSeed_WritesTruncatedInterestPerNonZeroRateCategory()
+    public void InterestCalculationProgram_FullSeed_WritesTruncatedInterestPerNonZeroRateCategory()
     {
         using BatchSupport s = OpenSeeded(out ImportResult imported);
         Assert.True(imported.Count("TRAN_CAT_BAL") > 0);
@@ -108,7 +108,7 @@ public sealed class BatchTests
             return disc.TryGetValue(("DEFAULT".PadRight(10), typeCd, catCd), out decimal d) ? d : 0m;
         }
 
-        var prog = new Cbact04c();
+        var prog = new InterestCalculationProgram();
         int rc = prog.Run(s, parmDate: "2022071800", clock: Clock);
         Assert.Equal(0, rc);
         Assert.Equal(balances.Count, prog.RecordCount);
@@ -151,7 +151,7 @@ public sealed class BatchTests
     /// processed/rejected counters are consistent and RC is 4 iff any record was rejected.
     /// </summary>
     [Fact]
-    public void Cbtrn02c_PostsValidDailyTransactions_IntoTransactionTableAndBalances()
+    public void TransactionPostingProgram_PostsValidDailyTransactions_IntoTransactionTableAndBalances()
     {
         using BatchSupport s = OpenSeeded(out ImportResult imported);
         Assert.True(imported.Count("DAILY_TRANSACTION") > 0);
@@ -166,7 +166,7 @@ public sealed class BatchTests
         decimal balBefore = acctBefore!.CurrBal;
 
         string rejPath = TempFile("dalyrejs");
-        var prog = new Cbtrn02c();
+        var prog = new TransactionPostingProgram();
         int rc = prog.Run(s, rejPath, clock: Clock, host: HostKind.Ebcdic);
 
         // Counters add up and RC reflects whether anything was rejected.
@@ -203,7 +203,7 @@ public sealed class BatchTests
     /// 9(4) at offset 350 and the reason description at offset 354.
     /// </summary>
     [Fact]
-    public void Cbtrn02c_WritesRejects_WithCorrectReasonCodes()
+    public void TransactionPostingProgram_WritesRejects_WithCorrectReasonCodes()
     {
         using BatchSupport s = BatchSupport.Open();
 
@@ -228,7 +228,7 @@ public sealed class BatchTests
             origTs: "2099-01-01-00.00.00.000000"));
 
         string rejPath = TempFile("dalyrejs-reasons");
-        var prog = new Cbtrn02c();
+        var prog = new TransactionPostingProgram();
         int rc = prog.Run(s, rejPath, clock: Clock, host: HostKind.Ebcdic);
 
         Assert.Equal(4, rc);                          // some rejected
@@ -262,7 +262,7 @@ public sealed class BatchTests
     /// net for the export/import boundary, with no mainframe oracle.
     /// </summary>
     [Fact]
-    public void Cbexport_Then_Cbimport_RoundTripsMasters_ToByteIdenticalTableState()
+    public void CustomerDataExportProgram_Then_CustomerDataImportProgram_RoundTripsMasters_ToByteIdenticalTableState()
     {
         using BatchSupport src = OpenSeeded(out _);
         var serializer = new RecordSerializer(new RecordLayouts(SeedPaths.CopybookDir));
@@ -337,20 +337,20 @@ public sealed class BatchTests
     /// <summary>
     /// End-to-end PROGRAM-LEVEL round-trip through the two ported programs themselves (not a hand-rolled
     /// re-implementation): seed an in-memory <see cref="RelationalDb"/> from the shipped EBCDIC masters via
-    /// <see cref="MasterImporter"/>, post the daily transactions (<see cref="Cbtrn02c"/>) so the TRANSACTION
-    /// table is non-empty, then run <see cref="Cbexport"/> to write the single multi-record 500-byte EXPORT
-    /// dataset and <see cref="Cbimport"/> to split it back into the five per-type output files (CUSTOUT /
+    /// <see cref="MasterImporter"/>, post the daily transactions (<see cref="TransactionPostingProgram"/>) so the TRANSACTION
+    /// table is non-empty, then run <see cref="CustomerDataExportProgram"/> to write the single multi-record 500-byte EXPORT
+    /// dataset and <see cref="CustomerDataImportProgram"/> to split it back into the five per-type output files (CUSTOUT /
     /// ACCTOUT / XREFOUT / TRNXOUT / CARDOUT). Each output file must round-trip back to the seeded table
     /// data: its bytes equal the concatenation of <see cref="RecordSerializer"/>-serialized images of the
     /// seeded rows, in the program's ascending-PK export order — byte-for-byte.
     /// </summary>
     [Fact]
-    public void Cbexport_Then_Cbimport_ProgramLevel_RoundTripsEveryType_ToByteIdenticalOutputs()
+    public void CustomerDataExportProgram_Then_CustomerDataImportProgram_ProgramLevel_RoundTripsEveryType_ToByteIdenticalOutputs()
     {
         using BatchSupport s = OpenSeeded(out _);
 
         // Populate TRANSACTION so type-'T' is exercised (CBEXPORT reads it; there is no TRANSACT seed file).
-        new Cbtrn02c().Run(s, TempFile("dalyrejs-for-export"), clock: Clock);
+        new TransactionPostingProgram().Run(s, TempFile("dalyrejs-for-export"), clock: Clock);
         Assert.NotEmpty(s.Transaction.ReadAll());
 
         var serializer = new RecordSerializer(new RecordLayouts(SeedPaths.CopybookDir));
@@ -358,7 +358,7 @@ public sealed class BatchTests
         // ---- Run CBEXPORT: every master row -> one 500-byte CVEXPORT record into the flat EXPORT dataset.
         string exportPath = TempFile("cbexport");
         IReadOnlyList<string> exportSysout =
-            Cbexport.Run(s, exportPath, SeedPaths.CopybookDir, Clock, HostKind.Ebcdic);
+            CustomerDataExportProgram.Run(s, exportPath, SeedPaths.CopybookDir, Clock, HostKind.Ebcdic);
         Assert.Contains("CBEXPORT: Export completed", exportSysout);
         Assert.True(File.Exists(exportPath));
         Assert.Equal(0, new FileInfo(exportPath).Length % 500);  // RECFM=F, LRECL 500
@@ -373,7 +373,7 @@ public sealed class BatchTests
         string errOut = TempFile("errout");
 
         var ctx = NewImportContext(exportPath, custOut, acctOut, xrefOut, trnxOut, errOut, serializer, cardOut);
-        int rc = new Cbimport(ctx).Run();
+        int rc = new CustomerDataImportProgram(ctx).Run();
         Assert.Equal(0, rc);
 
         // ---- Assert each output file round-trips back to the seeded table data (re-serialize + byte-compare).
@@ -393,12 +393,12 @@ public sealed class BatchTests
 
     /// <summary>
     /// FB-1 (CARDOUT has no JCL DD): with the JCL-faithful Context (<c>CardOutPath == null</c>),
-    /// <see cref="Cbimport"/> abends in 1100-OPEN-FILES on the missing CARDOUT DD. The export here carries a
+    /// <see cref="CustomerDataImportProgram"/> abends in 1100-OPEN-FILES on the missing CARDOUT DD. The export here carries a
     /// type-'D' record so the would-be CARD target is genuinely required; the port models the quirk as an
     /// <see cref="AbendException"/> (CEE3ABD), thrown before any record is processed.
     /// </summary>
     [Fact]
-    public void Cbimport_AbendsOnMissingCardOut_WhenTypeDPresent_FaithfulBug()
+    public void CustomerDataImportProgram_AbendsOnMissingCardOut_WhenTypeDPresent_FaithfulBug()
     {
         // A tiny DB with at least one CARD (type 'D') row to export.
         using BatchSupport s = BatchSupport.Open();
@@ -411,7 +411,7 @@ public sealed class BatchTests
         var serializer = new RecordSerializer(new RecordLayouts(SeedPaths.CopybookDir));
 
         string exportPath = TempFile("cbexport-d");
-        Cbexport.Run(s, exportPath, SeedPaths.CopybookDir, Clock, HostKind.Ebcdic);
+        CustomerDataExportProgram.Run(s, exportPath, SeedPaths.CopybookDir, Clock, HostKind.Ebcdic);
         // The export must actually contain the type-'D' record (one 500-byte record).
         Assert.Equal(500, new FileInfo(exportPath).Length);
 
@@ -421,7 +421,7 @@ public sealed class BatchTests
             TempFile("custout-d"), TempFile("acctout-d"), TempFile("xrefout-d"),
             TempFile("trnxout-d"), TempFile("errout-d"), serializer, cardOutPath: null);
 
-        AbendException abend = Assert.Throws<AbendException>(() => new Cbimport(ctx).Run());
+        AbendException abend = Assert.Throws<AbendException>(() => new CustomerDataImportProgram(ctx).Run());
         Assert.Equal("999", abend.AbendCode);
     }
 
@@ -434,14 +434,14 @@ public sealed class BatchTests
     /// 1 (start) + N cards + 1 (end), and the optional flat SYSOUT report has the same line count.
     /// </summary>
     [Fact]
-    public void Cbact02c_PrintsEachCardOnce_BetweenBanners()
+    public void CardMasterReportProgram_PrintsEachCardOnce_BetweenBanners()
     {
         using BatchSupport s = OpenSeeded(out _);
         long cards = s.Card.ReadAll().LongCount();
         Assert.True(cards > 0);
 
         string sysout = TempFile("cbact02c.sysout");
-        var prog = new Cbact02c();
+        var prog = new CardMasterReportProgram();
         int rc = prog.Run(s.Db, sysout);
 
         Assert.Equal(0, rc);
@@ -456,13 +456,13 @@ public sealed class BatchTests
     /// the MAIN loop). SYSOUT line count = 1 (start) + 2N + 1 (end).
     /// </summary>
     [Fact]
-    public void Cbact03c_PrintsEachXrefTwice_FaithfulBug()
+    public void CardXrefReportProgram_PrintsEachXrefTwice_FaithfulBug()
     {
         using BatchSupport s = OpenSeeded(out _);
         long xrefs = s.CardXref.ReadAll().LongCount();
         Assert.True(xrefs > 0);
 
-        var prog = new Cbact03c();
+        var prog = new CardXrefReportProgram();
         int rc = prog.Run(s.Db);
 
         Assert.Equal(0, rc);
@@ -476,14 +476,14 @@ public sealed class BatchTests
     /// flat SYSOUT report matches.
     /// </summary>
     [Fact]
-    public void Cbcus01c_PrintsEachCustomerTwice_FaithfulBug()
+    public void CustomerMasterReportProgram_PrintsEachCustomerTwice_FaithfulBug()
     {
         using BatchSupport s = OpenSeeded(out _);
         long custs = s.Customer.ReadAll().LongCount();
         Assert.True(custs > 0);
 
         string sysout = TempFile("cbcus01c.sysout");
-        var prog = new Cbcus01c();
+        var prog = new CustomerMasterReportProgram();
         int rc = prog.Run(s.Db, sysout);
 
         Assert.Equal(0, rc);
@@ -499,13 +499,13 @@ public sealed class BatchTests
     /// line per daily-transaction record processed.
     /// </summary>
     [Fact]
-    public void Cbtrn01c_ReadsAndValidatesDailyTransactions_BetweenBanners()
+    public void DailyTransactionValidationProgram_ReadsAndValidatesDailyTransactions_BetweenBanners()
     {
         using BatchSupport s = OpenSeeded(out _);
         long daily = s.DailyTransaction.ReadAll().LongCount();
         Assert.True(daily > 0);
 
-        IReadOnlyList<string> sysout = Cbtrn01c.Run(s);
+        IReadOnlyList<string> sysout = DailyTransactionValidationProgram.Run(s);
 
         Assert.Equal("START OF EXECUTION OF PROGRAM CBTRN01C", sysout[0]);
         Assert.Equal("END OF EXECUTION OF PROGRAM CBTRN01C", sysout[^1]);
@@ -526,16 +526,16 @@ public sealed class BatchTests
     /// CardDemo callers tolerate only message 2513 (FC-UNSUPP-RANGE), so both of these are rejected.
     /// </summary>
     [Fact]
-    public void Csutldtc_ValidatesGoodAndBadDates()
+    public void DateValidationUtility_ValidatesGoodAndBadDates()
     {
         // Good date.
-        Csutldtc good = Csutldtc.Run("2024-02-29", "YYYY-MM-DD", out string goodMsg, out int goodRc);
+        DateValidationUtility good = DateValidationUtility.Run("2024-02-29", "YYYY-MM-DD", out string goodMsg, out int goodRc);
         Assert.Equal(0, goodRc);
         Assert.Equal("0000", goodMsg[..4]);          // bytes 1-4 = severity (callers test '0000')
         Assert.Contains("Date is valid", goodMsg);
 
         // Bad date — Feb 29 in a non-leap year => FC-BAD-DATE-VALUE, message 2508 ("Datevalue error").
-        Csutldtc bad = Csutldtc.Run("2023-02-29", "YYYY-MM-DD", out string badMsg, out int badRc);
+        DateValidationUtility bad = DateValidationUtility.Run("2023-02-29", "YYYY-MM-DD", out string badMsg, out int badRc);
         Assert.Equal(3, badRc);                      // LE error severity
         Assert.Equal("0003", badMsg[..4]);
         Assert.Equal("2508", badMsg.Substring(15, 4)); // bytes 16-19 = message number (0x09CC)
@@ -543,13 +543,13 @@ public sealed class BatchTests
         Assert.NotEqual("2513", badMsg.Substring(15, 4)); // NOT the tolerated FC-UNSUPP-RANGE condition
 
         // Out-of-range month => FC-INVALID-MONTH, message 2517 ("Invalid month").
-        Csutldtc badMonth = Csutldtc.Run("2023-00-15", "YYYY-MM-DD", out string badMonthMsg, out _);
+        DateValidationUtility badMonth = DateValidationUtility.Run("2023-00-15", "YYYY-MM-DD", out string badMonthMsg, out _);
         Assert.Equal("0003", badMonthMsg[..4]);
         Assert.Equal("2517", badMonthMsg.Substring(15, 4)); // 0x09D5
         Assert.Contains("Invalid month", badMonthMsg);
 
         // The other shipped mask (YYYYMMDD) also validates a good date.
-        Csutldtc good8 = Csutldtc.Run("20240229", "YYYYMMDD", out string good8Msg, out int good8Rc);
+        DateValidationUtility good8 = DateValidationUtility.Run("20240229", "YYYYMMDD", out string good8Msg, out int good8Rc);
         Assert.Equal(0, good8Rc);
         Assert.Contains("Date is valid", good8Msg);
     }
@@ -560,7 +560,7 @@ public sealed class BatchTests
 
     /// <summary>CBACT01C reads the account master sequentially and produces its banners + per-account DISPLAY lines.</summary>
     [Fact]
-    public void Cbact01c_ReadsAccountMaster_AndWritesOutputDatasets()
+    public void AccountMasterReportProgram_ReadsAccountMaster_AndWritesOutputDatasets()
     {
         using BatchSupport s = OpenSeeded(out _);
         long accts = s.Account.ReadAll().LongCount();
@@ -570,7 +570,7 @@ public sealed class BatchTests
         string arryFile = TempFile("cbact01c.arry");
         string vbrcFile = TempFile("cbact01c.vbrc");
 
-        IReadOnlyList<string> sysout = Cbact01c.Run(s, outFile, arryFile, vbrcFile);
+        IReadOnlyList<string> sysout = AccountMasterReportProgram.Run(s, outFile, arryFile, vbrcFile);
 
         Assert.Equal("START OF EXECUTION OF PROGRAM CBACT01C", sysout[0]);
         Assert.Equal("END OF EXECUTION OF PROGRAM CBACT01C", sysout[^1]);
@@ -580,16 +580,16 @@ public sealed class BatchTests
 
     /// <summary>CBTRN03C transaction-detail report runs after a posting run and emits its banners + a report file.</summary>
     [Fact]
-    public void Cbtrn03c_ProducesTransactionDetailReport()
+    public void TransactionDetailReportProgram_ProducesTransactionDetailReport()
     {
         using BatchSupport s = OpenSeeded(out _);
 
         // Build the TRANSACTION table via a posting run so there is something to report on.
         string rejPath = TempFile("dalyrejs-for-rept");
-        new Cbtrn02c().Run(s, rejPath, clock: Clock);
+        new TransactionPostingProgram().Run(s, rejPath, clock: Clock);
 
         string reportPath = TempFile("tranrept");
-        IReadOnlyList<string> sysout = Cbtrn03c.Run(s.Db, reportPath, startDate: "0000-00-00", endDate: "9999-99-99");
+        IReadOnlyList<string> sysout = TransactionDetailReportProgram.Run(s.Db, reportPath, startDate: "0000-00-00", endDate: "9999-99-99");
 
         Assert.Equal("START OF EXECUTION OF PROGRAM CBTRN03C", sysout[0]);
         Assert.Equal("END OF EXECUTION OF PROGRAM CBTRN03C", sysout[^1]);
@@ -599,10 +599,10 @@ public sealed class BatchTests
 
     /// <summary>COBSWAIT derives the centisecond wait count from the SYSIN card and calls MVSWAIT once.</summary>
     [Fact]
-    public void Cobswait_DerivesWaitCount_FromSysinCard()
+    public void TimerWaitUtility_DerivesWaitCount_FromSysinCard()
     {
-        var waiter = new Cobswait.RecordingWaiter();
-        Cobswait prog = Cobswait.Run("00000010", waiter, HostKind.Ebcdic);
+        var waiter = new TimerWaitUtility.RecordingWaiter();
+        TimerWaitUtility prog = TimerWaitUtility.Run("00000010", waiter, HostKind.Ebcdic);
 
         Assert.Equal(10, prog.MvswaitTime);
         Assert.True(waiter.WasCalled);
@@ -760,17 +760,17 @@ public sealed class BatchTests
     };
 
     /// <summary>
-    /// Builds a <see cref="Cbimport.Context"/> for the program-level tests: the five output paths + ERROUT,
+    /// Builds a <see cref="CustomerDataImportProgram.Context"/> for the program-level tests: the five output paths + ERROUT,
     /// the shared serializer, and the five CVEXPORT record-type variant layouts parsed from
     /// <c>CVEXPORT.cpy</c>. <paramref name="cardOutPath"/> defaults to <c>null</c> (FB-1, JCL-faithful);
     /// supply a path to enable the type-'D' CARD sink.
     /// </summary>
-    private static Cbimport.Context NewImportContext(
+    private static CustomerDataImportProgram.Context NewImportContext(
         string exportPath, string custOut, string acctOut, string xrefOut, string trnxOut, string errOut,
         RecordSerializer serializer, string? cardOutPath)
     {
         string cvexport = File.ReadAllText(Path.Combine(SeedPaths.CopybookDir, "CVEXPORT.cpy"));
-        return new Cbimport.Context(
+        return new CustomerDataImportProgram.Context(
             ExportPath: exportPath,
             CustomerOutPath: custOut,
             AccountOutPath: acctOut,

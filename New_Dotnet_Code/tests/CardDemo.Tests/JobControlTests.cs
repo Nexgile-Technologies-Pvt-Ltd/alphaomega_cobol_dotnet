@@ -57,7 +57,7 @@ public sealed class JobControlTests
     /// warning must NOT abort the job.
     /// </summary>
     [Fact]
-    public void PostTran_RunsCbtrn01cThenCbtrn02c_PostsAndSurfacesRc4Warning()
+    public void PostTran_RunsDailyTransactionValidationProgramThenTransactionPostingProgram_PostsAndSurfacesRc4Warning()
     {
         using RelationalDb db = OpenSeededDb();
         long dailyCount = new DailyTransactionRepository(db).ReadAll().LongCount();
@@ -100,7 +100,7 @@ public sealed class JobControlTests
     /// step; the posting effect (rows in TRANSACTION) is identical.
     /// </summary>
     [Fact]
-    public void PostTran_SingleStepVariant_RunsOnlyCbtrn02c()
+    public void PostTran_SingleStepVariant_RunsOnlyTransactionPostingProgram()
     {
         using RelationalDb db = OpenSeededDb();
         JobContext ctx = NewContext(db);
@@ -124,7 +124,7 @@ public sealed class JobControlTests
     /// and the PARM-date TRAN-ID prefix; the SYSTRAN(+1) generation is created and catalogued.
     /// </summary>
     [Fact]
-    public void IntCalc_RunsCbact04c_AccruesInterestAndWritesSystranGeneration()
+    public void IntCalc_RunsInterestCalculationProgram_AccruesInterestAndWritesSystranGeneration()
     {
         using RelationalDb db = OpenSeededDb();
 
@@ -694,7 +694,7 @@ public sealed class JobControlTests
     /// SYSIN card '00,00001,00001,Y'. The job completes cleanly (RC 0) and the step is recorded as executed.
     /// </summary>
     [Fact]
-    public void CbPaup0J_RunsCbpaup0c_Cleanly()
+    public void CbPaup0J_RunsPendingAuthPurgeProgram_Cleanly()
     {
         using var db = new RelationalDb();
         var summaries = new PautSummaryRepository(db);
@@ -716,7 +716,7 @@ public sealed class JobControlTests
     /// record inserts a new transaction-type row, observable in the table after the job.
     /// </summary>
     [Fact]
-    public void MntTrDb2_RunsCobtupdt_AddsTransactionTypeRow()
+    public void MntTrDb2_RunsTransactionTypeMaintenanceBatch_AddsTransactionTypeRow()
     {
         using var db = new RelationalDb();
         var types = new TransactionTypeRepository(db);

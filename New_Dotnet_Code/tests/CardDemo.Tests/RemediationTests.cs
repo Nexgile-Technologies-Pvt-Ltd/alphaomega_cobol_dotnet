@@ -9,8 +9,8 @@ namespace CardDemo.Tests;
 
 /// <summary>
 /// Coverage + regression-lock suite for the five just-ported programs that previously had ZERO tests
-/// (<see cref="Cbstm03a"/>/<see cref="Cbstm03b"/> statement generation; <see cref="Paudbunl"/>,
-/// <see cref="Paudblod"/> and <see cref="Dbunldgs"/> IMS pending-auth unload/load utilities) plus locks
+/// (<see cref="StatementGenerationProgram"/>/<see cref="StatementFileAccessor"/> statement generation; <see cref="PendingAuthDbUnloadUtility"/>,
+/// <see cref="PendingAuthDbLoadUtility"/> and <see cref="PendingAuthGsamUnloadUtility"/> IMS pending-auth unload/load utilities) plus locks
 /// for the freshly-applied fidelity fixes (EditedNumeric lowercase-picture, CBTRN03C NEXT-SENTENCE
 /// loop termination, COPAUS2C/AUTHFRDS targeted fraud-flag update). Each test asserts real, specific
 /// values produced by the production code (no vacuous asserts).
@@ -47,7 +47,7 @@ public sealed class RemediationTests
     /// data and BOTH transaction amounts.
     /// </summary>
     [Fact]
-    public void Cbstm03a_GeneratesPlainTextAndHtmlStatement_WithAccountCustomerAndTxnAmounts()
+    public void StatementGenerationProgram_GeneratesPlainTextAndHtmlStatement_WithAccountCustomerAndTxnAmounts()
     {
         using var db = EmptyDb();
 
@@ -102,7 +102,7 @@ public sealed class RemediationTests
         string htmlPath = TempFile("cbstm03a.html");
         try
         {
-            IReadOnlyList<string> sysout = Cbstm03a.Run(db, stmtPath, htmlPath);
+            IReadOnlyList<string> sysout = StatementGenerationProgram.Run(db, stmtPath, htmlPath);
 
             // The TIOT-walk DISPLAY banner is always emitted.
             Assert.Contains(sysout, l => l.StartsWith("Running JCL"));
@@ -159,7 +159,7 @@ public sealed class RemediationTests
     [Theory]
     [InlineData(HostKind.Ebcdic)]
     [InlineData(HostKind.Ascii)]
-    public void Paudbunl_Then_Paudblod_RoundTripsEverySummaryAndDetail(HostKind host)
+    public void PendingAuthDbUnloadUtility_Then_PendingAuthDbLoadUtility_RoundTripsEverySummaryAndDetail(HostKind host)
     {
         // ---- Seed the source DB: 2 summaries, each owning 2 details. ----
         using var src = EmptyDb();
@@ -186,7 +186,7 @@ public sealed class RemediationTests
         try
         {
             // ---- UNLOAD: PAUDBUNL writes OUTFIL1 (summary images) + OUTFIL2 (key+detail records). ----
-            PaudbunlResult unl = Paudbunl.Run(srcSummaries, srcDetails, outfil1, outfil2, FixedClk, host);
+            PendingAuthDbUnloadUtilityResult unl = PendingAuthDbUnloadUtility.Run(srcSummaries, srcDetails, outfil1, outfil2, FixedClk, host);
             Assert.Equal(0, unl.ReturnCode);
             Assert.Contains("STARTING PROGRAM PAUDBUNL::", unl.Sysout);
 
@@ -199,7 +199,7 @@ public sealed class RemediationTests
             var dstSummaries = new PautSummaryRepository(dst.Connection);
             var dstDetails = new PautDetailRepository(dst.Connection);
 
-            PaudblodResult lod = Paudblod.Run(dstSummaries, dstDetails, outfil1, outfil2, FixedClk, host);
+            PendingAuthDbLoadUtilityResult lod = PendingAuthDbLoadUtility.Run(dstSummaries, dstDetails, outfil1, outfil2, FixedClk, host);
             Assert.Equal(0, lod.ReturnCode);
             Assert.Contains("ROOT INSERT SUCCESS    ", lod.Sysout);
             Assert.Contains("CHILD SEGMENT INSERTED SUCCESS", lod.Sysout);
@@ -242,7 +242,7 @@ public sealed class RemediationTests
     // =================================================================================================
 
     [Fact]
-    public void Dbunldgs_SummaryGsam_IsByteIdenticalToPaudbunlOutfil1_AndDetailsMatch()
+    public void PendingAuthGsamUnloadUtility_SummaryGsam_IsByteIdenticalToPendingAuthDbUnloadUtilityOutfil1_AndDetailsMatch()
     {
         using var src = EmptyDb();
         var summaries = new PautSummaryRepository(src.Connection);
@@ -265,11 +265,11 @@ public sealed class RemediationTests
         try
         {
             // PAUDBUNL is the reference: OUTFIL1 = 100-byte summary images; OUTFIL2 = 206-byte (key+detail).
-            PaudbunlResult unl = Paudbunl.Run(summaries, details, bunlOut1, bunlOut2, FixedClk, HostKind.Ebcdic);
+            PendingAuthDbUnloadUtilityResult unl = PendingAuthDbUnloadUtility.Run(summaries, details, bunlOut1, bunlOut2, FixedClk, HostKind.Ebcdic);
             Assert.Equal(0, unl.ReturnCode);
 
             // DBUNLDGS writes two GSAM files: summary (100-byte) + detail (200-byte, NO 6-byte key prefix).
-            DbunldgsResult gsam = Dbunldgs.Run(summaries, details, gsamSum, gsamDtl, FixedClk, HostKind.Ebcdic);
+            PendingAuthGsamUnloadUtilityResult gsam = PendingAuthGsamUnloadUtility.Run(summaries, details, gsamSum, gsamDtl, FixedClk, HostKind.Ebcdic);
             Assert.Equal(0, gsam.ReturnCode);
             Assert.Contains("STARTING PROGRAM DBUNLDGS::", gsam.Sysout);
 
@@ -347,7 +347,7 @@ public sealed class RemediationTests
     /// the loop truncated at #2 — a scenario that cannot occur once the SORT pre-filter is modelled).</para>
     /// </summary>
     [Fact]
-    public void Cbtrn03c_DalyPreFilter_ReportsAllInWindow_ExcludesOutOfWindow()
+    public void TransactionDetailReportProgram_DalyPreFilter_ReportsAllInWindow_ExcludesOutOfWindow()
     {
         using var db = EmptyDb();
 
@@ -382,7 +382,7 @@ public sealed class RemediationTests
         string reportPath = TempFile("cbtrn03c.report");
         try
         {
-            IReadOnlyList<string> sysout = Cbtrn03c.Run(
+            IReadOnlyList<string> sysout = TransactionDetailReportProgram.Run(
                 db, reportPath, startDate: "2026-06-01", endDate: "2026-06-30");
 
             Assert.Equal("START OF EXECUTION OF PROGRAM CBTRN03C", sysout[0]);

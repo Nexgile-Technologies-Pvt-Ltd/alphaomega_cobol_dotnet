@@ -84,7 +84,7 @@ public sealed partial class OnlineTests
     // ===============================================================================================
 
     [Fact]
-    public void Cosgn00c_cold_start_displays_signon_screen()
+    public void SignOnProgram_cold_start_displays_signon_screen()
     {
         using var db = SeededDb();
         var screen = new ScriptedScreenIo();
@@ -103,7 +103,7 @@ public sealed partial class OnlineTests
     }
 
     [Fact]
-    public void Cosgn00c_valid_admin_signon_xctls_to_admin_menu()
+    public void SignOnProgram_valid_admin_signon_xctls_to_admin_menu()
     {
         using var db = SeededDb();
         var (usrId, pwd) = FindUser(db, admin: true);
@@ -125,7 +125,7 @@ public sealed partial class OnlineTests
     }
 
     [Fact]
-    public void Cosgn00c_valid_user_signon_xctls_to_main_menu()
+    public void SignOnProgram_valid_user_signon_xctls_to_main_menu()
     {
         using var db = SeededDb();
         var (usrId, pwd) = FindUser(db, admin: false);
@@ -145,7 +145,7 @@ public sealed partial class OnlineTests
     }
 
     [Fact]
-    public void Cosgn00c_wrong_password_redisplays_with_message()
+    public void SignOnProgram_wrong_password_redisplays_with_message()
     {
         using var db = SeededDb();
         var (usrId, _) = FindUser(db, admin: true);
@@ -165,7 +165,7 @@ public sealed partial class OnlineTests
     }
 
     [Fact]
-    public void Cosgn00c_user_not_found_redisplays_with_message()
+    public void SignOnProgram_user_not_found_redisplays_with_message()
     {
         using var db = SeededDb();
         var screen = new ScriptedScreenIo
@@ -182,7 +182,7 @@ public sealed partial class OnlineTests
     }
 
     [Fact]
-    public void Cosgn00c_blank_password_with_userid_sets_errflag_shows_enter_password()
+    public void SignOnProgram_blank_password_with_userid_sets_errflag_shows_enter_password()
     {
         // COBOL COSGN00C.cbl:123-127 — the PASSWDI = SPACES/LOW-VALUES branch does MOVE 'Y' TO WS-ERR-FLG
         // (identical to the User-ID branch), so the later IF NOT ERR-FLG-ON (cbl:138) is FALSE and
@@ -211,7 +211,7 @@ public sealed partial class OnlineTests
     }
 
     [Fact]
-    public void Cosgn00c_blank_userid_shows_enter_userid_message()
+    public void SignOnProgram_blank_userid_shows_enter_userid_message()
     {
         using var db = SeededDb();
         var screen = new ScriptedScreenIo
@@ -231,7 +231,7 @@ public sealed partial class OnlineTests
     // ===============================================================================================
 
     [Fact]
-    public void Comen01c_option1_routes_to_account_view()
+    public void MainMenuProgram_option1_routes_to_account_view()
     {
         using var db = SeededDb();
         // A reenter COMMAREA from a regular user; ENTER with OPTION='1' -> XCTL COACTVWC.
@@ -248,7 +248,7 @@ public sealed partial class OnlineTests
     }
 
     [Fact]
-    public void Comen01c_option6_routes_to_transaction_list()
+    public void MainMenuProgram_option6_routes_to_transaction_list()
     {
         using var db = SeededDb();
         var ca = MenuCommArea(admin: false);
@@ -263,7 +263,7 @@ public sealed partial class OnlineTests
     }
 
     [Fact]
-    public void Comen01c_admin_only_option_blocked_for_regular_user()
+    public void MainMenuProgram_admin_only_option_blocked_for_regular_user()
     {
         // A regular user picking an admin-gated option is blocked; no XCTL. (Option 11 has USRTYPE='U' in the
         // shipped table, so to exercise the gate we rely on the invalid-option path: option 0 / out of range
@@ -282,7 +282,7 @@ public sealed partial class OnlineTests
     }
 
     [Fact]
-    public void Coadm01c_option1_routes_to_user_list()
+    public void AdminMenuProgram_option1_routes_to_user_list()
     {
         using var db = SeededDb();
         var ca = MenuCommArea(admin: true);
@@ -297,7 +297,7 @@ public sealed partial class OnlineTests
     }
 
     [Fact]
-    public void Coadm01c_option2_routes_to_user_add()
+    public void AdminMenuProgram_option2_routes_to_user_add()
     {
         using var db = SeededDb();
         var ca = MenuCommArea(admin: true);
@@ -318,7 +318,7 @@ public sealed partial class OnlineTests
     /// independent-audit fidelity fix (the C# previously painted the echo unconditionally).
     /// </summary>
     [Fact]
-    public void Coadm01c_first_display_paints_blank_option_not_zero()
+    public void AdminMenuProgram_first_display_paints_blank_option_not_zero()
     {
         using var db = SeededDb();
         var ca = MenuCommArea(admin: true); // NOT reenter -> first-display (SEND-MENU-SCREEN) path
@@ -338,7 +338,7 @@ public sealed partial class OnlineTests
     // ===============================================================================================
 
     [Fact]
-    public void Cousr01c_add_then_cousr02c_update_round_trips_over_usrsec()
+    public void UserAddProgram_add_then_cousr02c_update_round_trips_over_usrsec()
     {
         using var db = SeededDb();
         var repo = new UserSecurityRepository(db.Connection);
@@ -406,7 +406,7 @@ public sealed partial class OnlineTests
     // ===============================================================================================
 
     [Fact]
-    public void Cousr00c_select_user_xctls_to_update_carrying_selected_id()
+    public void UserListProgram_select_user_xctls_to_update_carrying_selected_id()
     {
         // COUSR00C user list: typing 'U' next to a row XCTLs to COUSR02C (update). The chosen user id sits in
         // the CDEMO-CU00-USR-SELECTED trailer field, which aliases CDEMO-CU02-USR-SELECTED at the same COMMAREA
@@ -439,7 +439,7 @@ public sealed partial class OnlineTests
     }
 
     [Fact]
-    public void Cotrn00c_select_transaction_xctls_to_detail_carrying_selected_id()
+    public void TransactionListProgram_select_transaction_xctls_to_detail_carrying_selected_id()
     {
         // COTRN00C transaction list: typing 'S' next to a row XCTLs to COTRN01C (detail view). The chosen
         // tran id sits in the CDEMO-CT00-TRN-SELECTED trailer field, which aliases CDEMO-CT01-TRN-SELECTED at
@@ -483,7 +483,7 @@ public sealed partial class OnlineTests
     // ===============================================================================================
 
     [Fact]
-    public void Coactvwc_reads_a_known_account_and_displays_its_status()
+    public void AccountViewProgram_reads_a_known_account_and_displays_its_status()
     {
         using var db = SeededDb();
 

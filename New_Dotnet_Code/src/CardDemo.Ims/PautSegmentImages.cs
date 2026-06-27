@@ -8,7 +8,7 @@ namespace CardDemo.Ims;
 /// (<c>PENDING-AUTH-SUMMARY</c>, copybook <c>CIPAUSMY</c>, 100 bytes) and the child detail
 /// (<c>PENDING-AUTH-DETAILS</c>, copybook <c>CIPAUDTY</c>, 200 bytes) — to/from their fixed-width host
 /// record images. This is the shared serialization used by the three IMS batch utilities
-/// (<see cref="Paudbunl"/> UNLOAD, <see cref="Dbunldgs"/> GSAM-UNLOAD, <see cref="Paudblod"/> LOAD) so an
+/// (<see cref="PendingAuthDbUnloadUtility"/> UNLOAD, <see cref="PendingAuthGsamUnloadUtility"/> GSAM-UNLOAD, <see cref="PendingAuthDbLoadUtility"/> LOAD) so an
 /// unload followed by a load round-trips byte-for-byte.
 /// </summary>
 /// <remarks>

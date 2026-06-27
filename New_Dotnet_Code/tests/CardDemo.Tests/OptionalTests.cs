@@ -16,14 +16,14 @@ namespace CardDemo.Tests;
 /// IMS pending-authorization, VSAM+MQ utilities) over a freshly-seeded in-memory <see cref="RelationalDb"/>.
 /// At least one test exercises each optional module:
 /// <list type="bullet">
-/// <item><b>DB2 / TRANSACTION_TYPE.</b> <see cref="Cobtupdt"/> (batch INSERT/UPDATE/DELETE round-trip),
-/// <see cref="Cotrtlic"/> (online list paging) and <see cref="Cotrtupc"/> (online add) over the same
+/// <item><b>DB2 / TRANSACTION_TYPE.</b> <see cref="TransactionTypeMaintenanceBatch"/> (batch INSERT/UPDATE/DELETE round-trip),
+/// <see cref="TransactionTypeListProgram"/> (online list paging) and <see cref="TransactionTypeUpdateProgram"/> (online add) over the same
 /// <c>TRANSACTION_TYPE</c> table.</item>
-/// <item><b>IMS / PAUT_SUMMARY + PAUT_DETAIL.</b> <see cref="Cbpaup0c"/> (batch expiry-purge GU/GNP/DLET
-/// flow) and <see cref="Copaus0c"/>/<see cref="Copaus1c"/> (online pending-auth view) over the relational
+/// <item><b>IMS / PAUT_SUMMARY + PAUT_DETAIL.</b> <see cref="PendingAuthPurgeProgram"/> (batch expiry-purge GU/GNP/DLET
+/// flow) and <see cref="PendingAuthSummaryProgram"/>/<see cref="PendingAuthDetailProgram"/> (online pending-auth view) over the relational
 /// re-host of the IMS hierarchy.</item>
-/// <item><b>MQ request/response.</b> <see cref="Coacct01"/> (account inquiry) and <see cref="Codate01"/>
-/// (date utility) driven through the in-proc <see cref="MqBroker"/> shim, plus <see cref="Copaua0c"/> (the
+/// <item><b>MQ request/response.</b> <see cref="AccountInquiryService"/> (account inquiry) and <see cref="SystemDateInquiryService"/>
+/// (date utility) driven through the in-proc <see cref="MqBroker"/> shim, plus <see cref="AuthorizationDecisionService"/> (the
 /// auth-decision server that writes the IMS PAUT tables) request→reply round-trip.</item>
 /// </list>
 /// The optional online handlers are also asserted to be wired into <see cref="OnlineProgramRegistry"/> under
@@ -66,13 +66,13 @@ public sealed class OptionalTests
     // =================================================================================================
 
     [Fact]
-    public void Cobtupdt_inserts_updates_and_deletes_over_TRANSACTION_TYPE()
+    public void TransactionTypeMaintenanceBatch_inserts_updates_and_deletes_over_TRANSACTION_TYPE()
     {
         using var db = EmptyDb();
         var repo = new TransactionTypeRepository(db.Connection);
 
         // INPFILE records are 53-byte RECFM=F: action(1) + type(2) + desc(50).
-        IReadOnlyList<string> sysout = Cobtupdt.Run(db, new[]
+        IReadOnlyList<string> sysout = TransactionTypeMaintenanceBatch.Run(db, new[]
         {
             InpRec('A', "91", "PURCHASE TYPE NINETY-ONE"),  // add
             InpRec('A', "92", "PAYMENT TYPE NINETY-TWO"),   // add
@@ -98,7 +98,7 @@ public sealed class OptionalTests
     // =================================================================================================
 
     [Fact]
-    public void Cotrtlic_lists_transaction_types_first_page()
+    public void TransactionTypeListProgram_lists_transaction_types_first_page()
     {
         using var db = EmptyDb();
         SeedTransactionTypes(db, count: 10); // TR_TYPE = "01".."10"
@@ -125,7 +125,7 @@ public sealed class OptionalTests
     // =================================================================================================
 
     [Fact]
-    public void Cotrtupc_creates_a_new_transaction_type_over_a_multi_turn_flow()
+    public void TransactionTypeUpdateProgram_creates_a_new_transaction_type_over_a_multi_turn_flow()
     {
         using var db = EmptyDb();
         var repo = new TransactionTypeRepository(db.Connection);
@@ -149,10 +149,10 @@ public sealed class OptionalTests
         var ca = new CardDemoCommArea { FromTranId = "CTTU", FromProgram = "COTRTUPC" };
         ca.SetReenter();
 
-        CicsOutcome turn = RunCotrtupcTurn(registry, AidKey.Enter, keyNew, ca);   // turn 1 -> DetailsNotFound
-        turn = RunCotrtupcTurn(registry, AidKey.Pf5, keyNew, turn.CommArea!);     // turn 2 -> CreateNewRecord
-        turn = RunCotrtupcTurn(registry, AidKey.Enter, keyNew, turn.CommArea!);   // turn 3 -> ChangesOkNotConfirmed
-        turn = RunCotrtupcTurn(registry, AidKey.Pf5, keyNew, turn.CommArea!);     // turn 4 -> INSERT
+        CicsOutcome turn = RunTransactionTypeUpdateProgramTurn(registry, AidKey.Enter, keyNew, ca);   // turn 1 -> DetailsNotFound
+        turn = RunTransactionTypeUpdateProgramTurn(registry, AidKey.Pf5, keyNew, turn.CommArea!);     // turn 2 -> CreateNewRecord
+        turn = RunTransactionTypeUpdateProgramTurn(registry, AidKey.Enter, keyNew, turn.CommArea!);   // turn 3 -> ChangesOkNotConfirmed
+        turn = RunTransactionTypeUpdateProgramTurn(registry, AidKey.Pf5, keyNew, turn.CommArea!);     // turn 4 -> INSERT
 
         Assert.Equal(CicsOutcomeKind.ReturnTransId, turn.Kind);
         Assert.Equal("CTTU", turn.TransId);
@@ -163,7 +163,7 @@ public sealed class OptionalTests
     }
 
     /// <summary>Runs one COTRTUPC (CTTU) turn with the given AID and keyed-input script over the carried COMMAREA.</summary>
-    private static CicsOutcome RunCotrtupcTurn(
+    private static CicsOutcome RunTransactionTypeUpdateProgramTurn(
         ProgramRegistry registry, AidKey aid, Action<BmsMap> onReceive, CardDemoCommArea commArea)
     {
         var screen = new ScriptedScreen { NextAid = aid, OnReceive = onReceive };
@@ -175,7 +175,7 @@ public sealed class OptionalTests
     // =================================================================================================
 
     [Fact]
-    public void Cbpaup0c_purges_expired_auth_details_and_empty_summaries()
+    public void PendingAuthPurgeProgram_purges_expired_auth_details_and_empty_summaries()
     {
         using var db = EmptyDb();
         var summaries = new PautSummaryRepository(db.Connection);
@@ -202,7 +202,7 @@ public sealed class OptionalTests
 
         // SYSIN positional card: P-EXPIRY-DAYS(2), P-CHKP-FREQ(5), P-CHKP-DIS-FREQ(5), P-DEBUG-FLAG(1).
         string sysin = $"{expiryDays:D2},00001,00001,N";
-        Cbpaup0cResult result = Cbpaup0c.Run(summaries, details, sysin, FixedClk);
+        PendingAuthPurgeProgramResult result = PendingAuthPurgeProgram.Run(summaries, details, sysin, FixedClk);
 
         Assert.Equal(0, result.ReturnCode); // clean run, no abend
         Assert.Contains("STARTING PROGRAM CBPAUP0C::", result.Sysout);
@@ -231,7 +231,7 @@ public sealed class OptionalTests
     // =================================================================================================
 
     [Fact]
-    public void Copaus0c_views_pending_auths_for_an_account()
+    public void PendingAuthSummaryProgram_views_pending_auths_for_an_account()
     {
         using var db = EmptyDb();
         SeedAccountChain(db, acctId: 55501234567, custId: 9001, cardNum: "5550123456789012");
@@ -270,7 +270,7 @@ public sealed class OptionalTests
     // =================================================================================================
 
     [Fact]
-    public void Copaus1c_cold_start_xctls_back_to_summary_program()
+    public void PendingAuthDetailProgram_cold_start_xctls_back_to_summary_program()
     {
         using var db = EmptyDb();
         var screen = new ScriptedScreen();
@@ -289,13 +289,13 @@ public sealed class OptionalTests
     // =================================================================================================
 
     [Fact]
-    public void Coacct01_replies_with_the_account_snapshot_for_a_known_account()
+    public void AccountInquiryService_replies_with_the_account_snapshot_for_a_known_account()
     {
         using var db = EmptyDb();
         InsertAccount(db, acctId: 12345678901, status: "Y", currBal: 250.00m, creditLimit: 5000.00m);
 
         var broker = new MqBroker();
-        broker.RegisterServer(new Coacct01(db));
+        broker.RegisterServer(new AccountInquiryService(db));
 
         // Request payload (REQUEST-MSG-COPY): WS-FUNC 'INQA' + WS-KEY 9(11) account id.
         string request = "INQA" + "12345678901";
@@ -311,11 +311,11 @@ public sealed class OptionalTests
     }
 
     [Fact]
-    public void Coacct01_replies_invalid_for_an_unknown_account()
+    public void AccountInquiryService_replies_invalid_for_an_unknown_account()
     {
         using var db = EmptyDb();
         var broker = new MqBroker();
-        broker.RegisterServer(new Coacct01(db));
+        broker.RegisterServer(new AccountInquiryService(db));
 
         // A NOTFND read -> INVALID REQUEST PARAMETERS text reply (no abend).
         MqMessage? reply = broker.Request(
@@ -330,10 +330,10 @@ public sealed class OptionalTests
     // =================================================================================================
 
     [Fact]
-    public void Codate01_replies_with_the_system_date_and_time()
+    public void SystemDateInquiryService_replies_with_the_system_date_and_time()
     {
         var broker = new MqBroker();
-        broker.RegisterServer(new Codate01(FixedClk));
+        broker.RegisterServer(new SystemDateInquiryService(FixedClk));
 
         // CODATE01 ignores the request body (FB-1) and replies with the formatted system date/time.
         MqMessage? reply = broker.Request(
@@ -350,7 +350,7 @@ public sealed class OptionalTests
     // =================================================================================================
 
     [Fact]
-    public void Copaua0c_approves_an_in_limit_auth_and_writes_the_pending_auth_tables()
+    public void AuthorizationDecisionService_approves_an_in_limit_auth_and_writes_the_pending_auth_tables()
     {
         using var db = EmptyDb();
         // A card whose account has plenty of available credit, so a small auth is approved.
@@ -358,7 +358,7 @@ public sealed class OptionalTests
             creditLimit: 9000.00m, currBal: 100.00m);
 
         var broker = new MqBroker();
-        broker.RegisterServer(new Copaua0c(db, clock: FixedClk));
+        broker.RegisterServer(new AuthorizationDecisionService(db, clock: FixedClk));
 
         // The request is a comma-delimited card-auth record (18 fields); field 3 is the card number and
         // field 9 is the transaction amount. A $50.00 auth is well under the available limit -> APPROVE.

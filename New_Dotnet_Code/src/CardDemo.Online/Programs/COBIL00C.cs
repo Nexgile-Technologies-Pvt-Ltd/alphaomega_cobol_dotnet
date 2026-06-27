@@ -348,7 +348,7 @@ public sealed class Cobil00c : ITransactionHandler
                 _tranRecord.CatCd = 2;                                   // MOVE 2 TO TRAN-CAT-CD. source: :221
                 _tranRecord.Source = PadX("POS TERM", 10);              // MOVE 'POS TERM' TO TRAN-SOURCE. source: :222
                 _tranRecord.Desc = PadX("BILL PAYMENT - ONLINE", 100); // MOVE 'BILL PAYMENT - ONLINE' TO TRAN-DESC. source: :223
-                _tranRecord.Amt = TruncateToCents(AcctCurrBal);         // MOVE ACCT-CURR-BAL TO TRAN-AMT (S9(9)V99). source: :224
+                _tranRecord.Amt = Decimals.Store(AcctCurrBal, 9, 2, true); // MOVE ACCT-CURR-BAL (S9(10)V99) TO TRAN-AMT (S9(9)V99) — high-order truncate int part to 9 digits (mod 10^9). source: :224
                 _tranRecord.CardNum = PadX(_xrefCardNum, 16);          // MOVE XREF-CARD-NUM TO TRAN-CARD-NUM. source: :225
                 _tranRecord.MerchantId = 999999999;                     // MOVE 999999999 TO TRAN-MERCHANT-ID. source: :226
                 _tranRecord.MerchantName = PadX("BILL PAYMENT", 50);   // MOVE 'BILL PAYMENT' TO TRAN-MERCHANT-NAME. source: :227

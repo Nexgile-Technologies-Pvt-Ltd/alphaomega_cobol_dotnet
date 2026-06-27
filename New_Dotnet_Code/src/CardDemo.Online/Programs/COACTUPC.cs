@@ -1461,7 +1461,12 @@ public sealed class Coactupc : ITransactionHandler
         if (_acctFilter == AcctFilter.NotOk) return; // :3620-3622
 
         GetAcctDataByAcct9300();               // :3624-3625
-        if (!_foundAcctInMaster) return;       // DID-NOT-FIND-ACCT-IN-ACCTDAT. :3627-3629
+        // :3627-3629 IF DID-NOT-FIND-ACCT-IN-ACCTDAT GO TO 9000-READ-ACCT-EXIT. The 88-level
+        // DID-NOT-FIND-ACCT-IN-ACCTDAT (on WS-RETURN-MSG, def :499-500) is NEVER set: its only SET is
+        // COMMENTED OUT at COACTUPC.cbl:3719. So this guard is ALWAYS false and control FALLS THROUGH on
+        // an ACCTDAT NOTFND (the xref-found-but-account-missing edge): COBOL still reads the customer and,
+        // if found, 9500-STORE-FETCHED-DATA over the freshly-instantiated (low-values) ACCOUNT-RECORD,
+        // then 2000-DECIDE-ACTION SETs ACUP-SHOW-DETAILS. Reproduced faithfully (no early return here).
 
         _cardRidCustId = _ca.CustId;           // MOVE CDEMO-CUST-ID TO WS-CARD-RID-CUST-ID. :3631
         GetCustDataByCust9400();               // :3633-3634
@@ -1543,7 +1548,9 @@ public sealed class Coactupc : ITransactionHandler
     // 9500-STORE-FETCHED-DATA. source: :3801-3884
     private void StoreFetchedData9500()
     {
-        Account a = _fetchedAccount!;
+        // On the ACCTDAT-NOTFND fall-through (see 9000-READ-ACCT), _fetchedAccount is null; COBOL reads the
+        // freshly-instantiated (low-values) ACCOUNT-RECORD here, i.e. zeros/spaces. A blank Account matches.
+        Account a = _fetchedAccount ?? new Account();
         Customer c = _fetchedCustomer!;
 
         // Store nav context. :3805-3811
@@ -1810,7 +1817,7 @@ public sealed class Coactupc : ITransactionHandler
     private static string RespText() => "0000000013"; // ERROR-RESP X(10) — NOTFND
     private static string ReasText() => "0000000000"; // ERROR-RESP2 X(10)
     private static string FileErrorMessage(string op, string file) =>
-        $"File Error: {ClampOrPad(op, 8)} on {ClampOrPad(file, 9)} returned RESP {RespText()} ,RESP2 {ReasText()}     "; // :389-408
+        $"File Error: {ClampOrPad(op, 8)} on {ClampOrPad(file, 9)} returned RESP {RespText()},RESP2 {ReasText()}     "; // :389-408 (ERROR-RESP X(10) is directly adjacent to FILLER ',RESP2 ' — no intervening space)
 
     // === Currency formatting via the +ZZZ,ZZZ,ZZZ.99 edited PIC. source: :371, EditedNumeric ===
     private static string FmtCurrency(decimal v) => EditedNumeric.Format(v, CurrencyPic);

@@ -147,7 +147,9 @@ public sealed class Cbimport(Cbimport.Context ctx)
         }
         catch (Exception)
         {
-            // NOT WS-EXPORT-OK  // source: CBIMPORT.cbl:199-202
+            // NOT WS-EXPORT-OK  // source: CBIMPORT.cbl:199-202. The COBOL DISPLAYs the runtime
+            // WS-EXPORT-STATUS; here that OPEN fails because the input dataset is absent, which is QSAM
+            // FILE STATUS '35' (nonexistent/unavailable file) — the value the status field carries on this path.
             Display("ERROR: Cannot open EXPORT-INPUT, Status: " + "35");
             AbendProgram9999();
         }
@@ -168,7 +170,8 @@ public sealed class Cbimport(Cbimport.Context ctx)
         // CARD sink normally.
         if (_ctx.CardOutPath is null)
         {
-            // NOT WS-CARD-OK  // source: CBIMPORT.cbl:234-237
+            // NOT WS-CARD-OK  // source: CBIMPORT.cbl:234-237. WS-CARD-STATUS = '35' (file not allocated):
+            // CBIMPORT.jcl codes no CARDOUT DD, so the OPEN finds no dataset — QSAM FILE STATUS '35'.
             Display("ERROR: Cannot open CARD-OUTPUT, Status: " + "35");
             AbendProgram9999();
         }
@@ -198,6 +201,8 @@ public sealed class Cbimport(Cbimport.Context ctx)
         }
         catch (Exception)
         {
+            // The COBOL DISPLAYs the runtime WS-*-STATUS for this DD; an OPEN OUTPUT that cannot create the
+            // dataset is modeled as QSAM FILE STATUS '35' (nonexistent/unavailable file).
             Display($"ERROR: Cannot open {ddName}, Status: " + "35");
             AbendProgram9999();
             throw; // unreachable: AbendProgram9999 throws.
@@ -477,7 +482,8 @@ public sealed class Cbimport(Cbimport.Context ctx)
         }
         catch (Exception)
         {
-            // NOT WS-ERROR-OK -> DISPLAY only (no abend).  // source: CBIMPORT.cbl:441-444
+            // NOT WS-ERROR-OK -> DISPLAY only (no abend).  // source: CBIMPORT.cbl:441-444. The COBOL DISPLAYs
+            // the runtime WS-ERROR-STATUS; a failed WRITE is modeled as QSAM FILE STATUS '30' (permanent I/O error).
             Display("ERROR: Writing error record, Status: " + "30");
         }
         _errorRecordsWritten++;                                         // source: CBIMPORT.cbl:446

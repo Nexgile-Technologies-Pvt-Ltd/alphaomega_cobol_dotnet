@@ -964,7 +964,7 @@ public sealed class Cbtrn03c
     }
 
     /// <summary>
-    /// TRANSACTION-DETAIL-REPORT (113 chars before pad). The FILLER positions are the constant
+    /// TRANSACTION-DETAIL-REPORT (114 chars before pad). The FILLER positions are the constant
     /// separators ('-' at the two type/cat separators, spaces elsewhere) per INITIALIZE semantics.
     /// // source: cpy/CVTRA07Y.cpy:15-31
     /// </summary>
@@ -1009,7 +1009,7 @@ public sealed class Cbtrn03c
     /// <summary>TRANSACTION-HEADER-2 — PIC X(133) VALUE ALL '-'. // source: cpy/CVTRA07Y.cpy:48</summary>
     private static string BuildTransactionHeader2() => new('-', ReportRecLen);
 
-    /// <summary>REPORT-PAGE-TOTALS (111 chars before pad). // source: cpy/CVTRA07Y.cpy:50-54</summary>
+    /// <summary>REPORT-PAGE-TOTALS (112 chars before pad). // source: cpy/CVTRA07Y.cpy:50-54</summary>
     private string BuildReportPageTotals(decimal pageTotal)
     {
         var sb = new System.Text.StringBuilder(ReportRecLen);
@@ -1019,7 +1019,7 @@ public sealed class Cbtrn03c
         return sb.ToString();
     }
 
-    /// <summary>REPORT-ACCOUNT-TOTALS (111 chars before pad). // source: cpy/CVTRA07Y.cpy:56-60</summary>
+    /// <summary>REPORT-ACCOUNT-TOTALS (112 chars before pad). // source: cpy/CVTRA07Y.cpy:56-60</summary>
     private string BuildReportAccountTotals(decimal accountTotal)
     {
         var sb = new System.Text.StringBuilder(ReportRecLen);
@@ -1029,7 +1029,7 @@ public sealed class Cbtrn03c
         return sb.ToString();
     }
 
-    /// <summary>REPORT-GRAND-TOTALS (111 chars before pad). // source: cpy/CVTRA07Y.cpy:62-66</summary>
+    /// <summary>REPORT-GRAND-TOTALS (112 chars before pad). // source: cpy/CVTRA07Y.cpy:62-66</summary>
     private string BuildReportGrandTotals(decimal grandTotal)
     {
         var sb = new System.Text.StringBuilder(ReportRecLen);

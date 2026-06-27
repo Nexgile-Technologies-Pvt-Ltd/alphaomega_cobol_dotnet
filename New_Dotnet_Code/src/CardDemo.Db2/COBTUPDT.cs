@@ -491,7 +491,7 @@ public sealed class Cobtupdt
     // Reads the INPFILE dataset. Splits on line breaks if the file is line-oriented; otherwise treats it
     // as a contiguous stream of fixed 53-byte records (RECFM=F). Each returned image is the raw record
     // text (un-padded here; MoveImageToInputRec pads/truncates to 53 on READ INTO).
-    internal static IReadOnlyList<string> ReadInputFile(string path)
+    public static IReadOnlyList<string> ReadInputFile(string path)
     {
         string text = File.ReadAllText(path);
         if (text.Contains('\n') || text.Contains('\r'))

@@ -193,7 +193,10 @@ public sealed class Cbact04c
         string status = _account.ReadByKey(acctId, out Account? acct);
         if (status != FileStatus.Ok) _sysout.Add("ACCOUNT NOT FOUND: " + acctId.ToString("D11")); // INVALID KEY
         if (status == FileStatus.Ok) _accountRecord = acct;
-        else { _sysout.Add("ERROR READING ACCOUNT FILE"); Abend9999(status); }  // bug #2: prints then abends
+        // 1100-GET-ACCT-DATA: INVALID KEY DISPLAYs 'ACCOUNT NOT FOUND' (above); then, because the file
+        // status is not '00', the ELSE path also DISPLAYs 'ERROR READING ACCOUNT FILE' and abends. Faithful
+        // to cbl:372-391 (this is NOT the numbered faithful-bug #2, which is the DISCGRP open-message label).
+        else { _sysout.Add("ERROR READING ACCOUNT FILE"); Abend9999(status); }
     }
 
     // --- 1110-GET-XREF-DATA (lines 392-413) — alt key (account id) -----------------------------------
@@ -306,11 +309,23 @@ public sealed class Cbact04c
         return acct + type + cat + bal + new string(' ', 22);  // + FILLER X(22)
     }
 
-    /// <summary>PIC S9(int)V9(scale) zoned magnitude as (int+scale) digit chars (sign overpunch dropped for display).</summary>
+    /// <summary>
+    /// Renders a <c>PIC S9(int)V9(scale)</c> zoned field as <c>DISPLAY</c> of the raw record would: exactly
+    /// (int+scale) digit characters. A NEGATIVE value carries the IBM EBCDIC sign overpunch on its low-order
+    /// digit (zone 0xD), which renders in the SYSOUT listing as <c>'}'</c> (digit 0) or <c>'J'..'R'</c>
+    /// (digits 1..9); a positive/zero value stores an unsigned zone (0xF) and prints as plain digits, exactly
+    /// as the all-positive shipped TCATBALF data does.
+    /// </summary>
     private static string Zoned(decimal value, int intDigits, int scale)
     {
-        decimal mag = Math.Abs(Decimals.Store(value, intDigits, scale, true));
-        long unscaled = (long)decimal.Truncate(mag * Decimals.Pow10(scale));
-        return unscaled.ToString("D" + (intDigits + scale));
+        decimal stored = Decimals.Store(value, intDigits, scale, true);
+        long unscaled = (long)decimal.Truncate(Math.Abs(stored) * Decimals.Pow10(scale));
+        string digits = unscaled.ToString("D" + (intDigits + scale));
+        if (stored < 0m)
+        {
+            const string neg = "}JKLMNOPQR"; // EBCDIC 0xD0..0xD9 overpunch for negative digits 0..9
+            digits = digits[..^1] + neg[digits[^1] - '0'];
+        }
+        return digits;
     }
 }

@@ -911,13 +911,13 @@ public sealed class Cbstm03a
     private const string HtmlL08 =
         "<table  align=\"center\" frame=\"box\" style=\"width:70%; font:12px Segoe UI,sans-serif;\">";
     private const string HtmlL10 =
-        "<td colspan=\"3\" style=\"padding:0px 5px; background-color:#1d1d96b3;\">";
+        "<td colspan=\"3\" style=\"padding:0px 5px;background-color:#1d1d96b3;\">";
     private const string HtmlL15 =
-        "<td colspan=\"3\" style=\"padding:0px 5px; background-color:#FFAF33;\">";
+        "<td colspan=\"3\" style=\"padding:0px 5px;background-color:#FFAF33;\">";
     private const string HtmlL22_35 =
-        "<td colspan=\"3\" style=\"padding:0px 5px; background-color:#f2f2f2;\">";
+        "<td colspan=\"3\" style=\"padding:0px 5px;background-color:#f2f2f2;\">";
     private const string HtmlL30_42 =
-        "<td colspan=\"3\" style=\"padding:0px 5px; background-color:#33FFD1; text-align:center;\">";
+        "<td colspan=\"3\" style=\"padding:0px 5px;background-color:#33FFD1; text-align:center;\">";
     private const string HtmlL47 =
         "<td style=\"width:25%; padding:0px 5px; background-color:#33FF5E; text-align:left;\">";
     private const string HtmlL50 =

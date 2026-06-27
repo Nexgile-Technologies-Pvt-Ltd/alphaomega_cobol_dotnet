@@ -132,7 +132,7 @@ COTRN02C (keyed add → confirm prompt + card resolve), COBIL00C (confirm-Y pays
 bill-pay TRANSACTION + debits the account to zero), CORPT00C (monthly report submit + green confirmation),
 COUSR03C (PF5 delete → row physically gone + confirmation literal).
 
-## Tests (88)
+## Tests (104)
 SchemaRoundTripTests, BatchTests (incl. CSUTLDTC 2508/2517 classification), OnlineTests, OptionalTests,
 JobControlTests (incl. CREASTMT statement job, UNLDPADB→LOADPADB round-trip job, UNLDGSAM GSAM job), and
 **RemediationTests** (CBSTM03A statement gen; PAUDBUNL→PAUDBLOD round-trip; DBUNLDGS GSAM byte-identity;
@@ -154,3 +154,49 @@ the **9 driven online screen-flow tests** above (all 17 online handlers now have
   source-vs-COBOL fidelity review in both audit passes. Online parity remains characterization-based (no CICS
   oracle exists) — asserted on field values + COMMAREA + next-TRANSID/XCTL + DB effects, not 3270 datastream
   bytes — but no online handler is now wiring-only.
+
+## Third independent 5-workflow audit + remediation (commit pending)
+A fresh blind pass ran **five independent verification workflows** (~190 subagents total), each with an
+adversarial verify stage so no finding survived unrefuted:
+1. **Anti-pattern** (15 agents) → CLEAN: zero embedded/executed COBOL, zero real stubs, zero float/rounding in
+   money paths, zero source corruption. (3 INFO notes were all correctly-identified benign modelling choices.)
+2. **Coverage matrix** (11 agents) → 44/44 programs ported & real (not shells); 61/62 copybooks (the 1 is the
+   dead orphan `UNUSED1Y`); 21/21 BMS maps. Found **3 genuine JCL job-flow gaps** (programs ported+tested but
+   no runnable JobControl flow): CBPAUP0J→CBPAUP0C, MNTTRDB2→COBTUPDT, TRANEXTR (DSNTIAUL reference unload).
+3. **Per-program fidelity** (67 agents, all 44) → **16 confirmed divergences** (2 HIGH, 5 MED, 9 LOW).
+4. **Anti-hallucination** (68 agents, all 44) → **16 confirmed** (4 real-output literal/behaviour defects +
+   12 comment/width inaccuracies — invented bug-numbers, wrong byte widths, a false "declares TRANSID" claim).
+5. **Data/codec/schema/numeric** (13 agents) → schema↔copybook, codecs, round-trip net, FileStatus all
+   verified; **3 confirmed** (1 HIGH-active, 2 latent). A tree-wide grep re-confirmed **zero** Math.Round /
+   decimal.Round / Math.Floor/Ceiling / double / float in any money path.
+
+**All confirmed defects fixed (35 items):**
+- **Runtime codecs:** `EditedNumeric.Format` now supports floating leading sign (`----9` — the COTRTLIC
+  `WS-DISP-SQLCODE` field rendered garbage for every nonzero DB2 SQLCODE), trailing sign, and CR/DB editing;
+  `BinaryCodec.Encode` now applies the IBM TRUNC(STD) decimal-digit modulo (mod 10^n) like the zoned/packed
+  codecs. (pinned by `VerificationFixTests`.)
+- **HIGH fidelity:** COACTUPC 9000-READ-ACCT no longer early-returns on ACCTDAT-NOTFND — the COBOL 88
+  `DID-NOT-FIND-ACCT-IN-ACCTDAT` is never set (its SET is commented out at cbl:3719), so control falls through
+  to read the customer (9500 tolerates the blank account). CBPAUP0C checkpoint-frequency test now does the IBM
+  numeric-vs-alphanumeric (zoned, right-space-padded) byte comparison instead of a numeric parse.
+- **MED fidelity:** CBACT04C DISPLAY emits the EBCDIC sign overpunch (`}`,`J`–`R`) for a negative TRAN-CAT-BAL;
+  COADM01C first-display OPTION is blank (LOW-VALUES), echoed only after PROCESS-ENTER-KEY; COCRDSLC/COCRDUPC
+  menu-entry no longer wipes a carried COMMAREA (the `FROM-PROGRAM = LIT-MENUPGM` disjunct is dead because the
+  COBOL tests it before the DFHCOMMAREA load).
+- **LOW fidelity:** COBIL00C TRAN-AMT high-order-truncates to 9 digits on the S9(10)→S9(9) move; COUSR01C /
+  COPAUS1C space/low-values guards now require ALL-spaces OR ALL-low-values; COUSR02C/03C build the id with
+  DELIMITED BY SPACE (stop at first space); COACCT01 WS-KEY uses the faithful zoned low-nibble interpretation.
+- **Hallucinations:** CBIMPORT/CBSTM03A/COACTUPC output-literal fixes (the 4 CBSTM03A HTML cells dropped a
+  spurious space; COACTUPC file-error message lost an extra space; CBIMPORT statuses documented as the faithful
+  QSAM values); COPAUS1C removed an invented blank→default XCTL fallback; 8 comment/width corrections
+  (CBACT04C bug#, CBEXPORT 40-byte header, CBTRN03C row widths, CSUTLDTC 2513/2508, COSGN00C TRANSID wording,
+  COPAUA0C 122-byte / 14-char, COPAUS2C 23-char WS-AUTH-TS).
+- **Coverage:** the 3 missing JCL job flows are now authored (`CardDemoJobs.CbPaup0J/MntTrDb2/TranExtr`) with
+  job-level tests; `MntTrDb2` adds a TRANSACTION_TYPE row from INPFILE, `TranExtr` writes byte-shaped 60-byte
+  TRANTYPE.PS/TRANCATG.PS unloads. COADM01C gains a first-display blank-OPTION regression lock.
+
+**Documented emulation boundaries (not fixed — no off-platform equivalent):** CBSTM03A TIOT-walk SYSOUT
+(job/step names + DD list come from PSA/TCB/TIOT control blocks); COPAUS2C non-duplicate SQL-failure branch
+(no DB2 SQLCODE in the relational store — branch is unreachable); COPAUS0C WS-MESSAGE STRING residual tail.
+
+**Result: build 0 errors; 104/104 tests pass, verified 3× deterministically.**

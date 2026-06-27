@@ -462,8 +462,7 @@ public sealed class Copaus1c : ITransactionHandler
 
         // EXEC CICS XCTL PROGRAM(CDEMO-TO-PROGRAM) COMMAREA(CARDDEMO-COMMAREA). :367-370
         SaveCpvdInfo();
-        string target = string.IsNullOrWhiteSpace(_commArea.ToProgram) ? WS_PGM_AUTH_SMRY : _commArea.ToProgram.TrimEnd();
-        ctx.Xctl(target, _commArea);
+        ctx.Xctl(_commArea.ToProgram.TrimEnd(), _commArea);
     }
 
     // =============================================================================================
@@ -811,9 +810,18 @@ public sealed class Copaus1c : ITransactionHandler
     /// <summary>True when a 9(11) value is numeric — COMMAREA numeric reads are always digit-valued here.</summary>
     private static bool IsNumeric(long value) => value >= 0;
 
-    /// <summary>True when NOT (all SPACES) AND NOT (all LOW-VALUES) — the COBOL "NOT = SPACES AND LOW-VALUES" guard.</summary>
+    /// <summary>
+    /// True when NOT (all SPACES) AND NOT (all LOW-VALUES) — the COBOL "X NOT = SPACES AND LOW-VALUES"
+    /// guard expands to (X NOT= all-SPACES) AND (X NOT= all-LOW-VALUES). A mixed space/NUL buffer is
+    /// neither entirely spaces nor entirely low-values, so it passes (returns true).
+    /// </summary>
     private static bool NotSpacesOrLow(string? s)
-        => !(string.IsNullOrEmpty(s) || s.All(c => c == ' ' || c == '\0'));
+    {
+        if (string.IsNullOrEmpty(s)) return false; // empty == all-SPACES (and all-LOW-VALUES) -> fails guard.
+        bool allSpaces = s.All(c => c == ' ');
+        bool allLow = s.All(c => c == '\0');
+        return !allSpaces && !allLow;
+    }
 
     /// <summary>Right-pads/truncates to a fixed COBOL X(width) field with spaces.</summary>
     private static string Fixed(string? v, int width)

@@ -442,10 +442,11 @@ public sealed class Cousr03c : ITransactionHandler
                 InitializeAllFields();                                   // PERFORM INITIALIZE-ALL-FIELDS. source: :315
                 _wsMessage = "";                                         // MOVE SPACES TO WS-MESSAGE. source: :316
                 _map.Field("ERRMSG").ColorOverride = BmsColor.Green;     // MOVE DFHGREEN TO ERRMSGC. source: :317
-                // STRING 'User ' (SIZE) + SEC-USR-ID (DELIMITED BY SPACE = right-trim) + ' has been deleted ...'
-                // (SIZE) INTO WS-MESSAGE. INITIALIZE-ALL-FIELDS cleared the screen fields, but SEC-USR-ID lives
+                // STRING 'User ' (SIZE) + SEC-USR-ID (DELIMITED BY SPACE = up to FIRST space) + ' has been deleted
+                // ...' (SIZE) INTO WS-MESSAGE. INITIALIZE-ALL-FIELDS cleared the screen fields, but SEC-USR-ID lives
                 // in SEC-USER-DATA (not a screen field), so it survives. source: :318-321
-                _wsMessage = $"User {SecUsrId.TrimEnd(' ')} has been deleted ...";
+                string secUsrIdToFirstSpace = SecUsrId.Split(' ')[0];    // DELIMITED BY SPACE stops at first space
+                _wsMessage = $"User {secUsrIdToFirstSpace} has been deleted ...";
                 SendUsrdelScreen(ctx);                                   // PERFORM SEND-USRDEL-SCREEN. source: :322
                 break;
             case Resp.NotFnd:

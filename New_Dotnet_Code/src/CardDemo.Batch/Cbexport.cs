@@ -557,7 +557,7 @@ public sealed class Cbexport
     // =================================================================================================
 
     /// <summary>
-    /// INITIALIZE EXPORT-RECORD + populate the common 50-byte header (REC-TYPE, the shared 26-char
+    /// INITIALIZE EXPORT-RECORD + populate the common 40-byte header (REC-TYPE, the shared 26-char
     /// timestamp, the pre-incremented global sequence number, branch '0001' and region 'NORTH'). The
     /// variant layout space-fills the X(460) base view (so unused payload bytes and FILLER stay spaces —
     /// bug #5); the caller then overlays the active type's payload fields.

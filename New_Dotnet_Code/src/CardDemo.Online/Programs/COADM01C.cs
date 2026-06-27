@@ -67,6 +67,11 @@ public sealed class Coadm01c : ITransactionHandler
     private string _wsMessage = ""; // WS-MESSAGE PIC X(80). source: COADM01C.cbl:38
     private int _wsOption;          // WS-OPTION  PIC 9(02) VALUE 0. source: COADM01C.cbl:46
 
+    // True once PROCESS-ENTER-KEY has done MOVE WS-OPTION TO OPTIONO (:129). On the first display
+    // (:93 MOVE LOW-VALUES TO COADM1AO) and any non-ENTER SEND, OPTIONO stays LOW-VALUES and renders
+    // blank — only an ENTER turn echoes the typed option. SEND-MENU-SCREEN itself never touches OPTIONO.
+    private bool _optionEchoed;
+
     // Per-turn override of the ERRMSG colour byte (ERRMSGC OF COADM1AO): MOVE DFHGREEN on the
     // "not installed" info paths. Null = use the map's default RED. source: COADM01C.cbl:151, 272.
     private BmsColor? _errMsgColor;
@@ -233,7 +238,7 @@ public sealed class Coadm01c : ITransactionHandler
         // MOVE WS-OPTION-X TO WS-OPTION (alphanumeric -> PIC 9(02)). source: COADM01C.cbl:128
         _wsOption = ToNumeric2(wsOptionX);
         // MOVE WS-OPTION TO OPTIONO OF COADM1AO (echo, zero-padded). source: COADM01C.cbl:129
-        // (Applied at SEND time via OptionEcho.)
+        _optionEchoed = true; // OPTIONO is now set; SEND-MENU-SCREEN will paint the echo (applied via OptionEcho).
 
         // IF WS-OPTION IS NOT NUMERIC OR WS-OPTION > CDEMO-ADMIN-OPT-COUNT OR WS-OPTION = ZEROS.
         // FB-6: the IS NOT NUMERIC disjunct is always false after the MOVE; kept verbatim.
@@ -307,8 +312,11 @@ public sealed class Coadm01c : ITransactionHandler
         PopulateHeaderInfo(ctx, map); // PERFORM POPULATE-HEADER-INFO. source: :177
         BuildMenuOptions(map);        // PERFORM BUILD-MENU-OPTIONS.  source: :178
 
-        // MOVE WS-OPTION TO OPTIONO OF COADM1AO — the echo from PROCESS-ENTER-KEY (:129), painted now.
-        map.Field("OPTION").SetValue(OptionEcho());
+        // SEND-MENU-SCREEN itself does NOT move WS-OPTION to OPTIONO (COADM01C.cbl:175-187). OPTIONO is
+        // LOW-VALUES (blank) on the first display (:93) and on any non-ENTER SEND; it carries the typed
+        // option only after PROCESS-ENTER-KEY did MOVE WS-OPTION TO OPTIONO (:129).
+        if (_optionEchoed)
+            map.Field("OPTION").SetValue(OptionEcho());
 
         // MOVE WS-MESSAGE TO ERRMSGO OF COADM1AO. source: COADM01C.cbl:180
         SetErrMsg(map, _wsMessage); // FB-4: clamps the X(80) message to the X(78) ERRMSGO field.

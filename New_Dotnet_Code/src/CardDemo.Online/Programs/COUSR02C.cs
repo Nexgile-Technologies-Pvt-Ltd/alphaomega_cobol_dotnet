@@ -492,7 +492,9 @@ public sealed class Cousr02c : ITransactionHandler
                 _wsMessage = "";                                         // MOVE SPACES TO WS-MESSAGE. source: :370
                 _map.Field("ERRMSG").ColorOverride = BmsColor.Green;     // MOVE DFHGREEN TO ERRMSGC. source: :371
                 // STRING 'User ' + SEC-USR-ID(DELIMITED BY SPACE) + ' has been updated ...'. source: :372-375
-                _wsMessage = $"User {SecUsrId.TrimEnd(' ')} has been updated ...";
+                // DELIMITED BY SPACE copies SEC-USR-ID only up to its FIRST space (not just trailing).
+                string usrIdDelim = SecUsrId.Split(' ')[0];
+                _wsMessage = $"User {usrIdDelim} has been updated ...";
                 SendUsrupdScreen(ctx);                                   // PERFORM SEND-USRUPD-SCREEN. source: :376
                 break;
             case Resp.NotFnd:

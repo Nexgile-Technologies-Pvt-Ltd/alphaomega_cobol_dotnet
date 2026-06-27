@@ -586,37 +586,24 @@ public sealed class Cbpaup0c
     }
 
     /// <summary>
-    /// Compares a numeric counter (left operand) against an X(05) alphanumeric (right operand), as IBM
-    /// Enterprise COBOL does for a numeric-vs-alphanumeric relation (bug #3). The alphanumeric operand is
-    /// interpreted numerically: leading/embedded characters are read as their digit value; under the
-    /// CardDemo run card the values are <c>'00001'</c> (== 1) or the defaulted left-justified space-filled
-    /// <c>'5    '</c>/<c>'10   '</c>. We parse the leading run of digits (ignoring trailing spaces), which
-    /// yields 1 for <c>'00001'</c>, 5 for <c>'5    '</c>, and 10 for <c>'10   '</c> — matching the observed
-    /// comparison value. A non-digit lead yields 0.
+    /// Compares a numeric counter (<c>WS-AUTH-SMRY-PROC-CNT</c> / <c>WS-NO-CHKP</c>, both <c>PIC 9(8)</c>
+    /// USAGE DISPLAY) against an <c>X(05)</c> alphanumeric (<c>P-CHKP-FREQ</c> / <c>P-CHKP-DIS-FREQ</c>)
+    /// exactly as IBM Enterprise COBOL evaluates a numeric-vs-alphanumeric relation (faithful bug #3).
+    /// The numeric integer is taken in its 8-byte ZONED character form (<c>"00000001"</c>), the X(05)
+    /// operand — the shorter — is conceptually extended on the RIGHT with spaces to the same width, and the
+    /// two are compared as ALPHANUMERIC, left-to-right, byte by byte. This means a RIGHT-justified zoned
+    /// count is compared against a LEFT-justified / space-padded frequency, so e.g. with the run card's
+    /// <c>"00001"</c> the relation only becomes true once the count's ten-thousands digit appears — NOT at
+    /// count &gt; 1. Ordinal comparison reproduces EBCDIC ordering for the digit/space subset (space 0x40 &lt;
+    /// digits 0xF0..0xF9; digits ascending), so <see cref="string.CompareOrdinal(string,string)"/> suffices.
     /// </summary>
     private static int CompareNumericToAlphanumeric(int left, string alpha)
     {
-        long right = AlphanumericAsNumber(alpha);
-        return left.CompareTo((int)right);
-    }
-
-    /// <summary>
-    /// Numeric value of an alphanumeric checkpoint-frequency field: the leading run of digits, trimmed of
-    /// surrounding spaces (so <c>'00001'</c>→1, <c>'5    '</c>→5, <c>'10   '</c>→10, all-blank→0).
-    /// </summary>
-    private static long AlphanumericAsNumber(string alpha)
-    {
-        string t = (alpha ?? string.Empty).Trim();
-        if (t.Length == 0) return 0;
-        long v = 0;
-        bool any = false;
-        foreach (char ch in t)
-        {
-            if (ch < '0' || ch > '9') break;
-            v = v * 10 + (ch - '0');
-            any = true;
-        }
-        return any ? v : 0;
+        // PIC 9(8) zoned character form, wrapping at the 8-digit field capacity (mod 10^8) as the field would.
+        string l = (Math.Abs(left) % 100000000).ToString("D8", CultureInfo.InvariantCulture);
+        string r = alpha ?? string.Empty;
+        int w = Math.Max(l.Length, r.Length);          // the shorter operand is right-padded with spaces
+        return string.CompareOrdinal(l.PadRight(w, ' '), r.PadRight(w, ' '));
     }
 
     // =================================================================================================

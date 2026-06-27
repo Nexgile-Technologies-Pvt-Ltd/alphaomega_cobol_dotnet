@@ -62,7 +62,7 @@ public sealed class Cosgn00c : ITransactionHandler
     public string ProgramName => "COSGN00C";
 
     /// <inheritdoc/>
-    public string TransId => "CC00"; // CSD: CC00 -> COSGN00C (entry point); program declares TRANSID(CC00)
+    public string TransId => "CC00"; // 'CC00' is WS-TRANID (VALUE 'CC00', :37), used in EXEC CICS RETURN TRANSID(WS-TRANID) (:99); the CC00 -> COSGN00C binding is an external CSD/RDO definition, not a TRANSID clause in the program
 
     // -----------------------------------------------------------------------------------------------
     //  MAIN-PARA (entry point) — source: COSGN00C.cbl:73-102

@@ -151,7 +151,7 @@ public sealed class Copaua0c : IMqServer
     // Customer is read but never consumed (FB-2); kept for parity/side-effect only.
 
     // =================================================================================================
-    //  ERROR-LOG-RECORD — source: CCPAUERY.cpy (ERR-* fields, 119 bytes).
+    //  ERROR-LOG-RECORD — source: CCPAUERY.cpy (ERR-* fields, 122 bytes).
     // =================================================================================================
     private string _errLocation = "";
     private char _errLevel;                     // 'L'/'I'/'W'/'C'
@@ -943,7 +943,7 @@ public sealed class Copaua0c : IMqServer
         AppendChar(ref pos, ',');
         AppendString(ref pos, Fixed(_rl.AuthRespReason, 4)); // PA-RL-AUTH-RESP-REASON X(4)
         AppendChar(ref pos, ',');
-        AppendString(ref pos, _wsApprovedAmtDis);           // WS-APPROVED-AMT-DIS -zzzzzzzzz9.99 (13 chars)
+        AppendString(ref pos, _wsApprovedAmtDis);           // WS-APPROVED-AMT-DIS -zzzzzzzzz9.99 (14 chars)
         AppendChar(ref pos, ',');                            // trailing comma
         _wsRespLength = (short)pos;                          // pointer ends at built-length+1 (persisted)
     }
@@ -1249,7 +1249,7 @@ public sealed class Copaua0c : IMqServer
              + " ";
     }
 
-    // ---- ERROR-LOG-RECORD layout (119 bytes, CCPAUERY). ----
+    // ---- ERROR-LOG-RECORD layout (122 bytes, CCPAUERY). ----
 
     /// <summary>Builds the fixed-offset ERROR-LOG-RECORD written to the CSSL TD queue. source: CCPAUERY; :996-1006</summary>
     private string BuildErrorLogRecord(string errDate, string errTime)

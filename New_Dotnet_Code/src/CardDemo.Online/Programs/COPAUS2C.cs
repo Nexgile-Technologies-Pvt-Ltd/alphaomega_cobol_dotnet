@@ -53,8 +53,9 @@ public sealed class WsFraudData
 /// caller owns the unit of work (faithful bug #6). source: COPAUS2C.cbl:2-6,88-244; COPAUS2C.md.
 /// </summary>
 /// <remarks>
-/// <para><b>AUTH_TS construction (load-bearing PK derivation).</b> COBOL builds the 26-char timestamp
-/// <c>YY-MM-DD HH.MI.SS&lt;sss&gt;000</c> where YY/MM/DD are slices of PA-AUTH-ORIG-DATE (YYMMDD) and
+/// <para><b>AUTH_TS construction (load-bearing PK derivation).</b> COBOL builds the 23-char timestamp
+/// <c>YY-MM-DD HH.MI.SS&lt;sss&gt;000</c> (WS-AUTH-TS, later MOVEd into the 26-char DCLGEN AUTH-TS) where
+/// YY/MM/DD are slices of PA-AUTH-ORIG-DATE (YYMMDD) and
 /// HH/MI/SS/SSS come from <c>WS-AUTH-TIME = 999999999 - PA-AUTH-TIME-9C</c> (9s-complement decode) sliced
 /// 1-2/3-4/5-6/7-9. The same string is bound on INSERT and on the UPDATE WHERE so the PK matches
 /// byte-for-byte. source: COPAUS2C.cbl:35-51,103-114,171-172,224-225.</para>
@@ -72,7 +73,9 @@ public sealed class Copaus2c
     private readonly IClock _clock;
 
     // ---- DCLGEN host variables built in MAIN-PARA (the row to write). source: COPAUS2C.cbl:113-139 ----
-    private string _wsAuthTs = "";  // WS-AUTH-TS X(26) — the formatted PK timestamp. source: :38-51.
+    // WS-AUTH-TS is the 23-char group 'YY-MM-DD HH.MI.SS<sss>000' built at :38-51; it is later MOVEd into the
+    // 26-char DCLGEN host variable AUTH-TS (dcl/AUTHFRDS.dcl:57, PIC X(26)), which space-pads it to 26.
+    private string _wsAuthTs = "";  // WS-AUTH-TS (23-char group). source: :38-51.
 
     /// <summary>
     /// Constructs the fraud worker over the shared relational DB (the AUTHFRDS repository participates in
@@ -167,9 +170,12 @@ public sealed class Copaus2c
         }
         else
         {
-            // WHEN OTHER — SQL failure. source: :205-216
+            // WHEN OTHER — a non-duplicate SQL failure. source: :205-216. Over the relational store
+            // AuthFraudRepository.Insert returns only OK or DUPLICATE-KEY, so this branch is unreachable;
+            // there is no live DB2 SQLCODE/SQLSTATE to render (no DB2 layer), so placeholder edits stand in.
+            // The COBOL STRING leaves the final 2 bytes of the X(50) WS-FRD-ACT-MSG unchanged; we space-pad
+            // (the residual would be SPACES here on a fresh COMMAREA anyway). Documented emulation boundary.
             ca.FrdUpdateStatus = "F";          // SET WS-FRD-UPDT-FAILED TO TRUE.
-            // STRING ' SYSTEM ERROR DB2: CODE:' WS-SQLCODE ', STATE: ' WS-SQLSTATE DELIMITED BY SIZE.
             ca.FrdActMsg = Fixed(" SYSTEM ERROR DB2: CODE:" + EditSqlCode(-1) + ", STATE: " + EditSqlState(0), 50);
         }
 
@@ -195,7 +201,10 @@ public sealed class Copaus2c
         }
         else
         {
-            // WHEN OTHER. source: :233-243
+            // WHEN OTHER. source: :233-243. As with the INSERT failure branch, UpdateFraudFlag returns only
+            // OK or NOT-FOUND over the relational store, so a true DB2 SQL failure cannot arise — there is no
+            // live SQLCODE/SQLSTATE to render and the COBOL STRING's residual trailing bytes are SPACES on a
+            // fresh COMMAREA, so the space-pad matches. Documented emulation boundary (no DB2 layer).
             ca.FrdUpdateStatus = "F";          // SET WS-FRD-UPDT-FAILED TO TRUE.
             ca.FrdActMsg = Fixed(" UPDT ERROR DB2: CODE:" + EditSqlCode(-1) + ", STATE: " + EditSqlState(0), 50);
         }

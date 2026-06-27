@@ -332,9 +332,10 @@ public sealed class Csutldtc
     // SEVERITY / MSG-NO halfwords that the program reads into WS-SEVERITY-N / WS-MSG-NO-N. The token drives
     // the verdict EVALUATE; severity/msg-no feed bytes 1-4 / 16-19 the callers branch on.
     //   - success         -> Severity 0, MsgNo 0, token X'0000000000000000' (FC-INVALID-DATE = "valid").
-    //   - bad date value  -> Severity 3, MsgNo 2513 (0x09D1+? -> see note), token FC-BAD-DATE-VALUE; this is
-    //                        the condition CardDemo callers tolerate via the '2513' check (CEE2513 = the LE
-    //                        message number whose token CEEDAYS returns for an unparseable/invalid date here).
+    //   - bad date value  -> Severity 3, MsgNo 2508 (0x09CC), token FC-BAD-DATE-VALUE; the condition CEEDAYS
+    //                        returns for an unparseable/invalid date here. The MsgNo 2513 (0x09D1) that the
+    //                        CardDemo callers tolerate via the '2513' check pairs with FC-UNSUPP-RANGE, not
+    //                        FC-BAD-DATE-VALUE. // see CSUTLDTC.cbl:64,66
     //   - non-numeric     -> Severity 3, MsgNo 2520, token FC-NON-NUMERIC-DATA.
     //   - bad pic string  -> Severity 3, MsgNo 2518, token FC-BAD-PIC-STRING (unrecognized mask).
     // The (severity, msgNo) -> token mapping is consistent with the 88-level hex constants in CSUTLDTC.cbl:62-70

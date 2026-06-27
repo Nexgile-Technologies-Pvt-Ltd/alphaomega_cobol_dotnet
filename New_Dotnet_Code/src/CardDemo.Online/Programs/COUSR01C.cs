@@ -437,7 +437,7 @@ public sealed class Cousr01c : ITransactionHandler
 
     /// <summary>True when a value is empty, all SPACES, or all LOW-VALUES (NUL) — the COBOL "= SPACES OR LOW-VALUES" guard.</summary>
     private static bool IsSpacesOrLowValues(string? s)
-        => string.IsNullOrEmpty(s) || s.All(c => c == ' ' || c == '\0');
+        => string.IsNullOrEmpty(s) || s.All(c => c == ' ') || s.All(c => c == '\0');
 
     /// <summary>The leading run up to the first SPACE — COBOL <c>STRING ... DELIMITED BY SPACE</c> on SEC-USR-ID. source: :256</summary>
     private static string DelimitedBySpace(string? s)

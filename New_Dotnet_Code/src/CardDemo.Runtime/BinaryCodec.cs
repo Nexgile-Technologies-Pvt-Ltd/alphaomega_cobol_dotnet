@@ -45,6 +45,10 @@ public static class BinaryCodec
             throw new ArgumentException($"Destination length {dest.Length} != COMP length {bytes}.", nameof(dest));
 
         decimal scaled = decimal.Truncate(value * Decimals.Pow10(scale));
+        // IBM Enterprise COBOL default TRUNC(STD): a value exceeding the field's DECIMAL digit capacity
+        // drops its high-order digits (modulo 10^totalDigits), NOT merely its high-order bytes. Mirror the
+        // ZonedDecimalCodec / PackedDecimalCodec / Decimals.Store overflow contract so all codecs agree.
+        scaled %= Decimals.Pow10(totalDigits);
         long u = (long)scaled;
         if (!signed) u = Math.Abs(u);
 

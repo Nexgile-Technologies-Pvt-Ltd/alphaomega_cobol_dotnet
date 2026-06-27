@@ -803,12 +803,14 @@ public sealed class Coacct01 : IMqServer
     /// </summary>
     private static long ParseKey11(string raw)
     {
-        var sb = new StringBuilder(11);
-        foreach (char c in raw) if (c is >= '0' and <= '9') sb.Append(c);
-        if (sb.Length == 0) return 0;
-        string digits = sb.ToString();
-        if (digits.Length > 11) digits = digits.Substring(digits.Length - 11);
-        return long.Parse(digits, CultureInfo.InvariantCulture);
+        // COBOL group MOVE REQUEST-MESSAGE -> WS-KEY (PIC 9(11) DISPLAY): the 11 bytes land verbatim and a
+        // numeric reference reads each byte's zoned LOW-ORDER nibble as its digit, IN PLACE — it does NOT
+        // de-edit/strip non-digit bytes. For a normal ASCII-digit request key '0'..'9' this equals the keyed
+        // account id; a non-digit byte contributes its low nibble at its own position (faithful), rather than
+        // being dropped (which would shift later digits left and change the numeric value). source: :109-112,:373.
+        long v = 0;
+        foreach (char c in raw) v = v * 10 + (c & 0x0F);
+        return v % 100000000000L; // 9(11) holds 11 digits
     }
 
     /// <summary>The X(11) RIDFLD / WS-KEY zoned image of an account id: 11 zero-padded digit bytes (no sign).

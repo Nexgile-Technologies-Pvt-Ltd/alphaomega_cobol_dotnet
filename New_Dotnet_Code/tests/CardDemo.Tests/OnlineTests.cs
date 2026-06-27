@@ -311,6 +311,28 @@ public sealed partial class OnlineTests
         Assert.Equal("CU01", outcome.TransId); // COUSR01C user add
     }
 
+    /// <summary>
+    /// COADM01C first display (non-reenter path): SEND-MENU-SCREEN does NOT echo WS-OPTION — the
+    /// <c>MOVE WS-OPTION TO OPTIONO</c> lives only inside PROCESS-ENTER-KEY (COADM01C.cbl:129). So OPTIONO is
+    /// LOW-VALUES and the 2-char OPTION field renders BLANK on the initial admin menu, not "00". Locks the
+    /// independent-audit fidelity fix (the C# previously painted the echo unconditionally).
+    /// </summary>
+    [Fact]
+    public void Coadm01c_first_display_paints_blank_option_not_zero()
+    {
+        using var db = SeededDb();
+        var ca = MenuCommArea(admin: true); // NOT reenter -> first-display (SEND-MENU-SCREEN) path
+        var screen = new ScriptedScreenIo();
+
+        CicsOutcome outcome = NewDispatcher(db, screen).RunTurn("CA00", AidKey.Enter, ca);
+
+        Assert.Equal(CicsOutcomeKind.ReturnTransId, outcome.Kind);
+        Assert.Equal("CA00", outcome.TransId); // pseudo-conversational re-display; no XCTL on first entry
+        Assert.NotNull(screen.LastSentMap);
+        Assert.True(string.IsNullOrWhiteSpace(screen.LastSentMap!.Field("OPTION").Value),
+            "first-display OPTION must be blank (LOW-VALUES), not the '00' echo");
+    }
+
     // ===============================================================================================
     //  CRUD round-trip over USRSEC: COUSR01C add -> COUSR02C update
     // ===============================================================================================

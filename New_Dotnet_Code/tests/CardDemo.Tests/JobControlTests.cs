@@ -686,6 +686,100 @@ public sealed class JobControlTests
     }
 
     // =================================================================================================
+    // CBPAUP0J / MNTTRDB2 / TRANEXTR — optional-module application batch job flows (coverage remediation)
+    // =================================================================================================
+
+    /// <summary>
+    /// CBPAUP0J runs its single IMS-BMP step (CBPAUP0C) over a seeded PAUT hierarchy with the JCL's literal
+    /// SYSIN card '00,00001,00001,Y'. The job completes cleanly (RC 0) and the step is recorded as executed.
+    /// </summary>
+    [Fact]
+    public void CbPaup0J_RunsCbpaup0c_Cleanly()
+    {
+        using var db = new RelationalDb();
+        var summaries = new PautSummaryRepository(db);
+        var details = new PautDetailRepository(db);
+        SeedPautSummary(summaries, 70000000001L, approvedCnt: 1);
+        SeedPautDetail(details, 70000000001L, authDate9c: 50000, authTime9c: 700000000L, approved: true, tranId: "PURGE0000001");
+
+        JobResult result = new JobRunner().Run(CardDemoJobs.CbPaup0J(), NewContext(db));
+
+        Assert.True(result.Succeeded);
+        StepResult step = Assert.Single(result.Steps);
+        Assert.Equal("CBPAUP0C", step.Program);
+        Assert.Equal(StepStatus.Executed, step.Status);
+        Assert.Equal(0, step.ReturnCode);
+    }
+
+    /// <summary>
+    /// MNTTRDB2 runs COBTUPDT against the TRANSACTION_TYPE table from an INPFILE control dataset: an 'A' (add)
+    /// record inserts a new transaction-type row, observable in the table after the job.
+    /// </summary>
+    [Fact]
+    public void MntTrDb2_RunsCobtupdt_AddsTransactionTypeRow()
+    {
+        using var db = new RelationalDb();
+        var types = new TransactionTypeRepository(db);
+        Assert.Equal(FileStatus.RecordNotFound, types.ReadByKey("90", out _));
+
+        // INPFILE record: col 1 = 'A' (add), cols 2-3 = type '90', cols 4-53 = description.
+        string inpfile = Path.Combine(NewWorkDir(), "INPFILE.dat");
+        File.WriteAllText(inpfile, "A90NEW REFERENCE TYPE".PadRight(53));
+
+        JobResult result = new JobRunner().Run(CardDemoJobs.MntTrDb2(inpfile), NewContext(db));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("COBTUPDT", Assert.Single(result.Steps).Program);
+        Assert.Equal(FileStatus.Ok, types.ReadByKey("90", out TransactionType? added));
+        Assert.Equal("NEW REFERENCE TYPE", added!.TrDescription.TrimEnd());
+    }
+
+    /// <summary>
+    /// TRANEXTR unloads TRANSACTION_TYPE and TRANSACTION_TYPE_CATEGORY to the 60-byte TRANTYPE.PS / TRANCATG.PS
+    /// reference files in the DSNTIAUL SELECT/CAST format (key + CHAR(50) data + '0' fill), ordered by key.
+    /// </summary>
+    [Fact]
+    public void TranExtr_UnloadsReferenceTablesTo60ByteFixedFiles()
+    {
+        using var db = new RelationalDb();
+        var types = new TransactionTypeRepository(db);
+        var cats = new TransactionTypeCategoryRepository(db);
+        Assert.Equal(FileStatus.Ok, types.Insert(new TransactionType { TrType = "02", TrDescription = "PAYMENT" }));
+        Assert.Equal(FileStatus.Ok, types.Insert(new TransactionType { TrType = "01", TrDescription = "PURCHASE" }));
+        Assert.Equal(FileStatus.Ok, cats.Insert(new TransactionTypeCategory
+        {
+            TrcTypeCode = "01", TrcTypeCategory = "0001", TrcCatData = "REGULAR SALES DRAFT",
+        }));
+
+        JobContext ctx = NewContext(db);
+        JobResult result = new JobRunner().Run(CardDemoJobs.TranExtr(), ctx);
+
+        Assert.True(result.Succeeded);
+        string typePath = ctx.Path("TRANTYPE.PS");
+        string catgPath = ctx.Path("TRANCATG.PS");
+        Assert.True(File.Exists(typePath));
+        Assert.True(File.Exists(catgPath));
+
+        // TRANTYPE: two 60-byte records (TR-TYPE(2) + CHAR(50) desc + '00000000'), ascending by TR_TYPE.
+        byte[] typeBytes = File.ReadAllBytes(typePath);
+        Assert.Equal(2 * 60, typeBytes.Length);
+        string rec0 = HostEncoding.Ebcdic.GetString(typeBytes, 0, 60);
+        Assert.Equal("01", rec0[..2]);                          // ordered -> '01' first
+        Assert.Equal("PURCHASE", rec0.Substring(2, 50).TrimEnd());
+        Assert.Equal("00000000", rec0.Substring(52, 8));
+        Assert.Equal("02", HostEncoding.Ebcdic.GetString(typeBytes, 60, 60)[..2]);
+
+        // TRANCATG: one 60-byte record (CODE(2)+CATEGORY(4)+CHAR(50)+'0000').
+        byte[] catgBytes = File.ReadAllBytes(catgPath);
+        Assert.Equal(60, catgBytes.Length);
+        string crec = HostEncoding.Ebcdic.GetString(catgBytes, 0, 60);
+        Assert.Equal("01", crec[..2]);
+        Assert.Equal("0001", crec.Substring(2, 4));
+        Assert.Equal("REGULAR SALES DRAFT", crec.Substring(6, 50).TrimEnd());
+        Assert.Equal("0000", crec.Substring(56, 4));
+    }
+
+    // =================================================================================================
     // Helpers
     // =================================================================================================
 

@@ -3,6 +3,7 @@ using CardDemo.Runtime;
 using CardDemo.Data;
 using CardDemo.Import;
 using CardDemo.Ims;
+using CardDemo.Db2;
 
 namespace CardDemo.JobControl;
 
@@ -31,9 +32,12 @@ public static class CardDemoJobs
     public const string GdgTransactDaly = "AWS.M2.CARDDEMO.TRANSACT.DALY";
     public const string GdgTranRept = "AWS.M2.CARDDEMO.TRANREPT";
     public const string GdgTcatbalfBkup = "AWS.M2.CARDDEMO.TCATBALF.BKUP";
+    public const string GdgTranTypeBkup = "AWS.M2.CARDDEMO.TRANTYPE.BKUP";       // TRANEXTR STEP10
+    public const string GdgTranCatgBkup = "AWS.M2.CARDDEMO.TRANCATG.PS.BKUP";    // TRANEXTR STEP20
 
     private const int TranRecLen = 350; // CVTRA05Y TRAN-RECORD
     private const int TcatRecLen = 50;  // CVTRA01Y TRAN-CAT-BAL-RECORD
+    private const int RefExtractLen = 60; // TRANEXTR DSNTIAUL unload record (TRANTYPE.PS / TRANCATG.PS)
 
     // =================================================================================================
     // File-setup / reload jobs (IDCAMS DELETE/DEFINE/REPRO from a .PS seed)
@@ -539,8 +543,122 @@ public static class CardDemoJobs
         ]);
 
     // =================================================================================================
+    // CBPAUP0J — IMS BMP that purges expired pending authorizations (CBPAUP0C)
+    // =================================================================================================
+
+    /// <summary>
+    /// CBPAUP0J (app-authorization-ims-db2-mq/jcl/CBPAUP0J.JCL) — the single IMS BMP step
+    /// <c>EXEC PGM=DFSRRC00,PARM='BMP,CBPAUP0C,PSBPAUTB'</c> that runs <c>CBPAUP0C</c> to delete expired
+    /// pending-authorization detail/summary segments. The IMS region / PSB / DBD DDs are IMS infrastructure
+    /// with no relational equivalent; the SYSIN control card is the job's literal <c>00,00001,00001,Y</c>
+    /// (expiry-days, checkpoint freq, checkpoint-display freq, debug flag). The step RC is the program's
+    /// RETURN-CODE: 0 on a clean run, 16 after a <c>9999-ABEND</c>.
+    /// </summary>
+    public static Job CbPaup0J() => new(
+        "CBPAUP0J", "EXECUTE IMS PROGRAM TO DELETE EXPIRED AUTHORIZATIONS",
+        [
+            new JobStep("STEP01", "CBPAUP0C", ctx => Cbpaup0c.Run(
+                new PautSummaryRepository(ctx.Db), new PautDetailRepository(ctx.Db),
+                "00,00001,00001,Y", ctx.Clock).ReturnCode),
+        ]);
+
+    // =================================================================================================
+    // MNTTRDB2 — DB2 batch maintenance of the TRANSACTION_TYPE table (COBTUPDT)
+    // =================================================================================================
+
+    /// <summary>
+    /// MNTTRDB2 (app-transaction-type-db2/jcl/MNTTRDB2.JCL) — the single <c>IKJEFT01 RUN PROGRAM(COBTUPDT)</c>
+    /// step that ADD/UPDATE/DELETEs <c>TRANSACTION_TYPE</c> rows from the INPFILE control dataset (column 1 =
+    /// A/D/U/*, columns 2-3 the type code, columns 4-53 the description). RC=4 (one or more records errored)
+    /// is a warning, not a job-stopping failure (faithful COBTUPDT bug #1).
+    /// </summary>
+    /// <param name="inputFilePath">The INPFILE dataset; defaults to <c>INPFILE.dat</c> in the job work dir.</param>
+    public static Job MntTrDb2(string? inputFilePath = null) => new(
+        "MNTTRDB2", "MAINTAIN DB2 TRANSACTION TABLE",
+        [
+            new JobStep("STEP1", "COBTUPDT", ctx =>
+            {
+                string path = inputFilePath ?? ctx.Path("INPFILE.dat");
+                Cobtupdt program = Cobtupdt.Create(ctx.Db, Cobtupdt.ReadInputFile(path));
+                program.Run();
+                return program.ReturnCode; // 0 clean, 4 = a record errored (warning, not abort).
+            }),
+        ]);
+
+    // =================================================================================================
+    // TRANEXTR — daily DB2 unload of the transaction-type reference data (DSNTIAUL)
+    // =================================================================================================
+
+    /// <summary>
+    /// TRANEXTR (app-transaction-type-db2/jcl/TRANEXTR.JCL) — the once-a-day DSNTIAUL extract that rebuilds
+    /// the 60-byte <c>TRANTYPE.PS</c> / <c>TRANCATG.PS</c> reference files (consumed by TRANREPT) from the
+    /// relational <c>TRANSACTION_TYPE</c> / <c>TRANSACTION_TYPE_CATEGORY</c> tables. STEP10/STEP20 back up the
+    /// prior PS files to GDG generations (IEBGENER); STEP30 deletes the prior PS (IEFBR14); STEP40/STEP50 are
+    /// the DSNTIAUL unloads. The unload records mirror the JCL's SELECT/CAST exactly:
+    /// TRANTYPE = TR-TYPE X(2) + TR-DESCRIPTION CHAR(50) + '00000000'; TRANCATG = TRC-TYPE-CODE X(2) +
+    /// TRC-TYPE-CATEGORY X(4) + TRC-CAT-DATA CHAR(50) + '0000', each 60 bytes, ordered by the primary key.
+    /// </summary>
+    public static Job TranExtr() => new(
+        "TRANEXTR", "EXTRACT TRAN TYPE REFERENCE DATA",
+        [
+            new JobStep("STEP10", "IEBGENER", ctx =>
+            {
+                // BACKUP the previous TRANTYPE.PS to a GDG generation (skip if there is no prior PS yet).
+                ctx.Gdg.Define(GdgTranTypeBkup);
+                string prior = ctx.Path("TRANTYPE.PS");
+                if (!File.Exists(prior)) return 0;
+                string outPath = ctx.Gdg.AllocateNext(GdgTranTypeBkup);
+                File.Copy(prior, outPath, overwrite: true);
+                ctx.Gdg.Catalog(GdgTranTypeBkup);
+                return 0;
+            }),
+            new JobStep("STEP20", "IEBGENER", ctx =>
+            {
+                ctx.Gdg.Define(GdgTranCatgBkup);
+                string prior = ctx.Path("TRANCATG.PS");
+                if (!File.Exists(prior)) return 0;
+                string outPath = ctx.Gdg.AllocateNext(GdgTranCatgBkup);
+                File.Copy(prior, outPath, overwrite: true);
+                ctx.Gdg.Catalog(GdgTranCatgBkup);
+                return 0;
+            }, conditions: [new CondCode(0, CondOperator.Ne)]),
+            new JobStep("STEP30", "IEFBR14",
+                ctx => UtilitySteps.Iefbr14(ctx.Path("TRANTYPE.PS"), ctx.Path("TRANCATG.PS")),
+                conditions: [new CondCode(0, CondOperator.Ne)]),
+            new JobStep("STEP40", "IKJEFT01", ctx =>
+                UtilitySteps.IdcamsReproUnload(ctx, ctx.Path("TRANTYPE.PS"), w => SerializeTranTypes(ctx, w), HostKind.Ebcdic),
+                conditions: [new CondCode(0, CondOperator.Ne)]),
+            new JobStep("STEP50", "IKJEFT01", ctx =>
+                UtilitySteps.IdcamsReproUnload(ctx, ctx.Path("TRANCATG.PS"), w => SerializeTranTypeCategories(ctx, w), HostKind.Ebcdic),
+                conditions: [new CondCode(4, CondOperator.Lt)]),
+        ]);
+
+    // =================================================================================================
     // Helpers — serialize a table to a flat fixed-width unload (for the REPRO unload primitive)
     // =================================================================================================
+
+    /// <summary>DSNTIAUL TRANSACTION_TYPE unload: TR-TYPE(2) + TR-DESCRIPTION CHAR(50) + '00000000' = 60 bytes.</summary>
+    private static void SerializeTranTypes(JobContext ctx, FixedFileWriter w)
+    {
+        System.Text.Encoding enc = HostEncoding.For(w.Host);
+        foreach (Domain.TransactionType t in new TransactionTypeRepository(ctx.Db).ReadAll())
+            w.WriteRecord(enc.GetBytes(Pad(t.TrType, 2) + Pad(t.TrDescription, 50) + "00000000"), RefExtractLen);
+    }
+
+    /// <summary>DSNTIAUL TRANSACTION_TYPE_CATEGORY unload: CODE(2)+CATEGORY(4)+CAT-DATA CHAR(50)+'0000' = 60.</summary>
+    private static void SerializeTranTypeCategories(JobContext ctx, FixedFileWriter w)
+    {
+        System.Text.Encoding enc = HostEncoding.For(w.Host);
+        foreach (Domain.TransactionTypeCategory c in new TransactionTypeCategoryRepository(ctx.Db).ReadAll())
+            w.WriteRecord(enc.GetBytes(Pad(c.TrcTypeCode, 2) + Pad(c.TrcTypeCategory, 4) + Pad(c.TrcCatData, 50) + "0000"), RefExtractLen);
+    }
+
+    /// <summary>Left-justify + space-pad (or clamp) a value to a fixed character width.</summary>
+    private static string Pad(string? s, int width)
+    {
+        s ??= "";
+        return s.Length >= width ? s[..width] : s.PadRight(width, ' ');
+    }
 
     private static void SerializeTransactions(JobContext ctx, FixedFileWriter w)
     {

@@ -396,9 +396,11 @@ public sealed class Cocrdupc : ITransactionHandler
         //      INITIALIZE CARDDEMO-COMMAREA WS-THIS-PROGCOMMAREA
         //      SET CDEMO-PGM-ENTER TO TRUE ; SET CCUP-DETAILS-NOT-FETCHED TO TRUE
         //   ELSE  copy the two segments out of DFHCOMMAREA
-        bool freshCommarea =
-            ctx.EibCalen == 0
-            || (ctx.CommArea is { } ca0 && ca0.FromProgram.TrimEnd() == LIT_MENUPGM && !ca0.IsReenter);
+        // COBOL evaluates this BEFORE the DFHCOMMAREA->CARDDEMO-COMMAREA load (ELSE at :396-400). At the IF
+        // (:388-390) CARDDEMO-COMMAREA is still the INITIALIZEd (SPACES) working-storage copy, so
+        // CDEMO-FROM-PROGRAM is blank and the second disjunct (= LIT-MENUPGM AND NOT CDEMO-PGM-REENTER) is
+        // ALWAYS FALSE — only EIBCALEN = 0 takes the INITIALIZE + SET-ENTER + SET-NOT-FETCHED path.
+        bool freshCommarea = ctx.EibCalen == 0;
 
         if (freshCommarea)
         {

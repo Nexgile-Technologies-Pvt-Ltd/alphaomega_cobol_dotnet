@@ -8,6 +8,7 @@
     <ProjectReference Include="..\CardDemo.Tooling\CardDemo.Tooling.csproj" />
     <ProjectReference Include="..\CardDemo.Batch\CardDemo.Batch.csproj" />
     <ProjectReference Include="..\CardDemo.Ims\CardDemo.Ims.csproj" />
+    <ProjectReference Include="..\CardDemo.Db2\CardDemo.Db2.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

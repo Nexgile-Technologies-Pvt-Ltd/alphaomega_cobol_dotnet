@@ -285,9 +285,13 @@ public sealed class Cocrdslc : ITransactionHandler
         //   ELSE
         //      MOVE DFHCOMMAREA(1:LEN OF CARDDEMO-COMMAREA) TO CARDDEMO-COMMAREA
         //      MOVE DFHCOMMAREA(LEN+1:LEN OF WS-THIS-PROGCOMMAREA) TO WS-THIS-PROGCOMMAREA
-        bool freshCommarea =
-            ctx.EibCalen == 0
-            || (ctx.CommArea is { } ca0 && ca0.FromProgram == PadX(LIT_MENUPGM, 8) && !ca0.IsReenter);
+        // The COBOL evaluates this test BEFORE loading DFHCOMMAREA into CARDDEMO-COMMAREA (the load is in
+        // the ELSE at :273-278). At the IF (:268-270) CARDDEMO-COMMAREA is still the INITIALIZEd (SPACES)
+        // working-storage copy, so CDEMO-FROM-PROGRAM is blank and the second disjunct
+        // (CDEMO-FROM-PROGRAM = LIT-MENUPGM AND NOT CDEMO-PGM-REENTER) is ALWAYS FALSE — only EIBCALEN = 0
+        // takes the INITIALIZE path. (Reading the PASSED FROM-PROGRAM here would wrongly wipe a carried
+        // COMMAREA on menu entry.)
+        bool freshCommarea = ctx.EibCalen == 0;
 
         if (freshCommarea)
         {

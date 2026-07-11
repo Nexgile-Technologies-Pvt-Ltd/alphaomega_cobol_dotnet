@@ -1,0 +1,14 @@
+# Build output
+bin/
+obj/
+
+# Local SQLite databases and batch output produced by running the app
+*.db
+*.db-shm
+*.db-wal
+reports/
+rejects/
+
+# IDE / user files
+.vs/
+*.user

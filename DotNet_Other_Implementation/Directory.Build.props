@@ -1,0 +1,25 @@
+<Project>
+
+  <!--
+    Shared build settings for the CardDemo .NET 10 console solution.
+    Target architecture: Documentation/09-DotNet-Target-Architecture.md.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!--
+      Keep NuGet security-audit advisories visible as warnings but do not fail the
+      build on them: the only advisory here (NU1903) is on SQLitePCLRaw, pulled in
+      transitively by EF Core's SQLite provider, with no fixed version available in
+      the EF Core 10.0.9 band. Tracked for a future provider bump.
+    -->
+    <WarningsNotAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

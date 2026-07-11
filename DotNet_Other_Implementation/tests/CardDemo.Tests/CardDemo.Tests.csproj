@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>CardDemo.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- xUnit analyzers occasionally warn on theory data shapes; do not fail the build on those. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CardDemo.Domain\CardDemo.Domain.csproj" />
+    <ProjectReference Include="..\..\src\CardDemo.Application\CardDemo.Application.csproj" />
+    <ProjectReference Include="..\..\src\CardDemo.Infrastructure\CardDemo.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\CardDemo.Console\CardDemo.Console.csproj" />
+  </ItemGroup>
+
+</Project>
